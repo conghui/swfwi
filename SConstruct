@@ -5,7 +5,6 @@
 # author: heconghui@gmail.com
 
 import os
-from nvcc import *
 
 # host compiler options
 compiler_set = 'gnu'
@@ -32,16 +31,6 @@ elif compiler_set == 'intel':
 else:
   print "Only GNU or Intel Compiler are supported now"
   Exit(-1)
-
-# cuda compiler options
-cuda_arch       = "-arch=sm_35"
-nvcc_flags      = """
-                  -m64 -dc
-                  -Xcompiler -Wall
-                  -Xcompiler -Wextra
-                  -Xcompiler -Wno-switch
-                  """.split()
-nvcc_flags     += [cuda_arch]
 
 # set up boost direcotry
 boost_root = os.environ['INSTALL_ROOT'] + '/boost/'
@@ -100,26 +89,6 @@ env = Environment(CC      = c_compiler,
                   LIBS    = libs,
                   ENV     = os.environ)
 
-# cuda environment
-cuda_cc     = 'nvcc'
-nvccPath    = which(cuda_cc)
-cudaRoot    = nvccPath[:-len(cuda_cc + 'bin/')];
-cudaInclude = [cudaRoot + 'include']
-cudaLibPath = [cudaRoot + 'lib64']
-cudaenv     = Environment()
-cudaenv.Tool(cuda_cc, toolpath='./nvcc.py')
-cudaenv.Replace(RANLIBCOM = '')
-cudaenv.Append(LIBPATH = cudaLibPath)
-cudaenv.Replace(ARCOM = cuda_cc + " " + cuda_arch +
-                        ' -dlink  -o $TARGET $SOURCES')
-cudaenv.Append(CPPPATH = cudaInclude + [cudaRoot + "/samples/common/inc/"])
-
-if int(is_debug_mode):
-  cudaenv.Append(NVCCFLAGS = debug_flags + ["-G"])
-else:
-  cudaenv.Append(NVCCFLAGS = optimize_flags)
-cudaenv.Append(NVCCFLAGS = nvcc_flags)
-
 # compile
 for d in dirlist:
   if not "src/" in d[1]:
@@ -128,10 +97,5 @@ for d in dirlist:
   SConscript(d[1] + "/SConscript",
              variant_dir = d[1].replace('src', 'build'),
              duplicate = 0,
-             exports = "env dirs cudaenv")
+             exports = "env dirs")
 
-# remove compiled python files
-python_file_list = ["nvcc.pyc"]
-for f in python_file_list:
-  if os.path.isfile(f):
-    os.remove(f)
