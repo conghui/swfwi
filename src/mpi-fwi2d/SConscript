@@ -1,14 +1,13 @@
 import os
 Import('*')
 
-bin_list = [("mpifwi", "mpifwi2d.cpp"),
+bin_list = [("mpifwi", "main-mpi-fwi2d.cpp"),
 
            ]
 
 lib = 'mpifwi'
 
 modules = """
-mpi-global-params.cpp
           """.split()
 
 include_dir = [

@@ -6,6 +6,7 @@ lib = "common"
 lib_modules = """
 			  common.cpp
 			  ricker-wavelet.cpp
+			  global-params.cpp
               """.split()
 
 extra_include_dir = [

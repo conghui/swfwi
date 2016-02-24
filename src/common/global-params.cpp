@@ -5,13 +5,14 @@
  *      Author: rice
  */
 
+#include "global-params.h"
+
 #include <mpi.h>
 #include <cmath>
-#include "mpi-global-params.h"
 
-MpiGlobalParams *MpiGlobalParams::ins = NULL;
+GlobalParams *GlobalParams::ins = NULL;
 
-MpiGlobalParams::MpiGlobalParams() {
+GlobalParams::GlobalParams() {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -26,14 +27,14 @@ MpiGlobalParams::MpiGlobalParams() {
   }
 }
 
-MpiGlobalParams::~MpiGlobalParams() {
+GlobalParams::~GlobalParams() {
   sf_close();
   delete ins;
 }
 
-MpiGlobalParams& MpiGlobalParams::instance() {
+GlobalParams& GlobalParams::instance() {
   if (ins == NULL) {
-    ins = new MpiGlobalParams();
+    ins = new GlobalParams();
     ins->getInputParams();
     ins->check();
     ins->putOutputParams();
@@ -43,7 +44,7 @@ MpiGlobalParams& MpiGlobalParams::instance() {
   return *ins;
 }
 
-void MpiGlobalParams::getInputParams() {
+void GlobalParams::getInputParams() {
   /* get parameters from velocity model and recorded shots */
    if (!sf_getbool("verb", &verb)) {
      verb = true;  /* vebosity */
@@ -138,7 +139,7 @@ void MpiGlobalParams::getInputParams() {
 //   printf("in file is: %s\n", filename);
 }
 
-void MpiGlobalParams::putOutputParams() {
+void GlobalParams::putOutputParams() {
   int rank;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -178,7 +179,7 @@ void MpiGlobalParams::putOutputParams() {
   }
 }
 
-void MpiGlobalParams::check() {
+void GlobalParams::check() {
   if (!(sxbeg >= 0 && szbeg >= 0 && sxbeg + (ns - 1)*jsx < nx && szbeg + (ns - 1)*jsz < nz)) {
     sf_warning("sources exceeds the computing zone!\n");
     exit(1);
@@ -191,7 +192,7 @@ void MpiGlobalParams::check() {
 
 }
 
-void MpiGlobalParams::calVars() {
+void GlobalParams::calVars() {
   MPI_Comm_size(MPI_COMM_WORLD, &numProc);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 

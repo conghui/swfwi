@@ -2,14 +2,13 @@ import os
 Import('*')
 
 bin_list = [
-			("fwi", "fwi2d.cpp")
+			("fwi", "main-serial-fwi2d.cpp")
 
            ]
 
 lib = 'fwi'
 
 modules = """
-global-params.cpp
           """.split()
 
 include_dir = [

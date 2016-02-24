@@ -1,3 +1,4 @@
+
 /* Time domain full waveform inversion
 Note: This serial FWI is merely designed to help the understanding of
 beginners. Enquist absorbing boundary condition (A2) is applied!
@@ -53,9 +54,10 @@ extern "C"
 
 #include <boost/timer/timer.hpp>
 #include "logger.h"
-#include "mpi-global-params.h"
+#include "global-params.h"
 #include "common.h"
 #include "ricker-wavelet.h"
+#include "cycle-swap.h"
 
 void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm) {
   int rank;
@@ -69,7 +71,7 @@ void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, in
 }
 
 
-float cal_obj_derr_illum_grad(const MpiGlobalParams &params,
+float cal_obj_derr_illum_grad(const GlobalParams &params,
     float *derr,  /* output */
     float *illum, /* output */
     float *g1,    /* output */
@@ -78,10 +80,6 @@ float cal_obj_derr_illum_grad(const MpiGlobalParams &params,
     const int *sxz,
     const int *gxz)
 {
-  int size, rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-
   std::vector<float> trans(params.ng * params.nt);
   std::vector<float> dobs(params.ng * params.nt);
   std::vector<float> bndr(params.nt * (2 * params.nz + params.nx), 0); /* boundaries for wavefield reconstruction */
@@ -98,7 +96,7 @@ float cal_obj_derr_illum_grad(const MpiGlobalParams &params,
   float dtx = params.dt / params.dx;
   float dtz = params.dt / params.dz;
 
-  for (int is = rank, ik = 0; is < params.ns; is += size, ik++) {
+  for (int is = 0; is < params.ns; is++) {
     sf_floatread(&trans[0], params.ng * params.nt, params.shots); /* Read local portion of input data */
     matrix_transpose(&trans[0], &dobs[0], params.nt, params.ng);
 
@@ -109,13 +107,12 @@ float cal_obj_derr_illum_grad(const MpiGlobalParams &params,
       step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
 
       // cycle swap
-      std::swap(sp0, sp1);
-      std::swap(sp1, sp2);
+      cycleSwap(sp0, sp1, sp2);
 
       rw_bndr(&bndr[it * (2 * params.nz + params.nx)], &sp0[0], params.nz, params.nx, true);
 
       record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      cal_residuals(&dcal[0], &dobs[it * params.ng], &derr[ik * params.ng * params.nt + it * params.ng], params.ng);
+      cal_residuals(&dcal[0], &dobs[it * params.ng], &derr[is * params.ng * params.nt + it * params.ng], params.ng);
     }
 
     std::swap(sp0, sp1);
@@ -128,28 +125,23 @@ float cal_obj_derr_illum_grad(const MpiGlobalParams &params,
       step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
       add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, false);
 
-      add_source(&gp1[0], &derr[ik * params.ng * params.nt + it * params.ng], gxz, params.ng, params.nz, true);
+      add_source(&gp1[0], &derr[is * params.ng * params.nt + it * params.ng], gxz, params.ng, params.nz, true);
       step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, params.nz, params.nx);
 
       cal_gradient(&g1[0], &lap[0], &gp1[0], params.nz, params.nx);
 
-      std::swap(sp0, sp1);
-      std::swap(sp1, sp2);
-
-      std::swap(gp0, gp1);
-      std::swap(gp1, gp2);
+      cycleSwap(sp0, sp1, sp2);
+      cycleSwap(gp0, gp1, gp2);
     }
-
-    sf_seek(params.shots, params.nt * params.ng * (size - 1)*sizeof(float), SEEK_CUR); /* Move on to the next portion */
 
   } /// output: derr, g1, illum
 
-  float obj = cal_objective(&derr[0], params.ng * params.nt * params.nk);
+  float obj = cal_objective(&derr[0], params.ng * params.nt * params.ns);
 
   return obj;
 }
 
-float calVelUpdateStepLen(const MpiGlobalParams &params,
+float calVelUpdateStepLen(const GlobalParams &params,
     const float *vtmp,
     const float *wlt,
     const int *sxz,
@@ -158,10 +150,6 @@ float calVelUpdateStepLen(const MpiGlobalParams &params,
     float epsil
     )
 {
-  int size, rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-
   std::vector<float> trans(params.ng * params.nt);
   std::vector<float> dobs(params.ng * params.nt);
   std::vector<float> dcal(params.ng, 0); /* calculated/synthetic seismic data */
@@ -174,7 +162,7 @@ float calVelUpdateStepLen(const MpiGlobalParams &params,
 
   float dtx = params.dt / params.dx;
   float dtz = params.dt / params.dz;
-  for (int is = rank, ik = 0; is < params.ns; is+= size, ik++) {
+  for (int is = 0; is < params.ns; is++) {
     sf_floatread(&trans[0], params.ng * params.nt, params.shots);
     matrix_transpose(&trans[0], &dobs[0], params.nt, params.ng);
 
@@ -188,9 +176,8 @@ float calVelUpdateStepLen(const MpiGlobalParams &params,
       std::swap(sp1, sp2);
 
       record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[it * params.ng], &derr[ik * params.ng * params.nt + it * params.ng], params.ng);
+      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[it * params.ng], &derr[is * params.ng * params.nt + it * params.ng], params.ng);
     }
-    sf_seek(params.shots, params.nt * params.ng * (size - 1)*sizeof(float), SEEK_CUR); /* Move on to the next portion */
   }
 
 
@@ -213,14 +200,9 @@ int main(int argc, char *argv[]) {
   /* initialize Madagascar */
   sf_init(argc, argv);
 
-  int size;
-  int rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);/* how many nodes */
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);/* who am I? */
+  Logger::instance().init("serial-fwi");
 
-  Logger::instance().init("mpi-fwi", boost::log::trivial::debug, Logger::NO_TIMESTAMP, rank);
-
-  MpiGlobalParams &params = MpiGlobalParams::instance();
+  GlobalParams &params = GlobalParams::instance();
 
   // how many groups of MPI chunk
   INFO() << format("each process should process %d shots") % params.nk;
@@ -246,44 +228,36 @@ int main(int argc, char *argv[]) {
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
-    sf_seek(params.shots, rank * params.nt * params.ng * sizeof(float), SEEK_SET);
+    sf_seek(params.shots, 0, SEEK_SET);
 
     /**
      * calculate local objective function & derr & illum & g1(gradient)
      */
     float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &vv[0], &wlt[0], &sxz[0], &gxz[0]);
 
-    /* MPI reduce */
-    MpiInplaceReduce(&obj, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MpiInplaceReduce(&g1[0], params.nz * params.nx, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MpiInplaceReduce(&illum[0], params.nz * params.nx, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
 
     float epsil = 0;
     float beta = 0;
-    if (rank == 0) {
-      scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
-      sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
-      bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
-      bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
-      sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
+    scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
+    sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
+    bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
+    bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
+    sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
 
-      beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
+    beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
 
-      cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
-      epsil = cal_epsilon(&vv[0], &cg[0], params.nz, params.nx);
-      cal_vtmp(&vtmp[0], &vv[0], &cg[0], epsil, params.nz, params.nx);
+    cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
+    epsil = cal_epsilon(&vv[0], &cg[0], params.nz, params.nx);
+    cal_vtmp(&vtmp[0], &vv[0], &cg[0], epsil, params.nz, params.nx);
 
-      std::swap(g1, g0); // let g0 be the previous gradient
-    }
+    std::swap(g1, g0); // let g0 be the previous gradient
 
-    sf_seek(params.shots, rank * params.nt * params.ng * sizeof(float), SEEK_SET);
+    sf_seek(params.shots, 0, SEEK_SET);
     MPI_Bcast(&vtmp[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     float alpha = calVelUpdateStepLen(params, &vtmp[0], &wlt[0], &sxz[0], &gxz[0], &derr[0], epsil);
 
-    if (rank == 0) {
       update_vel(&vv[0], &cg[0], alpha, params.nz, params.nx);
 
       sf_floatwrite(&vv[0], params.nz * params.nx, params.vupdates);
@@ -291,14 +265,11 @@ int main(int argc, char *argv[]) {
       // output important information at each FWI iteration
       INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
       INFO() << timer.format(2);
-    } // end of rank 0
 
     MPI_Bcast(&vv[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
   } /// end of iteration
 
-  if (rank == 0) {
-    sf_floatwrite(&objval[0], params.niter, params.objs);
-  }
+  sf_floatwrite(&objval[0], params.niter, params.objs);
 
   sf_close();
   MPI_Finalize();

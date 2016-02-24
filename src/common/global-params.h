@@ -1,12 +1,12 @@
 /*
- * global-params.h
+ * mpi-global-params.h
  *
- *  Created on: Feb 23, 2016
+ *  Created on: Feb 24, 2016
  *      Author: rice
  */
 
-#ifndef SRC_FWI_GLOBAL_PARAMS_H_
-#define SRC_FWI_GLOBAL_PARAMS_H_
+#ifndef SRC_MPIFWI_GLOBAL_PARAMS_H_
+#define SRC_MPIFWI_GLOBAL_PARAMS_H_
 
 extern "C"
 {
@@ -24,6 +24,8 @@ private:
   ~GlobalParams();
   void getInputParams();
   void putOutputParams();
+  void check();
+  void calVars();
 
 private:
   static GlobalParams *ins;
@@ -58,6 +60,10 @@ public:
   int jgx;
   int jgz;
   int csd;
-};
 
-#endif /* SRC_FWI_GLOBAL_PARAMS_H_ */
+public: // calculated
+  int nk; // # of shots for each process
+  int numProc; // total number of MPI process
+  int rank;    // current process
+};
+#endif /* SRC_MPIFWI_GLOBAL_PARAMS_H_ */
