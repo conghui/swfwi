@@ -11,9 +11,6 @@
 
 void matrix_transpose(float *matrix, float *trans, int n1, int n2);
 void step_forward(const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
-//void step_forward(float **p0, float **p1, float **p2, float **vv, float dtz, float dtx, int nz, int nx);
-
-//void step_backward(float **illum, float **lap, float **p0, float **p1, float **p2, float **vv, float dtz, float dtx, int nz, int nx);
 void step_backward(float *illum, float *lap, const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
 
 void add_source(float *p, const float *source, const int *sxz, int ns, int nz, bool add);
