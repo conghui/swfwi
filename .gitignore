@@ -1,0 +1,7 @@
+.deps
+*.o
+bin/
+build/
+.sconsign.dblite
+lib/
+*.log

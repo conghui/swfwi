@@ -1,0 +1,41 @@
+import os
+Import('*')
+
+bin_list = [
+			("fwi", "fwi2d.cpp")
+
+           ]
+
+lib = 'fwi'
+
+modules = """
+global-params.cpp
+          """.split()
+
+include_dir = [
+  os.environ['RSFROOT'] + '/include',
+  '#' + dirs['util'],
+  '#' + dirs['common'],
+]
+
+depend_libpath = [os.environ['RSFROOT'] + '/lib']
+depend_libs = ['rsf', 'util', 'common']
+
+# clone the environment from global env and make some modification of it
+myenv   = env.Clone(CPPPATH = include_dir)
+myenv.Append(LIBPATH = depend_libpath)
+myenv.Append(CXXFLAGS = '-DNO_BLAS')
+myenv.Append(LIBS = depend_libs)
+
+objs      = myenv.StaticObject(modules)
+
+# compile the library
+ar = myenv.StaticLibrary(target = lib, source = objs)
+
+# install
+myenv.Install("#" + dirs['lib'], ar)
+# compile each binary
+for bin in bin_list:
+  bin_obj = myenv.StaticObject(bin[1])
+  bin_target = myenv.Program(target = bin[0], source = bin_obj + ar)
+  myenv.Install("#" + dirs['bin'], bin_target)

@@ -1,0 +1,137 @@
+# usage:
+# scons [-j n]: compile in release mode
+# scons debug=1 [-j n]: compile in debug mode
+#
+# author: heconghui@gmail.com
+
+import os
+from nvcc import *
+
+# host compiler options
+compiler_set = 'gnu'
+if compiler_set == 'gnu':
+  c_compiler      = ["mpicc",  "-cc=gcc",  "-fopenmp"]
+  cxx_compiler    = ["mpicxx", "-cxx=g++", "-fopenmp"]
+  linker          = cxx_compiler
+  warn_flags      = ["-Wall", "-Wextra", "-Wno-write-strings"]
+  optimize_flags  = ["-O2"]
+  debug_flags     = ["-O0", "-g"]
+  other_flags     = ["-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  link_flags      = ["-O1"]
+
+elif compiler_set == 'intel':
+  c_compiler      = ["mpicc",  "-cc=icc",   "-openmp", "-mkl"]
+  cxx_compiler    = ["mpicxx", "-cxx=icpc", "-openmp", "-mkl"]
+  linker          = cxx_compiler
+  warn_flags      = ["-Wall"]
+  optimize_flags  = ["-O2"]
+  debug_flags     = ["-O0", "-g"]
+  other_flags     = ["-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  link_flags      = ["-O1"]
+
+else:
+  print "Only GNU or Intel Compiler are supported now"
+  Exit(-1)
+
+# cuda compiler options
+cuda_arch       = "-arch=sm_35"
+nvcc_flags      = """
+                  -m64 -dc
+                  -Xcompiler -Wall
+                  -Xcompiler -Wextra
+                  -Xcompiler -Wno-switch
+                  """.split()
+nvcc_flags     += [cuda_arch]
+
+# set up boost direcotry
+boost_root = os.environ['INSTALL_ROOT'] + '/boost/'
+boost_inc = boost_root + 'include'
+boost_lib = boost_root + 'lib'
+
+mkl_root = os.environ['INSTALL_ROOT'] + '/intel/mkl/'
+mkl_inc = mkl_root + 'include'
+mkl_lib = mkl_root + 'lib/intel64'
+
+fftw_inc = mkl_inc + '/fftw'
+
+mkl_root = os.environ['INSTALL_ROOT'] + '/softs/install/intel/mkl/'
+
+# set the sub directories (key, value), where value is the name of directory
+# please make sure the source code are in src subdirectory
+dirlist = [
+   ('lib', 'lib'),
+   ('bin', 'bin'),
+   ('fwi', 'src/fwi'),
+   ('mpifwi', 'src/mpifwi'),
+   ('common', 'src/common'),
+   ('util', 'src/util')
+]
+dirs = dict(dirlist)
+
+# normally, you don't need to modify from the line below
+# ---------------------------------------------------------------------- #
+is_debug_mode = ARGUMENTS.get('debug', 0)
+if int(is_debug_mode):
+  print "Debug mode"
+  cur_cflags = debug_flags + warn_flags + other_flags
+else:
+  print "Release mode"
+  cur_cflags = optimize_flags + warn_flags + other_flags
+
+# add boost include_dir and lib dir
+cur_cflags += ["-isystem", boost_inc, "-isystem", fftw_inc]
+libpath     = ["#" + dirs['lib'], boost_lib]
+libs        = ["boost_system",    "boost_filesystem",     "boost_thread",
+               "boost_date_time", "boost_chrono",         "boost_log_setup",
+               "boost_log",       "boost_program_options","boost_timer"]
+
+# add additional includes and libs for gnu compiler
+if compiler_set == 'gnu':
+  cur_cflags += ["-isystem", mkl_inc]
+  libpath    += [mkl_lib]
+  libs       += ["mkl_intel_lp64", "mkl_core", "mkl_gnu_thread"]
+
+# setup environment
+env = Environment(CC      = c_compiler,
+                  CXX     = cxx_compiler,
+                  LINK    = linker + link_flags,
+                  CCFLAGS = cur_cflags,
+                  LIBPATH = libpath,
+                  LIBS    = libs,
+                  ENV     = os.environ)
+
+# cuda environment
+cuda_cc     = 'nvcc'
+nvccPath    = which(cuda_cc)
+cudaRoot    = nvccPath[:-len(cuda_cc + 'bin/')];
+cudaInclude = [cudaRoot + 'include']
+cudaLibPath = [cudaRoot + 'lib64']
+cudaenv     = Environment()
+cudaenv.Tool(cuda_cc, toolpath='./nvcc.py')
+cudaenv.Replace(RANLIBCOM = '')
+cudaenv.Append(LIBPATH = cudaLibPath)
+cudaenv.Replace(ARCOM = cuda_cc + " " + cuda_arch +
+                        ' -dlink  -o $TARGET $SOURCES')
+cudaenv.Append(CPPPATH = cudaInclude + [cudaRoot + "/samples/common/inc/"])
+
+if int(is_debug_mode):
+  cudaenv.Append(NVCCFLAGS = debug_flags + ["-G"])
+else:
+  cudaenv.Append(NVCCFLAGS = optimize_flags)
+cudaenv.Append(NVCCFLAGS = nvcc_flags)
+
+# compile
+for d in dirlist:
+  if not "src/" in d[1]:
+    continue
+
+  SConscript(d[1] + "/SConscript",
+             variant_dir = d[1].replace('src', 'build'),
+             duplicate = 0,
+             exports = "env dirs cudaenv")
+
+# remove compiled python files
+python_file_list = ["nvcc.pyc"]
+for f in python_file_list:
+  if os.path.isfile(f):
+    os.remove(f)
