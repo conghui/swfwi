@@ -20,7 +20,7 @@ void sg_init(int *sxz, int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
 
 void rw_bndr(float *bndr, float *p, int nz, int nx, bool write);
 
-void cal_residuals(float *dcal, float *dobs, float *dres, int ng);
+void cal_residuals(const float *dcal, const float *dobs, float *dres, int ng);
 
 
 void cal_gradient(float *grad, const float *lap, const float *gp, int nz, int nx);

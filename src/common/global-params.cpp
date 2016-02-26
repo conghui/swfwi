@@ -132,11 +132,10 @@ void GlobalParams::getInputParams() {
    }
    /* default, common shot-gather; if n, record at every point*/
 
-//   char *filename;
-//   if (!(filename = sf_histstring(shots, "in"))) {
-//     sf_error("in or not required");
-//   }
-//   printf("in file is: %s\n", filename);
+   /* filename of the shot data */
+   if (!(obsDataFileName = sf_histstring(shots, "in"))) {
+     sf_error("in or not required");
+   }
 }
 
 void GlobalParams::putOutputParams() {

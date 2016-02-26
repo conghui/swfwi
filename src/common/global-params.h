@@ -65,5 +65,6 @@ public: // calculated
   int nk; // # of shots for each process
   int numProc; // total number of MPI process
   int rank;    // current process
+  const char *obsDataFileName;
 };
 #endif /* SRC_MPIFWI_GLOBAL_PARAMS_H_ */

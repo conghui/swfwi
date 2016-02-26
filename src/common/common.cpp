@@ -183,7 +183,7 @@ void rw_bndr(float *bndr, float *p, int nz, int nx, bool write)
   }
 }
 
-void cal_residuals(float *dcal, float *dobs, float *dres, int ng)
+void cal_residuals(const float *dcal, const float *dobs, float *dres, int ng)
 /*< calculate residual >*/
 {
   for (int ig = 0; ig < ng; ig++) {
