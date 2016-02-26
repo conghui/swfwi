@@ -134,8 +134,9 @@ void GlobalParams::getInputParams() {
 
    /* filename of the shot data */
    if (!(obsDataFileName = sf_histstring(shots, "in"))) {
-     sf_error("in or not required");
+     sf_error("cannot find observed data file path");
    }
+
 }
 
 void GlobalParams::putOutputParams() {

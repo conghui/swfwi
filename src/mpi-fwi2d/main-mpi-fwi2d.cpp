@@ -190,6 +190,21 @@ float calVelUpdateStepLen(const GlobalParams &params,
   return alpha;
 }
 
+void readVelocity(const GlobalParams &params, std::vector<float> &vv) {
+  if (params.rank == 0) {
+    INFO() << format("rank %d is reading velocity") % params.rank;
+    sf_floatread(&vv[0], params.nz * params.nx, params.vinit);
+  }
+
+  // broadcast the velocity
+  if (params.rank == 0) {
+    INFO() << format("rank %d is broadcasting velocity") % params.rank;
+  }
+
+  MPI_Bcast(&vv[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
+}
+
+
 void readObserveData(const GlobalParams &params, std::vector<float> &dobs) {
   MPI_File fh;
   int rank = params.rank;
@@ -218,7 +233,6 @@ void readObserveData(const GlobalParams &params, std::vector<float> &dobs) {
     MPI_Status status;
 
     MPI_File_read(fh, &trans[0], trans.size(), MPI_FLOAT, &status);
-    DEBUG() << format("mpi: is %d, sum_trans %f") % is % sum(trans);
     matrix_transpose(&trans[0], &dobs[k * trans.size()], params.nt, params.ng);
 
     MPI_File_seek(fh, params.nt * params.ng * (params.numProc - 1) * sizeof(float), MPI_SEEK_CUR);
@@ -233,12 +247,11 @@ int main(int argc, char *argv[]) {
   /* initialize Madagascar */
   sf_init(argc, argv);
 
-  int size;
   int rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);/* how many nodes */
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);/* who am I? */
 
-  Logger::instance().init("mpi-fwi", boost::log::trivial::debug, Logger::NO_TIMESTAMP, rank);
+//  Logger::instance().init("mpi-fwi", boost::log::trivial::debug, Logger::NO_TIMESTAMP, rank);
+  Logger::instance().init("mpi-fwi");
 
   GlobalParams &params = GlobalParams::instance();
 
@@ -255,11 +268,11 @@ int main(int argc, char *argv[]) {
   std::vector<float> objval(params.niter, 0); /* objective/misfit function */
 
   /* initialize varibles */
-  sf_floatread(&vv[0], params.nz * params.nx, params.vinit);
   rickerWavelet(&wlt[0], params.nt, params.fm, params.dt);
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
+  readVelocity(params, vv);
   readObserveData(params, dobs);
 
   float obj0 = 0;
