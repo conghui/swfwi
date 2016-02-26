@@ -58,6 +58,7 @@ extern "C"
 #include "common.h"
 #include "ricker-wavelet.h"
 #include "cycle-swap.h"
+#include "sum.h"
 
 void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm) {
   int rank;
@@ -193,7 +194,6 @@ float calVelUpdateStepLen(const GlobalParams &params,
 }
 
 
-
 int main(int argc, char *argv[]) {
   MPI_Init (&argc, &argv);
 
@@ -245,6 +245,7 @@ int main(int argc, char *argv[]) {
     bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
     sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
 
+    DEBUG() << format("before beta: sum_g0: %f, sum_g1: %f, sum_cg: %f") % sum(g0) % sum(g1) % sum(cg);
     beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
 
     cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);

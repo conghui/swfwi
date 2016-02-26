@@ -58,6 +58,7 @@ extern "C"
 #include "common.h"
 #include "ricker-wavelet.h"
 #include "cycle-swap.h"
+#include "sum.h"
 
 void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm) {
   int rank;
@@ -224,16 +225,12 @@ int main(int argc, char *argv[]) {
   INFO() << format("each process should process %d shots") % params.nk;
 
   std::vector<float> vv(params.nz * params.nx, 0);    /* updated velocity */
-  std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
-  std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
-  std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
   std::vector<float> cg(params.nz * params.nx, 0);    /* conjugate gradient */
-  std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
+  std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
   std::vector<float> wlt(params.nt); /* ricker wavelet */
   std::vector<int> sxz(params.ns); /* source positions */
   std::vector<int> gxz(params.ng); /* geophone positions */
   std::vector<float> objval(params.niter, 0); /* objective/misfit function */
-  std::vector<float> derr(params.nk * params.ng * params.nt, 0); /* residual/error between synthetic and observation */
 
   /* initialize varibles */
   sf_floatread(&vv[0], params.nz * params.nx, params.vinit);
@@ -244,6 +241,11 @@ int main(int argc, char *argv[]) {
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
+    std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
+    std::vector<float> derr(params.nk * params.ng * params.nt, 0); /* residual/error between synthetic and observation */
+    std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
+    std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
+
     sf_seek(params.shots, rank * params.nt * params.ng * sizeof(float), SEEK_SET);
 
     /**
@@ -261,12 +263,14 @@ int main(int argc, char *argv[]) {
     float epsil = 0;
     float beta = 0;
     if (rank == 0) {
-      scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
       sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
+
+      scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
       bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
       bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
       sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
 
+      DEBUG() << format("before beta: sum_g0: %f, sum_g1: %f, sum_cg: %f") % sum(g0) % sum(g1) % sum(cg);
       beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
 
       cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
@@ -274,6 +278,7 @@ int main(int argc, char *argv[]) {
       cal_vtmp(&vtmp[0], &vv[0], &cg[0], epsil, params.nz, params.nx);
 
       std::swap(g1, g0); // let g0 be the previous gradient
+
     }
 
     sf_seek(params.shots, rank * params.nt * params.ng * sizeof(float), SEEK_SET);
