@@ -1,18 +1,19 @@
 /*
- * mpi-global-params.cpp
+ * fwi-params.cpp
  *
- *  Created on: Feb 24, 2016
+ *  Created on: Feb 27, 2016
  *      Author: rice
  */
 
-#include "global-params.h"
+#include "fwi-params.h"
+
 
 #include <mpi.h>
 #include <cmath>
 
-GlobalParams *GlobalParams::ins = NULL;
+FwiParams *FwiParams::ins = NULL;
 
-GlobalParams::GlobalParams() {
+FwiParams::FwiParams() {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -27,14 +28,14 @@ GlobalParams::GlobalParams() {
   }
 }
 
-GlobalParams::~GlobalParams() {
+FwiParams::~FwiParams() {
   sf_close();
   delete ins;
 }
 
-GlobalParams& GlobalParams::instance() {
+FwiParams& FwiParams::instance() {
   if (ins == NULL) {
-    ins = new GlobalParams();
+    ins = new FwiParams();
     ins->getInputParams();
     ins->check();
     ins->putOutputParams();
@@ -44,7 +45,7 @@ GlobalParams& GlobalParams::instance() {
   return *ins;
 }
 
-void GlobalParams::getInputParams() {
+void FwiParams::getInputParams() {
   /* get parameters from velocity model and recorded shots */
    if (!sf_getbool("verb", &verb)) {
      verb = true;  /* vebosity */
@@ -139,7 +140,7 @@ void GlobalParams::getInputParams() {
 
 }
 
-void GlobalParams::putOutputParams() {
+void FwiParams::putOutputParams() {
   int rank;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -179,7 +180,7 @@ void GlobalParams::putOutputParams() {
   }
 }
 
-void GlobalParams::check() {
+void FwiParams::check() {
   if (!(sxbeg >= 0 && szbeg >= 0 && sxbeg + (ns - 1)*jsx < nx && szbeg + (ns - 1)*jsz < nz)) {
     sf_warning("sources exceeds the computing zone!\n");
     exit(1);
@@ -192,7 +193,7 @@ void GlobalParams::check() {
 
 }
 
-void GlobalParams::calVars() {
+void FwiParams::calVars() {
   MPI_Comm_size(MPI_COMM_WORLD, &numProc);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 

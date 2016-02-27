@@ -8,6 +8,7 @@ bin_list = [("mpifwi", "main-mpi-fwi2d.cpp"),
 lib = 'mpifwi'
 
 modules = """
+mpi-fwi-params.cpp
           """.split()
 
 include_dir = [

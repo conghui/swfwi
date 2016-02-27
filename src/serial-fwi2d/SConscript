@@ -9,6 +9,7 @@ bin_list = [
 lib = 'fwi'
 
 modules = """
+fwi-params.cpp
           """.split()
 
 include_dir = [

@@ -1,34 +1,34 @@
 /*
- * mpi-global-params.h
+ * mpi-fwi-params.h
  *
- *  Created on: Feb 24, 2016
+ *  Created on: Feb 26, 2016
  *      Author: rice
  */
 
-#ifndef SRC_MPIFWI_GLOBAL_PARAMS_H_
-#define SRC_MPIFWI_GLOBAL_PARAMS_H_
+#ifndef SRC_MPI_FWI2D_MPI_FWI_PARAMS_H_
+#define SRC_MPI_FWI2D_MPI_FWI_PARAMS_H_
 
 extern "C"
 {
 #include <rsf.h>
 }
 
-class GlobalParams {
+class MpiFwiParams {
 public:
-  static GlobalParams &instance();
+  static MpiFwiParams &instance();
 
 private:
-  GlobalParams();
-  GlobalParams(const GlobalParams &);
-  void operator=(const GlobalParams &);
-  ~GlobalParams();
+  MpiFwiParams();
+  MpiFwiParams(const MpiFwiParams &);
+  void operator=(const MpiFwiParams &);
+  ~MpiFwiParams();
   void getInputParams();
   void putOutputParams();
   void check();
   void calVars();
 
 private:
-  static GlobalParams *ins;
+  static MpiFwiParams *ins;
 
 public:
   sf_file vinit;        /* initial velocity model, unit=m/s */
@@ -67,4 +67,5 @@ public: // calculated
   int rank;    // current process
   const char *obsDataFileName;
 };
-#endif /* SRC_MPIFWI_GLOBAL_PARAMS_H_ */
+
+#endif /* SRC_MPI_FWI2D_MPI_FWI_PARAMS_H_ */

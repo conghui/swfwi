@@ -6,11 +6,14 @@ lib = "common"
 lib_modules = """
 			  common.cpp
 			  ricker-wavelet.cpp
-			  global-params.cpp
+			  mpi-utility.cpp
+			  sf-velocity-reader.cpp
+			  shotdata-reader.cpp
               """.split()
 
 extra_include_dir = [
   os.environ['RSFROOT'] + '/include',
+  "#" + dirs['util']
 ]
 
 ############################### for library ###########################

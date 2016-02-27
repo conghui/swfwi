@@ -54,25 +54,16 @@ extern "C"
 
 #include <boost/timer/timer.hpp>
 #include "logger.h"
-#include "global-params.h"
+#include "mpi-fwi-params.h"
 #include "common.h"
 #include "ricker-wavelet.h"
 #include "cycle-swap.h"
 #include "sum.h"
+#include "mpi-utility.h"
+#include "sf-velocity-reader.h"
+#include "shotdata-reader.h"
 
-void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm) {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  if (rank == 0) {
-    MPI_Reduce(MPI_IN_PLACE, buf, count, datatype, op, root, comm);
-  } else {
-    MPI_Reduce(buf, NULL, count, datatype, op, root, comm);
-  }
-}
-
-
-float cal_obj_derr_illum_grad(const GlobalParams &params,
+float cal_obj_derr_illum_grad(const MpiFwiParams &params,
     float *derr,  /* output */
     float *illum, /* output */
     float *g1,    /* output */
@@ -84,34 +75,43 @@ float cal_obj_derr_illum_grad(const GlobalParams &params,
 {
   int size = params.numProc;
   int rank = params.rank;
+  int nt = params.nt;
+  int nz = params.nz;
+  int nx = params.nx;
+  int ng = params.ng;
+  int ns = params.ns;
+  int nk = params.nk;
+  float dt = params.dt;
+  float dx = params.dx;
+  float dz = params.dz;
 
-  std::vector<float> bndr(params.nt * (2 * params.nz + params.nx), 0); /* boundaries for wavefield reconstruction */
-  std::vector<float> dcal(params.ng, 0); /* calculated/synthetic seismic data */
+  std::vector<float> bndr(nt * (2 * nz + nx), 0); /* boundaries for wavefield reconstruction */
+  std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
 
-  std::vector<float> sp0(params.nz * params.nx); /* source wavefield p0 */
-  std::vector<float> sp1(params.nz * params.nx); /* source wavefield p1 */
-  std::vector<float> sp2(params.nz * params.nx); /* source wavefield p2 */
-  std::vector<float> gp0(params.nz * params.nx); /* geophone/receiver wavefield p0 */
-  std::vector<float> gp1(params.nz * params.nx); /* geophone/receiver wavefield p1 */
-  std::vector<float> gp2(params.nz * params.nx); /* geophone/receiver wavefield p2 */
-  std::vector<float> lap(params.nz * params.nx); /* laplace of the source wavefield */
+  std::vector<float> sp0(nz * nx); /* source wavefield p0 */
+  std::vector<float> sp1(nz * nx); /* source wavefield p1 */
+  std::vector<float> sp2(nz * nx); /* source wavefield p2 */
+  std::vector<float> gp0(nz * nx); /* geophone/receiver wavefield p0 */
+  std::vector<float> gp1(nz * nx); /* geophone/receiver wavefield p1 */
+  std::vector<float> gp2(nz * nx); /* geophone/receiver wavefield p2 */
+  std::vector<float> lap(nz * nx); /* laplace of the source wavefield */
 
-  float dtx = params.dt / params.dx;
-  float dtz = params.dt / params.dz;
+  float dtx = dt / dx;
+  float dtz = dt / dz;
 
-  for (int is = rank, ik = 0; is < params.ns; is += size, ik++) {
+  for (int is = rank, ik = 0; is < ns; is += size, ik++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
-    for (int it = 0; it < params.nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
+    for (int it = 0; it < nt; it++) {
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
       // cycle swap
       cycleSwap(sp0, sp1, sp2);
 
-      rw_bndr(&bndr[it * (2 * params.nz + params.nx)], &sp0[0], params.nz, params.nx, true);
+      rw_bndr(&bndr[it * (2 * nz + nx)], &sp0[0], nz, nx, true);
 
-      record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      cal_residuals(&dcal[0], &dobs[ik * params.nt * params.ng + it * params.ng], &derr[ik * params.ng * params.nt + it * params.ng], params.ng);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      cal_residuals(&dcal[0], &dobs[ik * nt * ng + it * ng], &derr[ik * ng * nt + it * ng], ng);
     }
 
     std::swap(sp0, sp1);
@@ -119,15 +119,15 @@ float cal_obj_derr_illum_grad(const GlobalParams &params,
     std::fill(gp0.begin(), gp0.end(), 0);
     std::fill(gp1.begin(), gp1.end(), 0);
 
-    for (int it = params.nt - 1; it > -1; it--) {
-      rw_bndr(&bndr[it * (2 * params.nz + params.nx)], &sp1[0], params.nz, params.nx, false);
-      step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, false);
+    for (int it = nt - 1; it > -1; it--) {
+      rw_bndr(&bndr[it * (2 * nz + nx)], &sp1[0], nz, nx, false);
+      step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, false);
 
-      add_source(&gp1[0], &derr[ik * params.ng * params.nt + it * params.ng], gxz, params.ng, params.nz, true);
-      step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, params.nz, params.nx);
+      add_source(&gp1[0], &derr[ik * ng * nt + it * ng], gxz, ng, nz, true);
+      step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, nz, nx);
 
-      cal_gradient(&g1[0], &lap[0], &gp1[0], params.nz, params.nx);
+      cal_gradient(&g1[0], &lap[0], &gp1[0], nz, nx);
 
       cycleSwap(sp0, sp1, sp2);
       cycleSwap(gp0, gp1, gp2);
@@ -135,12 +135,12 @@ float cal_obj_derr_illum_grad(const GlobalParams &params,
 
   } /// output: derr, g1, illum
 
-  float obj = cal_objective(&derr[0], params.ng * params.nt * params.nk);
+  float obj = cal_objective(&derr[0], ng * nt * nk);
 
   return obj;
 }
 
-float calVelUpdateStepLen(const GlobalParams &params,
+float calVelUpdateStepLen(const MpiFwiParams &params,
     const float *vtmp,
     const float *wlt,
     const float *dobs,
@@ -152,29 +152,37 @@ float calVelUpdateStepLen(const GlobalParams &params,
 {
   const int size = params.numProc;
   const int rank = params.rank;
+  int nt = params.nt;
+  int nz = params.nz;
+  int nx = params.nx;
+  int ng = params.ng;
+  int ns = params.ns;
+  float dt = params.dt;
+  float dx = params.dx;
+  float dz = params.dz;
 
-  std::vector<float> dcal(params.ng, 0); /* calculated/synthetic seismic data */
-  std::vector<float> sp0(params.nz * params.nx); /* source wavefield p0 */
-  std::vector<float> sp1(params.nz * params.nx); /* source wavefield p1 */
-  std::vector<float> sp2(params.nz * params.nx); /* source wavefield p2 */
+  std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
+  std::vector<float> sp0(nz * nx); /* source wavefield p0 */
+  std::vector<float> sp1(nz * nx); /* source wavefield p1 */
+  std::vector<float> sp2(nz * nx); /* source wavefield p2 */
 
-  std::vector<float> alpha1(params.ng, 0); /* numerator of alpha, length=ng */
-  std::vector<float> alpha2(params.ng, 0); /* denominator of alpha, length=ng */
+  std::vector<float> alpha1(ng, 0); /* numerator of alpha, length=ng */
+  std::vector<float> alpha2(ng, 0); /* denominator of alpha, length=ng */
 
-  float dtx = params.dt / params.dx;
-  float dtz = params.dt / params.dz;
-  for (int is = rank, ik = 0; is < params.ns; is+= size, ik++) {
+  float dtx = dt / dx;
+  float dtz = dt / dz;
+  for (int is = rank, ik = 0; is < ns; is+= size, ik++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
-    for (int it = 0; it < params.nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, params.nz, params.nx);
+    for (int it = 0; it < nt; it++) {
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, nz, nx);
 
       std::swap(sp0, sp1);
       std::swap(sp1, sp2);
 
-      record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[ik * params.nt * params.ng + it * params.ng], &derr[ik * params.ng * params.nt + it * params.ng], params.ng);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[ik * nt * ng + it * ng], &derr[ik * ng * nt + it * ng], ng);
     }
   }
 
@@ -182,63 +190,12 @@ float calVelUpdateStepLen(const GlobalParams &params,
   /**
    * MPI reduce
    */
-  MpiInplaceReduce(&alpha1[0], params.ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-  MpiInplaceReduce(&alpha2[0], params.ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+  MpiInplaceReduce(&alpha1[0], ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+  MpiInplaceReduce(&alpha2[0], ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-  float alpha = cal_alpha(&alpha1[0], &alpha2[0], epsil, params.ng);
+  float alpha = cal_alpha(&alpha1[0], &alpha2[0], epsil, ng);
 
   return alpha;
-}
-
-void readVelocity(const GlobalParams &params, std::vector<float> &vv) {
-  if (params.rank == 0) {
-    INFO() << format("rank %d is reading velocity") % params.rank;
-    sf_floatread(&vv[0], params.nz * params.nx, params.vinit);
-  }
-
-  // broadcast the velocity
-  if (params.rank == 0) {
-    INFO() << format("rank %d is broadcasting velocity") % params.rank;
-  }
-
-  MPI_Bcast(&vv[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
-}
-
-
-void readObserveData(const GlobalParams &params, std::vector<float> &dobs) {
-  MPI_File fh;
-  int rank = params.rank;
-
-  int file_open_error = MPI_File_open(MPI_COMM_WORLD, params.obsDataFileName,
-                      MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
-
-  if (file_open_error != MPI_SUCCESS) {
-
-    char error_string[BUFSIZ];
-    int length_of_error_string, error_class;
-
-    MPI_Error_class(file_open_error, &error_class);
-    MPI_Error_string(error_class, error_string, &length_of_error_string);
-    printf("%d: %s\n", rank, error_string);
-
-    MPI_Error_string(file_open_error, error_string, &length_of_error_string);
-    printf("%d: %s\n", rank, error_string);
-
-    MPI_Abort(MPI_COMM_WORLD, file_open_error);
-  }
-
-  MPI_File_seek(fh, rank * params.nt * params.ng * sizeof(float), MPI_SEEK_SET);
-  for (int is = rank, k = 0; is < params.ns; is += params.numProc, k++) {
-    std::vector<float> trans(params.nt * params.ng);
-    MPI_Status status;
-
-    MPI_File_read(fh, &trans[0], trans.size(), MPI_FLOAT, &status);
-    matrix_transpose(&trans[0], &dobs[k * trans.size()], params.nt, params.ng);
-
-    MPI_File_seek(fh, params.nt * params.ng * (params.numProc - 1) * sizeof(float), MPI_SEEK_CUR);
-  }
-
-  MPI_File_close(&fh);
 }
 
 int main(int argc, char *argv[]) {
@@ -253,7 +210,7 @@ int main(int argc, char *argv[]) {
 //  Logger::instance().init("mpi-fwi", boost::log::trivial::debug, Logger::NO_TIMESTAMP, rank);
   Logger::instance().init("mpi-fwi");
 
-  GlobalParams &params = GlobalParams::instance();
+  MpiFwiParams &params = MpiFwiParams::instance();
 
   // how many groups of MPI chunk
   INFO() << format("each process should process %d shots") % params.nk;
@@ -272,8 +229,12 @@ int main(int argc, char *argv[]) {
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
-  readVelocity(params, vv);
-  readObserveData(params, dobs);
+  // read velocity
+  SfVelocityReader velReader(params.vinit);
+  velReader.readAndBcast(&vv[0], vv.size(), rank);
+
+  // read observed data
+  ShotDataReader::read(params.obsDataFileName, &dobs[0], params.ns, params.nt, params.ng);
 
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {

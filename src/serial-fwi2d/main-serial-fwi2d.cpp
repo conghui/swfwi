@@ -54,7 +54,7 @@ extern "C"
 
 #include <boost/timer/timer.hpp>
 #include "logger.h"
-#include "global-params.h"
+#include "fwi-params.h"
 #include "common.h"
 #include "ricker-wavelet.h"
 #include "cycle-swap.h"
@@ -72,7 +72,7 @@ void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, in
 }
 
 
-float cal_obj_derr_illum_grad(const GlobalParams &params,
+float cal_obj_derr_illum_grad(const FwiParams &params,
     float *derr,  /* output */
     float *illum, /* output */
     float *g1,    /* output */
@@ -142,7 +142,7 @@ float cal_obj_derr_illum_grad(const GlobalParams &params,
   return obj;
 }
 
-float calVelUpdateStepLen(const GlobalParams &params,
+float calVelUpdateStepLen(const FwiParams &params,
     const float *vtmp,
     const float *wlt,
     const int *sxz,
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
 
   Logger::instance().init("serial-fwi");
 
-  GlobalParams &params = GlobalParams::instance();
+  FwiParams &params = FwiParams::instance();
 
   // how many groups of MPI chunk
   INFO() << format("each process should process %d shots") % params.nk;
