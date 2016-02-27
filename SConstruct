@@ -51,6 +51,7 @@ dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
    ('mpi-fwi', 'src/mpi-fwi2d'),
+   ('ess-fwi', 'src/ess-fwi2d'),
    ('serial-fwi', 'src/serial-fwi2d'),
    ('common', 'src/common'),
    ('util', 'src/util')

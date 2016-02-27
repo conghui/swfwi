@@ -9,6 +9,8 @@ lib_modules = """
 			  mpi-utility.cpp
 			  sf-velocity-reader.cpp
 			  shotdata-reader.cpp
+			  random-code.cpp
+			  encoder.cpp
               """.split()
 
 extra_include_dir = [

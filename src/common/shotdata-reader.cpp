@@ -62,3 +62,26 @@ void ShotDataReader::serialRead(sf_file file, float* dobs, int nshots,
     matrix_transpose(&trans[0], &dobs[is * trans.size()], nt, ng);
   }
 }
+
+void ShotDataReader::readAndEncode(sf_file file, const std::vector<int>& codes,
+    float* dobs, int nshots, int nt, int ng)
+{
+  /**
+   * reset file pointer and observed data
+   */
+  sf_seek(file, 0, SEEK_SET);
+  std::fill(dobs, dobs + nt * ng, 0);
+
+  for (int is = 0; is < nshots; is++) {
+    std::vector<float> trans(nt * ng);
+    std::vector<float> tmp(nt * ng);
+
+    sf_floatread(&trans[0], nt * ng, file);
+    matrix_transpose(&trans[0], &tmp[0], nt, ng);
+
+    /// encode the observed data
+    for (size_t j = 0; j < trans.size(); j++) {
+      dobs[j] += tmp[j] * codes[is];
+    }
+  }
+}
