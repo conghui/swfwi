@@ -43,13 +43,13 @@ extern "C"
 #include <rsf.h>
 }
 
-#include <mpi.h>
 #include <time.h>
 #include <cmath>
 
 #include <omp.h>
 #include <algorithm>
 #include <numeric>
+#include <cstdlib>
 #include <vector>
 
 #include <boost/timer/timer.hpp>
@@ -59,18 +59,8 @@ extern "C"
 #include "ricker-wavelet.h"
 #include "cycle-swap.h"
 #include "sum.h"
-
-void MpiInplaceReduce(void *buf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm) {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  if (rank == 0) {
-    MPI_Reduce(MPI_IN_PLACE, buf, count, datatype, op, root, comm);
-  } else {
-    MPI_Reduce(buf, NULL, count, datatype, op, root, comm);
-  }
-}
-
+#include "sf-velocity-reader.h"
+#include "shotdata-reader.h"
 
 float cal_obj_derr_illum_grad(const FwiParams &params,
     float *derr,  /* output */
@@ -78,42 +68,46 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
     float *g1,    /* output */
     const float *vv,
     const float *wlt,
+    const float *dobs,
     const int *sxz,
     const int *gxz)
 {
-  std::vector<float> trans(params.ng * params.nt);
-  std::vector<float> dobs(params.ng * params.nt);
-  std::vector<float> bndr(params.nt * (2 * params.nz + params.nx), 0); /* boundaries for wavefield reconstruction */
-  std::vector<float> dcal(params.ng, 0); /* calculated/synthetic seismic data */
+  int nt = params.nt;
+  int nz = params.nz;
+  int nx = params.nx;
+  int ng = params.ng;
+  int ns = params.ns;
+  float dt = params.dt;
+  float dx = params.dx;
+  float dz = params.dz;
 
-  std::vector<float> sp0(params.nz * params.nx); /* source wavefield p0 */
-  std::vector<float> sp1(params.nz * params.nx); /* source wavefield p1 */
-  std::vector<float> sp2(params.nz * params.nx); /* source wavefield p2 */
-  std::vector<float> gp0(params.nz * params.nx); /* geophone/receiver wavefield p0 */
-  std::vector<float> gp1(params.nz * params.nx); /* geophone/receiver wavefield p1 */
-  std::vector<float> gp2(params.nz * params.nx); /* geophone/receiver wavefield p2 */
-  std::vector<float> lap(params.nz * params.nx); /* laplace of the source wavefield */
+  std::vector<float> bndr(nt * (2 * nz + nx), 0); /* boundaries for wavefield reconstruction */
+  std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
 
-  float dtx = params.dt / params.dx;
-  float dtz = params.dt / params.dz;
+  std::vector<float> sp0(nz * nx); /* source wavefield p0 */
+  std::vector<float> sp1(nz * nx); /* source wavefield p1 */
+  std::vector<float> sp2(nz * nx); /* source wavefield p2 */
+  std::vector<float> gp0(nz * nx); /* geophone/receiver wavefield p0 */
+  std::vector<float> gp1(nz * nx); /* geophone/receiver wavefield p1 */
+  std::vector<float> gp2(nz * nx); /* geophone/receiver wavefield p2 */
+  std::vector<float> lap(nz * nx); /* laplace of the source wavefield */
 
-  for (int is = 0; is < params.ns; is++) {
-    sf_floatread(&trans[0], params.ng * params.nt, params.shots); /* Read local portion of input data */
-    matrix_transpose(&trans[0], &dobs[0], params.nt, params.ng);
+  float dtx = dt / dx;
+  float dtz = dt / dz;
 
+  for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
-    for (int it = 0; it < params.nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
-
+    for (int it = 0; it < nt; it++) {
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
       // cycle swap
       cycleSwap(sp0, sp1, sp2);
 
-      rw_bndr(&bndr[it * (2 * params.nz + params.nx)], &sp0[0], params.nz, params.nx, true);
+      rw_bndr(&bndr[it * (2 * nz + nx)], &sp0[0], nz, nx, true);
 
-      record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      cal_residuals(&dcal[0], &dobs[it * params.ng], &derr[is * params.ng * params.nt + it * params.ng], params.ng);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      cal_residuals(&dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
 
     std::swap(sp0, sp1);
@@ -121,15 +115,16 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
     std::fill(gp0.begin(), gp0.end(), 0);
     std::fill(gp1.begin(), gp1.end(), 0);
 
-    for (int it = params.nt - 1; it > -1; it--) {
-      rw_bndr(&bndr[it * (2 * params.nz + params.nx)], &sp1[0], params.nz, params.nx, false);
-      step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, params.nz, params.nx);
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, false);
+    for (int it = nt - 1; it > -1; it--) {
+      rw_bndr(&bndr[it * (2 * nz + nx)], &sp1[0], nz, nx, false);
+      step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, false);
 
-      add_source(&gp1[0], &derr[is * params.ng * params.nt + it * params.ng], gxz, params.ng, params.nz, true);
-      step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, params.nz, params.nx);
+      add_source(&gp1[0], &derr[is * ng * nt + it * ng], gxz, ng, nz, true);
 
-      cal_gradient(&g1[0], &lap[0], &gp1[0], params.nz, params.nx);
+      step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, nz, nx);
+
+      cal_gradient(&g1[0], &lap[0], &gp1[0], nz, nx);
 
       cycleSwap(sp0, sp1, sp2);
       cycleSwap(gp0, gp1, gp2);
@@ -137,7 +132,7 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 
   } /// output: derr, g1, illum
 
-  float obj = cal_objective(&derr[0], params.ng * params.nt * params.ns);
+  float obj = cal_objective(&derr[0], ng * nt * ns);
 
   return obj;
 }
@@ -145,57 +140,53 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 float calVelUpdateStepLen(const FwiParams &params,
     const float *vtmp,
     const float *wlt,
+    const float *dobs,
     const int *sxz,
     const int *gxz,
     const float *derr,
     float epsil
     )
 {
-  std::vector<float> trans(params.ng * params.nt);
-  std::vector<float> dobs(params.ng * params.nt);
-  std::vector<float> dcal(params.ng, 0); /* calculated/synthetic seismic data */
-  std::vector<float> sp0(params.nz * params.nx); /* source wavefield p0 */
-  std::vector<float> sp1(params.nz * params.nx); /* source wavefield p1 */
-  std::vector<float> sp2(params.nz * params.nx); /* source wavefield p2 */
+  int nt = params.nt;
+  int nz = params.nz;
+  int nx = params.nx;
+  int ng = params.ng;
+  int ns = params.ns;
+  float dt = params.dt;
+  float dx = params.dx;
+  float dz = params.dz;
 
-  std::vector<float> alpha1(params.ng, 0); /* numerator of alpha, length=ng */
-  std::vector<float> alpha2(params.ng, 0); /* denominator of alpha, length=ng */
+  std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
+  std::vector<float> sp0(nz * nx); /* source wavefield p0 */
+  std::vector<float> sp1(nz * nx); /* source wavefield p1 */
+  std::vector<float> sp2(nz * nx); /* source wavefield p2 */
 
-  float dtx = params.dt / params.dx;
-  float dtz = params.dt / params.dz;
-  for (int is = 0; is < params.ns; is++) {
-    sf_floatread(&trans[0], params.ng * params.nt, params.shots);
-    matrix_transpose(&trans[0], &dobs[0], params.nt, params.ng);
+  std::vector<float> alpha1(ng, 0); /* numerator of alpha, length=ng */
+  std::vector<float> alpha2(ng, 0); /* denominator of alpha, length=ng */
 
+  float dtx = dt / dx;
+  float dtz = dt / dz;
+  for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
-    for (int it = 0; it < params.nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, params.nz, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, params.nz, params.nx);
+    for (int it = 0; it < nt; it++) {
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, nz, nx);
 
       std::swap(sp0, sp1);
       std::swap(sp1, sp2);
 
-      record_seis(&dcal[0], gxz, &sp0[0], params.ng, params.nz);
-      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[it * params.ng], &derr[is * params.ng * params.nt + it * params.ng], params.ng);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
   }
 
-
-  /**
-   * MPI reduce
-   */
-  MpiInplaceReduce(&alpha1[0], params.ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-  MpiInplaceReduce(&alpha2[0], params.ng, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-  float alpha = cal_alpha(&alpha1[0], &alpha2[0], epsil, params.ng);
+  float alpha = cal_alpha(&alpha1[0], &alpha2[0], epsil, ng);
 
   return alpha;
 }
 
-
 int main(int argc, char *argv[]) {
-  MPI_Init (&argc, &argv);
 
   /* initialize Madagascar */
   sf_init(argc, argv);
@@ -204,43 +195,48 @@ int main(int argc, char *argv[]) {
 
   FwiParams &params = FwiParams::instance();
 
-  // how many groups of MPI chunk
-  INFO() << format("each process should process %d shots") % params.nk;
-
   std::vector<float> vv(params.nz * params.nx, 0);    /* updated velocity */
-  std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
-  std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
-  std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
+  std::vector<float> dobs(params.ns * params.nt * params.ng); /* observed data */
   std::vector<float> cg(params.nz * params.nx, 0);    /* conjugate gradient */
-  std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
+  std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
   std::vector<float> wlt(params.nt); /* ricker wavelet */
   std::vector<int> sxz(params.ns); /* source positions */
   std::vector<int> gxz(params.ng); /* geophone positions */
   std::vector<float> objval(params.niter, 0); /* objective/misfit function */
-  std::vector<float> derr(params.nk * params.ng * params.nt, 0); /* residual/error between synthetic and observation */
 
   /* initialize varibles */
-  sf_floatread(&vv[0], params.nz * params.nx, params.vinit);
   rickerWavelet(&wlt[0], params.nt, params.fm, params.dt);
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
+  // read velocity
+  SfVelocityReader velReader(params.vinit);
+  velReader.read(&vv[0], vv.size());
+
+  // read observed data
+  ShotDataReader::serialRead(params.shots, &dobs[0], params.ns, params.nt, params.ng);
+
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
-    sf_seek(params.shots, 0, SEEK_SET);
+    std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
+    std::vector<float> derr(params.ns * params.ng * params.nt, 0); /* residual/error between synthetic and observation */
+    std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
+    std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
 
     /**
      * calculate local objective function & derr & illum & g1(gradient)
      */
-    float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &vv[0], &wlt[0], &sxz[0], &gxz[0]);
+    float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &vv[0], &wlt[0], &dobs[0], &sxz[0], &gxz[0]);
 
+    DEBUG() << format("sum_derr %f, sum_illum %f, sum_g1 %f") % sum(derr) % sum(illum) % sum(g1);
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
 
     float epsil = 0;
     float beta = 0;
-    scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
     sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
+
+    scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
     bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
     bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
     sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
@@ -254,26 +250,21 @@ int main(int argc, char *argv[]) {
 
     std::swap(g1, g0); // let g0 be the previous gradient
 
-    sf_seek(params.shots, 0, SEEK_SET);
-    MPI_Bcast(&vtmp[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    float alpha = calVelUpdateStepLen(params, &vtmp[0], &wlt[0], &dobs[0], &sxz[0], &gxz[0], &derr[0], epsil);
 
-    float alpha = calVelUpdateStepLen(params, &vtmp[0], &wlt[0], &sxz[0], &gxz[0], &derr[0], epsil);
+    update_vel(&vv[0], &cg[0], alpha, params.nz, params.nx);
 
-      update_vel(&vv[0], &cg[0], alpha, params.nz, params.nx);
+    sf_floatwrite(&vv[0], params.nz * params.nx, params.vupdates);
 
-      sf_floatwrite(&vv[0], params.nz * params.nx, params.vupdates);
+    // output important information at each FWI iteration
+    INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
+//    INFO() << timer.format(2);
 
-      // output important information at each FWI iteration
-      INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
-      INFO() << timer.format(2);
-
-    MPI_Bcast(&vv[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);
   } /// end of iteration
 
   sf_floatwrite(&objval[0], params.niter, params.objs);
 
   sf_close();
-  MPI_Finalize();
 
   return 0;
 }

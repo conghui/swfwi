@@ -29,6 +29,11 @@ void SfVelocityReader::readAndBcast(float* vv, size_t count,
   MPI_Bcast(vv, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
 }
 
+void SfVelocityReader::read(float* vv, size_t count) {
+  INFO() << "reading velocity";
+  sf_floatread(vv, count, file);
+}
+
 SfVelocityReader::~SfVelocityReader() {
 }
 

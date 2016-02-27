@@ -8,11 +8,15 @@
 #ifndef SRC_COMMON_SHOTDATA_READER_H_
 #define SRC_COMMON_SHOTDATA_READER_H_
 
+extern "C" {
+#include <rsf.h>
+}
 #include <mpi.h>
 
 class ShotDataReader {
 public:
-  static void read(const char *datapath, float *dobs, int nshots, int nt, int ng);
+  static void parallelRead(const char *datapath, float *dobs, int nshots, int nt, int ng);
+  static void serialRead(sf_file file, float *dobs, int nshots, int nt, int ng);
 };
 
 #endif /* SRC_COMMON_SHOTDATA_READER_H_ */

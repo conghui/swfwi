@@ -11,7 +11,7 @@
 #include "logger.h"
 #include "common.h"
 
-void ShotDataReader::read(const char *datapath, float* dobs, int nshots, int nt, int ng) {
+void ShotDataReader::parallelRead(const char *datapath, float* dobs, int nshots, int nt, int ng) {
   int nproc;
   int rank;
 
@@ -51,4 +51,14 @@ void ShotDataReader::read(const char *datapath, float* dobs, int nshots, int nt,
   MPI_File_close(&fh);
 }
 
+void ShotDataReader::serialRead(sf_file file, float* dobs, int nshots,
+    int nt, int ng) {
 
+  sf_seek(file, 0, SEEK_SET);
+  for (int is = 0; is < nshots; is++) {
+    std::vector<float> trans(nt * ng);
+
+    sf_floatread(&trans[0], nt * ng, file);
+    matrix_transpose(&trans[0], &dobs[is * trans.size()], nt, ng);
+  }
+}

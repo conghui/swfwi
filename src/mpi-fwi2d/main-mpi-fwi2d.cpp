@@ -50,6 +50,7 @@ extern "C"
 #include <omp.h>
 #include <algorithm>
 #include <numeric>
+#include <cstdlib>
 #include <vector>
 
 #include <boost/timer/timer.hpp>
@@ -234,7 +235,7 @@ int main(int argc, char *argv[]) {
   velReader.readAndBcast(&vv[0], vv.size(), rank);
 
   // read observed data
-  ShotDataReader::read(params.obsDataFileName, &dobs[0], params.ns, params.nt, params.ng);
+  ShotDataReader::parallelRead(params.obsDataFileName, &dobs[0], params.ns, params.nt, params.ng);
 
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
@@ -253,6 +254,8 @@ int main(int argc, char *argv[]) {
     MpiInplaceReduce(&obj, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     MpiInplaceReduce(&g1[0], params.nz * params.nx, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     MpiInplaceReduce(&illum[0], params.nz * params.nx, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) DEBUG() << format("sum_derr %f, sum_illum %f, sum_g1 %f") % sum(derr) % sum(illum) % sum(g1);
 
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
 
@@ -288,7 +291,7 @@ int main(int argc, char *argv[]) {
 
       // output important information at each FWI iteration
       INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
-      INFO() << timer.format(2);
+//      INFO() << timer.format(2);
     } // end of rank 0
 
     MPI_Bcast(&vv[0], params.nz * params.nx, MPI_FLOAT, 0, MPI_COMM_WORLD);

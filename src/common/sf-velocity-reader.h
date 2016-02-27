@@ -16,6 +16,7 @@ class SfVelocityReader {
 public:
   SfVelocityReader(sf_file &f);
   void readAndBcast(float *vv, size_t count, int rank);
+  void read(float *vv, size_t count);
   virtual ~SfVelocityReader();
 
 private:

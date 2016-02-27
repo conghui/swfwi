@@ -8,24 +8,18 @@
 #include "fwi-params.h"
 
 
-#include <mpi.h>
 #include <cmath>
 
 FwiParams *FwiParams::ins = NULL;
 
 FwiParams::FwiParams() {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
   vinit = sf_input ("vin");       /* initial velocity model, unit=m/s */
   shots = sf_input("shots");      /* recorded shots from exact velocity model */
 
-  if (rank == 0) {
-    vupdates = sf_output("vout");   /* updated velocity in iterations */
-    grads = sf_output("grads");     /* gradient in iterations */
-    illums = sf_output("illums");   /* source illumination in iterations */
-    objs = sf_output("objs");       /* values of objective function in iterations */
-  }
+  vupdates = sf_output("vout");   /* updated velocity in iterations */
+  grads = sf_output("grads");     /* gradient in iterations */
+  illums = sf_output("illums");   /* source illumination in iterations */
+  objs = sf_output("objs");       /* values of objective function in iterations */
 }
 
 FwiParams::~FwiParams() {
@@ -39,7 +33,6 @@ FwiParams& FwiParams::instance() {
     ins->getInputParams();
     ins->check();
     ins->putOutputParams();
-    ins->calVars();
   }
 
   return *ins;
@@ -141,43 +134,37 @@ void FwiParams::getInputParams() {
 }
 
 void FwiParams::putOutputParams() {
-  int rank;
-
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  if (rank == 0) {
-    sf_putint(vupdates, "n1", nz);
-    sf_putint(vupdates, "n2", nx);
-    sf_putfloat(vupdates, "d1", dz);
-    sf_putfloat(vupdates, "d2", dx);
-    sf_putstring(vupdates, "label1", "Depth");
-    sf_putstring(vupdates, "label2", "Distance");
-    sf_putstring(vupdates, "label3", "Iteration");
-    sf_putint(vupdates, "n3", niter);
-    sf_putint(vupdates, "d3", 1);
-    sf_putint(vupdates, "o3", 1);
-    sf_putint(grads, "n1", nz);
-    sf_putint(grads, "n2", nx);
-    sf_putint(grads, "n3", niter);
-    sf_putfloat(grads, "d1", dz);
-    sf_putfloat(grads, "d2", dx);
-    sf_putint(grads, "d3", 1);
-    sf_putint(grads, "o3", 1);
-    sf_putstring(grads, "label1", "Depth");
-    sf_putstring(grads, "label2", "Distance");
-    sf_putstring(grads, "label3", "Iteration");
-    sf_putint(illums, "n1", nz);
-    sf_putint(illums, "n2", nx);
-    sf_putfloat(illums, "d1", dz);
-    sf_putfloat(illums, "d2", dx);
-    sf_putint(illums, "n3", niter);
-    sf_putint(illums, "d3", 1);
-    sf_putint(illums, "o3", 1);
-    sf_putint(objs, "n1", niter);
-    sf_putint(objs, "n2", 1);
-    sf_putfloat(objs, "d1", 1);
-    sf_putfloat(objs, "o1", 1);
-  }
+  sf_putint(vupdates, "n1", nz);
+  sf_putint(vupdates, "n2", nx);
+  sf_putfloat(vupdates, "d1", dz);
+  sf_putfloat(vupdates, "d2", dx);
+  sf_putstring(vupdates, "label1", "Depth");
+  sf_putstring(vupdates, "label2", "Distance");
+  sf_putstring(vupdates, "label3", "Iteration");
+  sf_putint(vupdates, "n3", niter);
+  sf_putint(vupdates, "d3", 1);
+  sf_putint(vupdates, "o3", 1);
+  sf_putint(grads, "n1", nz);
+  sf_putint(grads, "n2", nx);
+  sf_putint(grads, "n3", niter);
+  sf_putfloat(grads, "d1", dz);
+  sf_putfloat(grads, "d2", dx);
+  sf_putint(grads, "d3", 1);
+  sf_putint(grads, "o3", 1);
+  sf_putstring(grads, "label1", "Depth");
+  sf_putstring(grads, "label2", "Distance");
+  sf_putstring(grads, "label3", "Iteration");
+  sf_putint(illums, "n1", nz);
+  sf_putint(illums, "n2", nx);
+  sf_putfloat(illums, "d1", dz);
+  sf_putfloat(illums, "d2", dx);
+  sf_putint(illums, "n3", niter);
+  sf_putint(illums, "d3", 1);
+  sf_putint(illums, "o3", 1);
+  sf_putint(objs, "n1", niter);
+  sf_putint(objs, "n2", 1);
+  sf_putfloat(objs, "d1", 1);
+  sf_putfloat(objs, "o1", 1);
 }
 
 void FwiParams::check() {
@@ -193,9 +180,3 @@ void FwiParams::check() {
 
 }
 
-void FwiParams::calVars() {
-  MPI_Comm_size(MPI_COMM_WORLD, &numProc);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  nk = std::ceil(static_cast<float>(ns) / numProc);
-}
