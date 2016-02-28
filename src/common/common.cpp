@@ -121,32 +121,32 @@ void step_backward(float *illum, float *lap, const float *p0, const float *p1, f
   }
 }
 
-void add_source(float *p, const float *source, const int *sxz, int ns, int nz, bool add)
+void add_source(float *p, const float *source, const int *sxz, int ns, int nz, int nb, bool add)
 /*< add/subtract seismic sources >*/
 {
   if (add) {
     for (int is = 0; is < ns; is++) {
-      int sx = sxz[is] / nz;
+      int sx = sxz[is] / nz + nb;
       int sz = sxz[is] % nz;
-      p[sx * nz + sz] += source[is];
+      p[sx * (nz + nb) + sz] += source[is];
     }
   } else {
     for (int is = 0; is < ns; is++) {
-      int sx = sxz[is] / nz;
+      int sx = sxz[is] / nz + nb;
       int sz = sxz[is] % nz;
-      p[sx * nz +sz] -= source[is];
+      p[sx * (nz + nb) + sz] -= source[is];
     }
   }
 }
 
-void record_seis(float *seis_it, const int *gxz, const float *p, int ng, int nz)
+void record_seis(float *seis_it, const int *gxz, const float *p, int ng, int nz, int nb)
 /*< record seismogram at time it into a vector length of ng >*/
 {
 #pragma omp parallel for
   for (int ig = 0; ig < ng; ig++) {
-    int gx = gxz[ig] / nz;
+    int gx = gxz[ig] / nz + nb;
     int gz = gxz[ig] % nz;
-    seis_it[ig] = p[gx * nz + gz];
+    seis_it[ig] = p[gx * (nz + nb) + gz];
   }
 }
 

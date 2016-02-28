@@ -13,9 +13,9 @@ void matrix_transpose(float *matrix, float *trans, int n1, int n2);
 void step_forward(const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
 void step_backward(float *illum, float *lap, const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
 
-void add_source(float *p, const float *source, const int *sxz, int ns, int nz, bool add);
+void add_source(float *p, const float *source, const int *sxz, int ns, int nz, int nb, bool add);
 
-void record_seis(float *seis_it, const int *gxz, const float *p, int ng, int nz);
+void record_seis(float *seis_it, const int *gxz, const float *p, int ng, int nz, int nb);
 void sg_init(int *sxz, int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
 
 void rw_bndr(float *bndr, float *p, int nz, int nx, bool write);

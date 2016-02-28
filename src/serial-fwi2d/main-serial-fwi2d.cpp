@@ -94,19 +94,20 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 
   float dtx = dt / dx;
   float dtz = dt / dz;
+  int nb = 0; // no expanded boundary
 
   for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
     for (int it = 0; it < nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
       step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
       // cycle swap
       cycleSwap(sp0, sp1, sp2);
 
       rw_bndr(&bndr[it * (2 * nz + nx)], &sp0[0], nz, nx, true);
 
-      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz, nb);
       cal_residuals(&dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
 
@@ -118,9 +119,9 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
     for (int it = nt - 1; it > -1; it--) {
       rw_bndr(&bndr[it * (2 * nz + nx)], &sp1[0], nz, nx, false);
       step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, false);
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, false);
 
-      add_source(&gp1[0], &derr[is * ng * nt + it * ng], gxz, ng, nz, true);
+      add_source(&gp1[0], &derr[is * ng * nt + it * ng], gxz, ng, nz, nb, true);
 
       step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, nz, nx);
 
@@ -166,17 +167,19 @@ float calVelUpdateStepLen(const FwiParams &params,
 
   float dtx = dt / dx;
   float dtz = dt / dz;
+  int nb = 0; // no expanded boundary
+
   for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
     for (int it = 0; it < nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, true);
+      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
       step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, nz, nx);
 
       std::swap(sp0, sp1);
       std::swap(sp1, sp2);
 
-      record_seis(&dcal[0], gxz, &sp0[0], ng, nz);
+      record_seis(&dcal[0], gxz, &sp0[0], ng, nz, nb);
       sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
   }

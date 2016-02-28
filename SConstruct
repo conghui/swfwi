@@ -53,6 +53,7 @@ dirlist = [
    ('mpi-fwi', 'src/mpi-fwi2d'),
    ('ess-fwi', 'src/ess-fwi2d'),
    ('serial-fwi', 'src/serial-fwi2d'),
+   ('fm2d', 'src/fm2d'),
    ('common', 'src/common'),
    ('util', 'src/util')
 ]
@@ -60,7 +61,7 @@ dirs = dict(dirlist)
 
 # normally, you don't need to modify from the line below
 # ---------------------------------------------------------------------- #
-is_debug_mode = ARGUMENTS.get('debug', 0)
+is_debug_mode = ARGUMENTS.get('debug', 1)
 if int(is_debug_mode):
   print "Debug mode"
   cur_cflags = debug_flags + warn_flags + other_flags

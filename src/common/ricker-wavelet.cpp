@@ -5,7 +5,11 @@
  *      Author: rice
  */
 
+extern "C" {
+#include <rsf.h>
+}
 #include <cmath>
+
 #include "ricker-wavelet.h"
 
 void rickerWavelet(float *wlt, int nt, float fm, float dt) {
