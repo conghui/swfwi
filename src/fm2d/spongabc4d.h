@@ -13,19 +13,21 @@
 
 class SpongAbc4d {
 public:
-  SpongAbc4d(const Velocity &_vel, const FmParams &_params);
+  SpongAbc4d(float _dt, float _dx, float _dz, int _nb);
+  Velocity transformVelocityForModeling(const Velocity &v0);
   void stepForward(float *p0, float *p1);
+  void setVelocity(const Velocity &_vel);
 
 private:
   void applySponge(float *p);
-  void transVel();
   void initCoeff();
   void initbndr();
 
-public:
-  Velocity vel;
-  const FmParams &params;
+private:
+  const Velocity *vel;
   std::vector<float> bndr;
+  float dt, dx, dz;
+  int nb;
   float c0, c11, c12, c21, c22;
 };
 

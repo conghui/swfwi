@@ -21,7 +21,4 @@ public:
   int nz;
 };
 
-void expand(Velocity &exp, const Velocity &org, int nb);
-
-
 #endif /* SRC_FM2D_VELOCITY_H_ */
