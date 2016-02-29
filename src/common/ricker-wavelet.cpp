@@ -12,10 +12,10 @@ extern "C" {
 
 #include "ricker-wavelet.h"
 
-void rickerWavelet(float *wlt, int nt, float fm, float dt) {
+void rickerWavelet(float *wlt, int nt, float fm, float dt, float amp) {
   for (int it = 0; it < nt; it++) {
     float tmp = M_PI * fm * (it * dt - 1.0 / fm);
     tmp *= tmp;
-    wlt[it] = (1.0 - 2.0 * tmp) * std::exp(-tmp);
+    wlt[it] = amp * (1.0 - 2.0 * tmp) * std::exp(-tmp);
   }
 }

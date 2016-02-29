@@ -51,8 +51,6 @@ int main(int argc, char* argv[])
   int ns = params.ns;
   float dt = params.dt;
   float fm = params.fm;
-  int nzpad=nz+nb;
-  int nxpad=nx+2*nb;
 
   std::vector<float> v0(nx * nz);
   std::vector<int> sxz(params.ns); /* source positions */
@@ -62,11 +60,11 @@ int main(int argc, char* argv[])
   velReader.read(&v0[0], v0.size());
 
   Velocity vv0(v0, nx, nz);
-  Velocity exvel(nxpad, nzpad);
+  Velocity exvel(nx+2*nb, nz+nb);
   expand(exvel, vv0, nb);
 
   std::vector<float> wlt(nt);
-  rickerWavelet(&wlt[0], nt, fm, dt);
+  rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
@@ -74,8 +72,8 @@ int main(int argc, char* argv[])
   SpongAbc4d fmMethod(exvel, params);
   for(int is=0; is<ns; is++)
   {
-    std::vector<float> p0(nzpad * nxpad, 0);
-    std::vector<float> p1(nzpad * nxpad, 0);
+    std::vector<float> p0(exvel.nz * exvel.nx, 0);
+    std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
     std::vector<float> trans(params.nt * params.ng, 0);
 

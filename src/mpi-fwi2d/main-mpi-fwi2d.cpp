@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
   std::vector<float> objval(params.niter, 0); /* objective/misfit function */
 
   /* initialize varibles */
-  rickerWavelet(&wlt[0], params.nt, params.fm, params.dt);
+  rickerWavelet(&wlt[0], params.nt, params.fm, params.dt, params.amp);
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
