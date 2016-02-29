@@ -22,9 +22,6 @@ void SpongAbc4d::stepForward(float *p0, float *p1) {
   int nz = vel.nz;
   const std::vector<float> &vv = vel.dat;
 
-//  fprintf(stderr, "before loop, sum p1: %.40f\n", sum(p1, nx * nz));
-//  fprintf(stderr, "before loop, p1[3442] %.20f\n", p1[3442]);
-
   for (int ix = 2; ix < nx - 2; ix++) {
     for (int iz = 2; iz < nz - 2; iz++) {
       float tmp = c0 * p1[ix * nz + iz] +
@@ -33,27 +30,12 @@ void SpongAbc4d::stepForward(float *p0, float *p1) {
                   c21 * (p1[(ix - 1) * nz + iz] + p1[(ix + 1) * nz + iz]) +
                   c22 * (p1[(ix - 2) * nz + iz] + p1[(ix + 2) * nz + iz]);
 
-//      if (ix ==41 && iz == 2) {
-//        fprintf(stderr, "c0 %.20f\n", c0);
-//        fprintf(stderr, "c11 %.20f\n", c11);
-//        fprintf(stderr, "c12 %.20f\n", c12);
-//        fprintf(stderr, "c21 %.20f\n", c21);
-//        fprintf(stderr, "c22 %.20f\n", c22);
-//        fprintf(stderr, "p1[ix][iz] %.20f\n", p1[ix * nz + iz]);
-//        fprintf(stderr, "p1[ix][iz-1] %.20f\n", p1[ix * nz + (iz - 1)]);
-//        fprintf(stderr, "p1[ix][iz+1] %.20f\n", p1[ix * nz + (iz + 1)]);
-//        fprintf(stderr, "p1[ix][iz-2] %.20f\n", p1[ix * nz + (iz - 2)]);
-//        fprintf(stderr, "p1[ix][iz+2] %.20f\n", p1[ix * nz + (iz + 2)]);
-//        fprintf(stderr, "p1[ix-1][iz] %.20f\n", p1[(ix - 1) * nz + iz]);
-//        fprintf(stderr, "p1[ix+1][iz] %.20f\n", p1[(ix + 1) * nz + iz]);
-//        fprintf(stderr, "p1[ix-2][iz] %.20f\n", p1[(ix - 2) * nz + iz]);
-//        fprintf(stderr, "p1[ix+2][iz] %.20f\n", p1[(ix + 2) * nz + iz]);
-//        fprintf(stderr, "p1[%d] %.20f\n", (ix + 2) * nz + iz, p1[(ix + 2) * nz + iz]);
-//      }
-//      fprintf(stderr, "ix %d, iz %d, tmp %.20f\n", ix, iz, tmp);
       p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + vv[ix * nz + iz] * tmp;
     }
   }
+
+  applySponge(p0);
+  applySponge(p1);
 
 }
 

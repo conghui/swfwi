@@ -1,7 +1,6 @@
-
-/* Time domain full waveform inversion
-Note: This serial FWI is merely designed to help the understanding of
-beginners. Enquist absorbing boundary condition (A2) is applied!
+/* 2-D prestack forward modeling using sponge ABC using 4-th order FD
+NB: prepare high quality prestack seismic data for LSRTM and FWI
+Top boundary is free surface (no ABC applied)!
  */
 /*
   Copyright (C) 2014  Xi'an Jiaotong University, UT Austin (Pengliang Yang)
@@ -19,122 +18,81 @@ beginners. Enquist absorbing boundary condition (A2) is applied!
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-  Important references:
-    [1] Clayton, Robert, and Björn Engquist. "Absorbing boundary
-  conditions for acoustic and elastic wave equations." Bulletin
-  of the Seismological Society of America 67.6 (1977): 1529-1540.
-    [2] Tarantola, Albert. "Inversion of seismic reflection data in the
-  acoustic approximation." Geophysics 49.8 (1984): 1259-1266.
-    [3] Pica, A., J. P. Diet, and A. Tarantola. "Nonlinear inversion
-  of seismic reflection data in a laterally invariant medium."
-  Geophysics 55.3 (1990): 284-292.
-    [4] Dussaud, E., Symes, W. W., Williamson, P., Lemaistre, L.,
-  Singer, P., Denel, B., & Cherrett, A. (2008). Computational
-  strategies for reverse-time migration. In SEG Technical Program
-  Expanded Abstracts 2008 (pp. 2267-2271).
-    [5] Hager, William W., and Hongchao Zhang. "A survey of nonlinear
-  conjugate gradient methods." Pacific journal of Optimization
-  2.1 (2006): 35-58.
  */
 
-extern "C"
-{
+extern "C" {
 #include <rsf.h>
 }
-
 #include <time.h>
-#include <cmath>
 
+#ifdef _OPENMP
 #include <omp.h>
-#include <algorithm>
-#include <numeric>
-#include <cstdlib>
-#include <vector>
+#endif
 
-#include <boost/timer/timer.hpp>
-#include "logger.h"
 #include "fm-params.h"
-#include "common.h"
+#include "sum.h"
 #include "ricker-wavelet.h"
-#include "cycle-swap.h"
-#include "sf-velocity-reader.h"
 #include "velocity.h"
 #include "spongabc4d.h"
-#include "sum.h"
+#include "sf-velocity-reader.h"
+#include "common.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char* argv[])
+{
   /* initialize Madagascar */
-  sf_init(argc, argv);
-
-  Logger::instance().init("fm2d");
+  sf_init(argc,argv);
 
   FmParams &params = FmParams::instance();
+  int nz = params.nz;
+  int nx = params.nx;
+  int nb = params.nb;
+  int ng = params.ng;
+  int nt = params.nt;
+  int ns = params.ns;
+  float dt = params.dt;
+  float fm = params.fm;
+  int nzpad=nz+nb;
+  int nxpad=nx+2*nb;
 
-  // original velocity
-  std::vector<float> v0(params.nx * params.nz);
-  std::vector<float> wlt(params.nt); /* ricker wavelet */
+  std::vector<float> v0(nx * nz);
   std::vector<int> sxz(params.ns); /* source positions */
   std::vector<int> gxz(params.ng); /* geophone positions */
 
   SfVelocityReader velReader(params.vinit);
   velReader.read(&v0[0], v0.size());
-  Velocity vel0(v0, params.nx, params.nz);
 
-  // expand velocity
-  Velocity exvel(params.nx + 2 * params.nb, params.nz + params.nb);
-  expand(exvel, vel0, params.nb);
+  Velocity vv0(v0, nx, nz);
+  Velocity exvel(nxpad, nzpad);
+  expand(exvel, vv0, nb);
 
-  DEBUG() << format("sum_exvel %f") % sum(exvel.dat);
+  std::vector<float> wlt(nt);
+  rickerWavelet(&wlt[0], nt, fm, dt);
 
-  // create wavelet
-  rickerWavelet(&wlt[0], params.nt, params.fm, params.dt);
-  sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
-  sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
+  sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
-  for(int is=0; is < params.ns; is++)
+  SpongAbc4d fmMethod(exvel, params);
+  for(int is=0; is<ns; is++)
   {
-    std::vector<float> p0(exvel.nx * exvel.nz, 0);
-    std::vector<float> p1(exvel.nx * exvel.nz, 0);
-    std::vector<float> dobs(params.nt * params.ng);
-    std::vector<float> trans(params.nt * params.ng);
+    std::vector<float> p0(nzpad * nxpad, 0);
+    std::vector<float> p1(nzpad * nxpad, 0);
+    std::vector<float> dobs(params.nt * params.ng, 0);
+    std::vector<float> trans(params.nt * params.ng, 0);
 
-    SpongAbc4d fm(exvel, params);
-
-      char fn[128];
-      sprintf(fn, "fmwld%d.rsf", is);
-      sf_file f = sf_output(fn);
-      sf_putint(f, "n1", exvel.nz);
-      sf_putint(f, "n2", exvel.nx);
-      sf_putint(f, "n3", params.nt);
-
-    for(int it=0; it<params.nt; it++)
+    for(int it=0; it<nt; it++)
     {
-//      fprintf(stderr, "is %d, it %d, before add source sum p0: %.20f\n", is , it , sum(p0));
-//      fprintf(stderr, "is %d, it %d, before add source sum p1: %.20f\n", is , it , sum(p1));
+      add_source(&p1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
+      fmMethod.stepForward(&p0[0], &p1[0]);
 
-      add_source(&p1[0], &wlt[it], &sxz[is], 1, params.nz, params.nb, true);
-//      fprintf(stderr, "is %d, it %d, after add source sum p0: %.20f\n", is , it , sum(p0));
-//      fprintf(stderr, "is %d, it %d, after add source sum p1: %.20f\n", is , it , sum(p1));
+      std::swap(p1, p0);
 
-      fm.stepForward(&p0[0], &p1[0]);
-//      fprintf(stderr, "is %d, it %d, after forward sum p0: %.20f\n", is , it , sum(p0));
-//      fprintf(stderr, "is %d, it %d, after forward sum p1: %.20f\n", is , it , sum(p1));
-
-      sf_floatwrite(&p0[0], p0.size(), f);
-
-      fm.applySponge(&p0[0]);
-      fm.applySponge(&p1[0]);
-
-      std::swap(p0, p1);
-//      fprintf(stderr, "is %d, it %d, after swap sum p0: %.20f\n", is , it , sum(p0));
-//      fprintf(stderr, "is %d, it %d, after swap sum p1: %.20f\n", is , it , sum(p1));
-
-      record_seis(&dobs[it * params.ng], &gxz[0], &p0[0], params.ng, params.nz, params.nb);
+      record_seis(&dobs[it*ng], &gxz[0], &p0[0], ng, nz, nb);
     }
-    matrix_transpose(&dobs[0], &trans[0], params.ng, params.nt);
-    sf_floatwrite(&trans[0], params.ng*params.nt, params.shots);
+    matrix_transpose(&dobs[0], &trans[0], ng, nt);
+    sf_floatwrite(&trans[0], ng*nt, params.shots);
+
   }
 
   return 0;
 }
+
