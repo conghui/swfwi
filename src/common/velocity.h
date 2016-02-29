@@ -12,7 +12,6 @@
 
 class Velocity {
 public:
-  Velocity(const std::vector<float> &vel, int _nx, int _nz);
   Velocity(int _nx, int _nz);
 
 public:

@@ -11,7 +11,6 @@ lib = 'fm'
 
 modules = """
 fm-params.cpp
-velocity.cpp
 spongabc4d.cpp
           """.split()
 
@@ -22,7 +21,7 @@ include_dir = [
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['rsf', 'util', 'common']
+depend_libs = ['common', 'util', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)

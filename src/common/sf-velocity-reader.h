@@ -12,7 +12,12 @@ extern "C" {
 #include <rsf.h>
 }
 
+#include "velocity.h"
+
 class SfVelocityReader {
+public:
+  static Velocity read(sf_file file, int nx, int nz);
+
 public:
   SfVelocityReader(sf_file &f);
   void readAndBcast(float *vv, size_t count, int rank);

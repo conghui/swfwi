@@ -29,6 +29,7 @@ extern "C" {
 #include <omp.h>
 #endif
 
+#include "logger.h"
 #include "fm-params.h"
 #include "sum.h"
 #include "ricker-wavelet.h"
@@ -52,16 +53,14 @@ int main(int argc, char* argv[])
   float dt = params.dt;
   float fm = params.fm;
 
-  std::vector<float> v0(nx * nz);
   std::vector<int> sxz(params.ns); /* source positions */
   std::vector<int> gxz(params.ng); /* geophone positions */
 
   SfVelocityReader velReader(params.vinit);
-  velReader.read(&v0[0], v0.size());
+  Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
 
-  Velocity vv0(v0, nx, nz);
   SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
-  Velocity exvel = fmMethod.transformVelocityForModeling(vv0);
+  Velocity exvel = fmMethod.transformVelocityForModeling(v0);
   fmMethod.setVelocity(exvel);
 
   std::vector<float> wlt(nt);
