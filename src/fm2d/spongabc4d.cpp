@@ -123,11 +123,11 @@ void SpongAbc4d::initbndr() {
     bndr[ib]=expf(-tmp*tmp);
   }
 
-  static bool init = false;
-  if (!init) {
-    init = true;
-    fprintf(stderr, "sum bndr %.20f\n", sum(bndr));
-  }
+//  static bool init = false;
+//  if (!init) {
+//    init = true;
+//    fprintf(stderr, "sum bndr %.20f\n", sum(bndr));
+//  }
 }
 
 

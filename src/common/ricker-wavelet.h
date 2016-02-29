@@ -10,5 +10,6 @@
 
 
 void rickerWavelet(float *wlt, int nt, float fm, float dt, float amp);
+void rickerWaveletPFwi(float *wlt, int nt, float fm, float dt, float amp);
 
 #endif /* SRC_COMMON_RICKER_WAVELET_H_ */

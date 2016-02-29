@@ -12,6 +12,7 @@ lib = 'fm'
 modules = """
 fm-params.cpp
 spongabc4d.cpp
+damp4t10d.cpp
           """.split()
 
 include_dir = [

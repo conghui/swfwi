@@ -23,6 +23,8 @@ Top boundary is free surface (no ABC applied)!
 extern "C" {
 #include <rsf.h>
 }
+
+#include <boost/timer/timer.hpp>
 #include <time.h>
 
 #ifdef _OPENMP
@@ -34,16 +36,22 @@ extern "C" {
 #include "sum.h"
 #include "ricker-wavelet.h"
 #include "velocity.h"
-#include "spongabc4d.h"
 #include "sf-velocity-reader.h"
 #include "common.h"
 
+#include "spongabc4d.h"
+#include "damp4t10d.h"
+
 int main(int argc, char* argv[])
 {
+  boost::timer::auto_cpu_timer t;
+
   /* initialize Madagascar */
   sf_init(argc,argv);
 
   FmParams &params = FmParams::instance();
+  Logger::instance().init("fm");
+
   int nz = params.nz;
   int nx = params.nx;
   int nb = params.nb;
@@ -59,8 +67,11 @@ int main(int argc, char* argv[])
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
 
-  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
+//  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
+  Damp4t10d fmMethod(dt, params.dx);
   Velocity exvel = fmMethod.transformVelocityForModeling(v0);
+  return 0;
+
   fmMethod.setVelocity(exvel);
 
   std::vector<float> wlt(nt);
@@ -68,6 +79,9 @@ int main(int argc, char* argv[])
 
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
+
+  DEBUG() << format("nt %d, fm %d, dt %f, amp %f") % nt % fm % dt % params.amp;
+  DEBUG() << format("sum wlt: %.20f") % sum(wlt);
 
   for(int is=0; is<ns; is++)
   {

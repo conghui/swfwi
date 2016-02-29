@@ -6,13 +6,12 @@
  */
 
 #include "damp4t10d.h"
+#include "logger.h"
+#include "sum.h"
 
-Damp4t10d::Damp4t10d() {
-  // TODO Auto-generated constructor stub
-
+extern "C" {
+#include <rsf.h>
 }
-
-
 //static void fd4t10s_bd1_2d(dim3d_t dim, const float *vel, float *prev_wave, float *curr_wave) {
 //  float a[6];
 //
@@ -79,3 +78,116 @@ Damp4t10d::Damp4t10d() {
 //    }
 //  }
 //}
+
+
+static void numericTrans(Velocity &vel, float dx, float dt) {
+  std::vector<float> &vv = vel.dat;
+  for (int i = 0; i < vv.size(); i ++) {
+    vv[i] = (dx * dx) / (vv[i] * vv[i] * dt * dt);
+  }
+}
+
+static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo_size) {
+  int nx = v0.nx + 2 * halo_size;
+  int nz = v0.nz + 2 * halo_size;
+
+  std::vector<float> &vel_e = exvel.dat;
+  const std::vector<float> &vel = v0.dat;
+
+  //copy the vel into vel_e
+  for (int ix = halo_size; ix < v0.nx + halo_size; ix++) {
+    for (int iz = halo_size; iz < v0.nz + halo_size; iz++) {
+      vel_e[ix * nz + iz] = vel[(ix - halo_size) * v0.nz +  (iz - halo_size)];
+    }
+  }
+
+  //expand z direction first
+  for (int ix = halo_size; ix < v0.nx + halo_size; ix++) {
+    for (int iz = 0; iz < halo_size; iz++) {
+      vel_e[ix * nz + iz] = vel_e[ix * nz + halo_size];               // top
+    }
+    for (int iz = v0.nz + halo_size; iz < nz; iz ++) {
+      vel_e[ix * nz + iz] = vel_e[ix * nz + (v0.nz + halo_size - 1)]; // bottom
+    }
+  }
+
+  //Then x direction
+  for (int iz = 0; iz < nz; iz++) {
+    for (int ix = 0; ix < halo_size; ix++) {
+      vel_e[ix * nz + iz] = vel_e[halo_size * nz + iz];               // left
+    }
+    for (int ix = v0.nx + halo_size; ix < nx; ix++) {
+      vel_e[ix * nz + iz] = vel_e[(v0.nx + halo_size - 1) * nz + iz]; // right
+    }
+  }
+
+}
+
+static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
+  int nx = v0.nx;
+  int nz = v0.nz;
+  int nxpad = nx + 2 * nb;
+  int nzpad = nz + nb;
+  const std::vector<float> &a = v0.dat;
+  std::vector<float> &b = exvel.dat;
+
+  /// internal
+  for (int ix = 0; ix < nx; ix++) {
+    for (int iz = 0; iz < nz; iz++) {
+      b[(nb + ix) * nzpad + iz] = a[ix * nx + iz];
+    }
+  }
+
+  /// boundary
+  for (int ix = 0; ix < nxpad; ix++) {
+    for (int iz = 0; iz < nb; iz++) {
+      b[ix * nzpad + iz] = b[ix * nzpad + nb];                              /* top */
+      b[ix * nzpad + (nzpad - iz - 1)] = b[ix * nzpad + (nzpad - nb - 1)];  /* bottom*/
+    }
+  }
+
+  for (int ix = 0; ix < nb; ix++) {
+    for (int iz = 0; iz < nzpad; iz++) {
+      b[ix * nzpad + iz] = b[nb * nzpad + iz];                              /* left */
+      b[(nxpad - ix - 1) * nzpad + iz] = b[(nxpad - nb - 1) * nzpad + iz];  /* right */
+    }
+  }
+}
+
+Damp4t10d::Damp4t10d(float _dt, float _dx) :
+  dt(_dt), dx(_dx)
+{
+
+}
+
+Velocity Damp4t10d::transformVelocityForModeling(const Velocity& _vel) {
+  Velocity vv = _vel;
+
+  DEBUG() << format("nx %d, nz %d") % vv.nx % vv.nz;
+  DEBUG() << format("before transform sum vv %.20f") % sum(vv.dat);
+  numericTrans(vv, dx, dt);
+
+  DEBUG() << format("sum vv %.20f") % sum(vv.dat);
+
+  Velocity exvelForStencil(vv.nx+2*FDLEN, vv.nz+2*FDLEN);
+  expandForStencil(exvelForStencil, vv, FDLEN);
+
+  sf_file f = sf_output("exvel.rsf");
+  sf_putint(f, "n1", exvelForStencil.nz);
+  sf_putint(f, "n2", exvelForStencil.nx);
+  sf_putfloat(f, "d1", dx);
+  sf_putfloat(f, "d2", dx);
+  sf_putfloat(f, "o1", 0);
+  sf_putfloat(f, "o2", 0);
+  sf_floatwrite(&exvelForStencil.dat[0], exvelForStencil.nx * exvelForStencil.nz, f);
+
+  DEBUG() << format("sum exvel %.20f") % sum(exvelForStencil.dat);
+
+  return vv;
+}
+
+void Damp4t10d::stepForward(float* p0, float* p1) {
+}
+
+void Damp4t10d::setVelocity(const Velocity& _vel) {
+}

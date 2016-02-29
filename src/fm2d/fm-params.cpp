@@ -14,8 +14,8 @@ FmParams *FmParams::ins = NULL;
 
 FmParams::FmParams() {
   /*< set up I/O files >*/
-  vinit=sf_input ("in");   /* initial velocity model, unit=m/s */
-  shots=sf_output("out");
+  vinit=sf_input ("vinit");   /* initial velocity model, unit=m/s */
+  shots=sf_output("shots");
 }
 
 FmParams::~FmParams() {
