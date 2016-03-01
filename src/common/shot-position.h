@@ -13,12 +13,15 @@
 class ShotPosition {
 public:
   ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
+  ShotPosition clip(int begin, int end);
   int getx(int idx) const;
   int getz(int idx) const;
 
+public:
+  int ns;
+
 private:
   std::vector<int> pos;
-  int ns;
   int nz;
 };
 

@@ -19,7 +19,7 @@ public:
   void stepForward(float *p0, float *p1);
   void setVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, int ns, const int *sxz, int snz);
-  void addSource(float *p, const float *source, int ns, const ShotPosition &pos);
+  void addSource(float *p, const float *source, const ShotPosition &pos);
 
 private:
   void applySponge(float *p);

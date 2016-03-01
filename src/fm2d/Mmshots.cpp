@@ -390,9 +390,10 @@ int main(int argc, char* argv[])
     }
     matrix_transpose(dobs, trans, ng, nt);
     sf_floatwrite(trans, ng*nt, shots);
+//    fprintf(stderr, "sum trans: %.20f\n", sum(trans, ng * nt));
 
     end = clock();
-    sf_warning("shot %d finished: %f", is+1,((float)(end-start))/CLOCKS_PER_SEC);
+//    sf_warning("shot %d finished: %f", is+1,((float)(end-start))/CLOCKS_PER_SEC);
   }
 
   free(sxz);

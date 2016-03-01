@@ -9,6 +9,7 @@ extern "C" {
 #include <rsf.h>
 }
 #include "common.h"
+#include "logger.h"
 
 void matrix_transpose(float *matrix, float *trans, int n1, int n2)
 /*< matrix transpose: matrix tansposed to be trans >*/
@@ -129,6 +130,7 @@ void add_source(float *p, const float *source, const int *sxz, int ns, int nz, i
       int sx = sxz[is] / nz + nb;
       int sz = sxz[is] % nz;
       p[sx * (nz + nb) + sz] += source[is];
+//      DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
     }
   } else {
     for (int is = 0; is < ns; is++) {

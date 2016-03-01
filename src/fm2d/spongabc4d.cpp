@@ -8,6 +8,7 @@
 #include <ostream>
 #include "spongabc4d.h"
 #include "sum.h"
+#include "logger.h"
 
 static void expand(Velocity &exvel, const Velocity &v0, int nb) {
   int nx = v0.nx;
@@ -18,11 +19,18 @@ static void expand(Velocity &exvel, const Velocity &v0, int nb) {
   std::vector<float> &b = exvel.dat;
 
   /// internal
+
+  DEBUG() << format("000: %.20f") % sum(b);
+  DEBUG() << format("000: sum a %.20f") % sum(a);
   for (int ix = 0; ix < nx; ix++) {
     for (int iz = 0; iz < nz; iz++) {
-      b[(nb + ix) * nzpad + iz] = a[ix * nx + iz];
+      b[(nb + ix) * nzpad + iz] = a[ix * nz + iz];
+//      DEBUG() << format("ix %d, iz %d, nb %d, aidx %d, vv[%d] %.20f") %
+//          ix % iz % nb % (ix * nz + iz) % ((nb + ix) * nzpad + iz) % b[(nb + ix) * nzpad + iz];
     }
   }
+
+  DEBUG() << format("111: %.20f") % sum(b);
 
   /// boundary
   for (int ix = 0; ix < nxpad; ix++) {
@@ -140,6 +148,8 @@ Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) {
   Velocity exvel(nxpad, nzpad);
 
   expand(exvel, v0, nb);
+  DEBUG() << format("before trans sum exvel: %.20f") % sum(exvel.dat);
+
   numericTrans(exvel, dt);
 
   return exvel;
@@ -158,13 +168,13 @@ void SpongAbc4d::addSource(float* p, const float* source, int ns,
   }
 }
 
-void SpongAbc4d::addSource(float* p, const float* source, int ns,
-    const ShotPosition& pos) {
+void SpongAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) {
   int nzpad = vel->nz;
 
-  for (int is = 0; is < ns; is++) {
-    int sx = pos.getx(is);
+  for (int is = 0; is < pos.ns; is++) {
+    int sx = pos.getx(is) + nb;
     int sz = pos.getz(is);
     p[sx * nzpad + sz] += source[is];
+//    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }

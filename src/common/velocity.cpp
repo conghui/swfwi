@@ -8,5 +8,5 @@
 #include "velocity.h"
 #include "logger.h"
 
-Velocity::Velocity(int _nx, int _nz) : dat(_nx *_nz), nx(_nx), nz(_nz) {
+Velocity::Velocity(int _nx, int _nz) : dat(_nx *_nz, 0), nx(_nx), nz(_nz) {
 }

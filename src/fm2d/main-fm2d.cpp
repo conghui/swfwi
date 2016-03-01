@@ -67,6 +67,13 @@ int main(int argc, char* argv[])
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
+  for (size_t i = 0; i < v0.dat.size(); i++) {
+//    DEBUG() << format("%f") % v0.dat[i];
+  }
+  sf_file f = sf_output("readvel.rsf");
+  sf_putint(f, "n1", nz);
+  sf_putint(f, "n2", nx);
+  sf_floatwrite(&v0.dat[0], nx * nz, f);
 
   SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
 //  Damp4t10d fmMethod(dt, params.dx, nb);
@@ -80,12 +87,15 @@ int main(int argc, char* argv[])
   sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
-  DEBUG() << format("nt %d, fm %d, dt %f, amp %f") % nt % fm % dt % params.amp;
-  DEBUG() << format("sum wlt: %.20f") % sum(wlt);
-
-  DEBUG() << "use shot-position";
+//  DEBUG() << format("nt %d, fm %d, dt %f, amp %f") % nt % fm % dt % params.amp;
+//  DEBUG() << format("sum wlt: %.20f") % sum(wlt);
+//
+//  DEBUG() << format("sum v0: %.20f") % sum(v0.dat);
+//  DEBUG() << format("sum exvel: %.20f") % sum(exvel.dat);
+//
+//  DEBUG() << "use shot-position";
 //  ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
-  ShotPosition spos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
 
 //  return 0;
   for(int is=0; is<ns; is++)
@@ -94,21 +104,22 @@ int main(int argc, char* argv[])
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
     std::vector<float> trans(params.nt * params.ng, 0);
+    ShotPosition curSrcPos = allSrcPos.clip(is, is);
 
     for(int it=0; it<nt; it++)
     {
-      add_source(&p1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
-//      fmMethod.addSource(&p1[0], &wlt[0], ns, &sxz[0], nz);
-//      fmMethod.addSource(&p1[0], &wlt[0], 1, spos);
+      fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
       fmMethod.stepForward(&p0[0], &p1[0]);
 
       std::swap(p1, p0);
+//      fprintf(stderr, "is %d, it %d, after swap sum p0: %.20f\n", is , it , sum(p0));
+//      fprintf(stderr, "is %d, it %d, after swap sum p1: %.20f\n", is , it , sum(p1));
 
       record_seis(&dobs[it*ng], &gxz[0], &p0[0], ng, nz, nb);
     }
     matrix_transpose(&dobs[0], &trans[0], ng, nt);
     sf_floatwrite(&trans[0], ng*nt, params.shots);
-
+//    fprintf(stderr, "sum trans: %.20f\n", sum(trans));
   }
 
   return 0;
