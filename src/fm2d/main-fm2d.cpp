@@ -38,6 +38,7 @@ extern "C" {
 #include "velocity.h"
 #include "sf-velocity-reader.h"
 #include "common.h"
+#include "shot-position.h"
 
 #include "spongabc4d.h"
 #include "damp4t10d.h"
@@ -67,10 +68,9 @@ int main(int argc, char* argv[])
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
 
-//  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
-  Damp4t10d fmMethod(dt, params.dx);
+  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
+//  Damp4t10d fmMethod(dt, params.dx, nb);
   Velocity exvel = fmMethod.transformVelocityForModeling(v0);
-  return 0;
 
   fmMethod.setVelocity(exvel);
 
@@ -83,6 +83,11 @@ int main(int argc, char* argv[])
   DEBUG() << format("nt %d, fm %d, dt %f, amp %f") % nt % fm % dt % params.amp;
   DEBUG() << format("sum wlt: %.20f") % sum(wlt);
 
+  DEBUG() << "use shot-position";
+//  ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
+  ShotPosition spos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+
+//  return 0;
   for(int is=0; is<ns; is++)
   {
     std::vector<float> p0(exvel.nz * exvel.nx, 0);
@@ -93,6 +98,8 @@ int main(int argc, char* argv[])
     for(int it=0; it<nt; it++)
     {
       add_source(&p1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
+//      fmMethod.addSource(&p1[0], &wlt[0], ns, &sxz[0], nz);
+//      fmMethod.addSource(&p1[0], &wlt[0], 1, spos);
       fmMethod.stepForward(&p0[0], &p1[0]);
 
       std::swap(p1, p0);

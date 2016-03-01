@@ -117,6 +117,8 @@ void SpongAbc4d::setVelocity(const Velocity& _vel) {
   this->vel = &_vel;
 }
 
+
+
 void SpongAbc4d::initbndr() {
   for(int ib=0;ib<nb;ib++){
     float tmp=0.015*(nb-ib);
@@ -141,4 +143,28 @@ Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) {
   numericTrans(exvel, dt);
 
   return exvel;
+}
+
+
+void SpongAbc4d::addSource(float* p, const float* source, int ns,
+    const int* sxz, int snz)
+{
+  int nzpad = snz + nb;
+
+  for (int is = 0; is < ns; is++) {
+    int sx = sxz[is] / snz + nb;
+    int sz = sxz[is] % snz;
+    p[sx * nzpad + sz] += source[is];
+  }
+}
+
+void SpongAbc4d::addSource(float* p, const float* source, int ns,
+    const ShotPosition& pos) {
+  int nzpad = vel->nz;
+
+  for (int is = 0; is < ns; is++) {
+    int sx = pos.getx(is);
+    int sz = pos.getz(is);
+    p[sx * nzpad + sz] += source[is];
+  }
 }

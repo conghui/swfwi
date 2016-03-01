@@ -10,6 +10,7 @@
 
 #include "velocity.h"
 #include "fm-params.h"
+#include "shot-position.h"
 
 class SpongAbc4d {
 public:
@@ -17,6 +18,8 @@ public:
   Velocity transformVelocityForModeling(const Velocity &v0);
   void stepForward(float *p0, float *p1);
   void setVelocity(const Velocity &_vel);
+  void addSource(float *p, const float *source, int ns, const int *sxz, int snz);
+  void addSource(float *p, const float *source, int ns, const ShotPosition &pos);
 
 private:
   void applySponge(float *p);
