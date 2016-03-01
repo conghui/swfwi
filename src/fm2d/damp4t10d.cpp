@@ -159,7 +159,7 @@ static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
 }
 
 Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
-  dt(_dt), dx(_dx), nb(_nb)
+  vel(NULL), dt(_dt), dx(_dx), nb(_nb)
 {
 
 }
@@ -177,21 +177,13 @@ Velocity Damp4t10d::transformVelocityForModeling(const Velocity& _vel) {
   Velocity exvelForBndry(vv.nx + 2 * nb, vv.nz + nb);
   expandBndry(exvelForBndry, vv, nb);
 
+  // expand for stencil
   Velocity exvelForStencil(exvelForBndry.nx+2*FDLEN, exvelForBndry.nz+2*FDLEN);
   expandForStencil(exvelForStencil, vv, FDLEN);
 
-  sf_file f = sf_output("exvel.rsf");
-  sf_putint(f, "n1", exvelForStencil.nz);
-  sf_putint(f, "n2", exvelForStencil.nx);
-  sf_putfloat(f, "d1", dx);
-  sf_putfloat(f, "d2", dx);
-  sf_putfloat(f, "o1", 0);
-  sf_putfloat(f, "o2", 0);
-  sf_floatwrite(&exvelForStencil.dat[0], exvelForStencil.nx * exvelForStencil.nz, f);
-
   DEBUG() << format("sum exvel %.20f") % sum(exvelForStencil.dat);
 
-  return vv;
+  return exvelForStencil;
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) {
@@ -200,6 +192,25 @@ void Damp4t10d::stepForward(float* p0, float* p1) {
 
 void Damp4t10d::setVelocity(const Velocity& _vel) {
   this->vel = &_vel;
+}
+
+void Damp4t10d::recordSeis(float* seis_it, const float* p,
+    const ShotPosition& geoPos) {
+
+  int ng = geoPos.ns;
+  int nzpad = vel->nz;
+
+//  DEBUG() << format("ng %d") % ng;
+//  float sum = 0;
+  for (int ig = 0; ig < ng; ig++) {
+    int gx = geoPos.getx(ig) + nb + FDLEN;
+    int gz = geoPos.getz(ig) + FDLEN;
+    int idx = gx * nzpad + gz;
+    seis_it[ig] = p[idx];
+//    DEBUG() << format("ig %d, idx %d, v %.20f") % ig % idx % seis_it[ig];
+  }
+//  DEBUG() << format("sum %.20f") % sum;
+
 }
 
 void Damp4t10d::fd4t10s_bd1_2d(float* prev_wave, const float* curr_wave) {
@@ -223,10 +234,11 @@ void Damp4t10d::fd4t10s_bd1_2d(float* prev_wave, const float* curr_wave) {
   int nz = vel->nz;
   std::vector<float> u2(nx * nz, 0);
 
+//  DEBUG() << format("nx %d, nz %d") % nx % nz;
+
   #pragma omp parallel for schedule(dynamic) private(ix, iz, curPos)
   for (ix = d; ix < nx - d; ix ++) {
     for (iz = d; iz < nz - d; iz ++) {
-//      curPos = idx_in_cube(dim, ix, 0, iz);
       curPos = ix * nz + iz;
       u2[curPos] = -4.0 * a[0] * curr_wave[curPos] +
                    a[1] * (curr_wave[curPos - 1]  +  curr_wave[curPos + 1]  +
@@ -262,7 +274,6 @@ void Damp4t10d::fd4t10s_bd1_2d(float* prev_wave, const float* curr_wave) {
 
       delta = max_delta * dist * dist;
 
-//      curPos = idx_in_cube(dim, ix, 0, iz);
       curPos = ix * nz + iz;
       float curvel = vel->dat[curPos];
       prev_wave[curPos] = (2. - 2 * delta + delta * delta) * curr_wave[curPos] - (1 - 2 * delta) * prev_wave[curPos]  +
@@ -270,5 +281,18 @@ void Damp4t10d::fd4t10s_bd1_2d(float* prev_wave, const float* curr_wave) {
                           1.0f / 12 * (1.0f / curvel) * (1.0f / curvel) *
                           (u2[curPos - 1] + u2[curPos + 1] + u2[curPos - nz] + u2[curPos + nz] - 4 * u2[curPos]); /// 4th order
     }
+  }
+}
+
+void Damp4t10d::addSource(float* p, const float* source,
+    const ShotPosition& pos)
+{
+  int nzpad = vel->nz;
+
+  for (int is = 0; is < pos.ns; is++) {
+    int sx = pos.getx(is) + nb + FDLEN;
+    int sz = pos.getz(is) + FDLEN;
+    p[sx * nzpad + sz] += source[is];
+//    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }

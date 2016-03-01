@@ -382,11 +382,12 @@ int main(int argc, char* argv[])
       apply_sponge(p1);
       apply_sponge(p0);
 
-      ptr=p0; p0=p1; p1=ptr;
 //      fprintf(stderr, "is %d, it %d, after swap sum p0: %.20f\n", is , it , sum(p0[0], size));
 //      fprintf(stderr, "is %d, it %d, after swap sum p1: %.20f\n", is , it , sum(p1[0], size));
 
       record_seis(&dobs[it*ng], gxz, p0, ng);
+
+      ptr=p0; p0=p1; p1=ptr;
     }
     matrix_transpose(dobs, trans, ng, nt);
     sf_floatwrite(trans, ng*nt, shots);

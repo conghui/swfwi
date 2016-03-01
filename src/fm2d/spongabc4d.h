@@ -20,6 +20,7 @@ public:
   void setVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, int ns, const int *sxz, int snz);
   void addSource(float *p, const float *source, const ShotPosition &pos);
+  void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);
 
 private:
   void applySponge(float *p);

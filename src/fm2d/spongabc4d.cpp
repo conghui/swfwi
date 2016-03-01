@@ -178,3 +178,21 @@ void SpongAbc4d::addSource(float* p, const float* source, const ShotPosition& po
 //    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }
+
+void SpongAbc4d::recordSeis(float* seis_it, const float* p,
+    const ShotPosition& geoPos) {
+
+  int ng = geoPos.ns;
+  int nzpad = vel->nz;
+
+//  DEBUG() << format("ng %d") % ng;
+//  float sum = 0;
+  for (int ig = 0; ig < ng; ig++) {
+    int gx = geoPos.getx(ig) + nb;
+    int gz = geoPos.getz(ig);
+    int idx = gx * nzpad + gz;
+    seis_it[ig] = p[idx];
+//    DEBUG() << format("ig %d, idx %d, v %.20f") % ig % idx % seis_it[ig];
+  }
+
+}

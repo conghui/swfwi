@@ -67,16 +67,10 @@ int main(int argc, char* argv[])
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
-  for (size_t i = 0; i < v0.dat.size(); i++) {
-//    DEBUG() << format("%f") % v0.dat[i];
-  }
-  sf_file f = sf_output("readvel.rsf");
-  sf_putint(f, "n1", nz);
-  sf_putint(f, "n2", nx);
-  sf_floatwrite(&v0.dat[0], nx * nz, f);
 
-  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
-//  Damp4t10d fmMethod(dt, params.dx, nb);
+//  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
+  Damp4t10d fmMethod(dt, params.dx, nb);
+
   Velocity exvel = fmMethod.transformVelocityForModeling(v0);
 
   fmMethod.setVelocity(exvel);
@@ -84,42 +78,33 @@ int main(int argc, char* argv[])
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
-  sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
-  sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-
-//  DEBUG() << format("nt %d, fm %d, dt %f, amp %f") % nt % fm % dt % params.amp;
-//  DEBUG() << format("sum wlt: %.20f") % sum(wlt);
-//
-//  DEBUG() << format("sum v0: %.20f") % sum(v0.dat);
-//  DEBUG() << format("sum exvel: %.20f") % sum(exvel.dat);
-//
-//  DEBUG() << "use shot-position";
-//  ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
-//  return 0;
-  for(int is=0; is<ns; is++)
-  {
+  for(int is=0; is<ns; is++) {
     std::vector<float> p0(exvel.nz * exvel.nx, 0);
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
     std::vector<float> trans(params.nt * params.ng, 0);
     ShotPosition curSrcPos = allSrcPos.clip(is, is);
 
-    for(int it=0; it<nt; it++)
-    {
+    for(int it=0; it<nt; it++) {
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
+      TRACE() << format("it %d, sum p after adding source %.20f") % it % sum(p1);
+
       fmMethod.stepForward(&p0[0], &p1[0]);
+      TRACE() << format("it %d, sum p after fd %.20f") % it % sum(p0);
+
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
+      TRACE() << format("it %d, sum dobs %.20f") % it % sum(&dobs[it * ng], ng);
 
       std::swap(p1, p0);
-//      fprintf(stderr, "is %d, it %d, after swap sum p0: %.20f\n", is , it , sum(p0));
-//      fprintf(stderr, "is %d, it %d, after swap sum p1: %.20f\n", is , it , sum(p1));
-
-      record_seis(&dobs[it*ng], &gxz[0], &p0[0], ng, nz, nb);
     }
+
     matrix_transpose(&dobs[0], &trans[0], ng, nt);
     sf_floatwrite(&trans[0], ng*nt, params.shots);
-//    fprintf(stderr, "sum trans: %.20f\n", sum(trans));
+    DEBUG() << format("shot %d, sum dobs %.20f") % is % sum(trans);
+
   }
 
   return 0;
