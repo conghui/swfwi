@@ -61,27 +61,27 @@ extern "C"
 #include "sum.h"
 #include "sf-velocity-reader.h"
 #include "shotdata-reader.h"
+#include "velocity.h"
+#include "shot-position.h"
+#include "enquistabc2d.h"
 
 float cal_obj_derr_illum_grad(const FwiParams &params,
     float *derr,  /* output */
     float *illum, /* output */
     float *g1,    /* output */
-    const float *vv,
     const float *wlt,
     const float *dobs,
-    const int *sxz,
-    const int *gxz)
+    const EnquistAbc2d &fmMethod,
+    const ShotPosition &allSrcPos,
+    const ShotPosition &allGeoPos)
 {
   int nt = params.nt;
   int nz = params.nz;
   int nx = params.nx;
   int ng = params.ng;
   int ns = params.ns;
-  float dt = params.dt;
-  float dx = params.dx;
-  float dz = params.dz;
 
-  std::vector<float> bndr(nt * (2 * nz + nx), 0); /* boundaries for wavefield reconstruction */
+  std::vector<float> bndr = fmMethod.initBndryVector(nt);
   std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
 
   std::vector<float> sp0(nz * nx); /* source wavefield p0 */
@@ -92,22 +92,22 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
   std::vector<float> gp2(nz * nx); /* geophone/receiver wavefield p2 */
   std::vector<float> lap(nz * nx); /* laplace of the source wavefield */
 
-  float dtx = dt / dx;
-  float dtz = dt / dz;
-  int nb = 0; // no expanded boundary
-
   for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
+
+    ShotPosition curSrcPos = allSrcPos.clip(is);
+
     for (int it = 0; it < nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
+      fmMethod.addSource(&sp1[0], &wlt[it], curSrcPos);
+      fmMethod.stepForward(&sp0[0], &sp1[0], &sp2[0]);
+
       // cycle swap
       cycleSwap(sp0, sp1, sp2);
 
-      rw_bndr(&bndr[it * (2 * nz + nx)], &sp0[0], nz, nx, true);
+      fmMethod.writeBndry(&bndr[0], &sp0[0], it);
+      fmMethod.recordSeis(&dcal[0], &sp0[0], allGeoPos);
 
-      record_seis(&dcal[0], gxz, &sp0[0], ng, nz, nb);
       cal_residuals(&dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
 
@@ -117,14 +117,16 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
     std::fill(gp1.begin(), gp1.end(), 0);
 
     for (int it = nt - 1; it > -1; it--) {
-      rw_bndr(&bndr[it * (2 * nz + nx)], &sp1[0], nz, nx, false);
-      step_backward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0], vv, dtz, dtx, nz, nx);
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, false);
+      /// backward propagate source wavefield
+      fmMethod.readBndry(&bndr[0], &sp1[0], it);
+      fmMethod.stepBackward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0]);
+      fmMethod.subSource(&sp1[0], &wlt[it], curSrcPos);
 
-      add_source(&gp1[0], &derr[is * ng * nt + it * ng], gxz, ng, nz, nb, true);
+      /// forward propagate geophone wavefield
+      fmMethod.addSource(&gp1[0], &derr[is * ng * nt + it * ng], allGeoPos);
+      fmMethod.stepForward(&gp0[0], &gp1[0], &gp2[0]);
 
-      step_forward(&gp0[0], &gp1[0], &gp2[0], vv, dtz, dtx, nz, nx);
-
+      /// calculate gradient
       cal_gradient(&g1[0], &lap[0], &gp1[0], nz, nx);
 
       cycleSwap(sp0, sp1, sp2);
@@ -139,13 +141,13 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 }
 
 float calVelUpdateStepLen(const FwiParams &params,
-    const float *vtmp,
     const float *wlt,
     const float *dobs,
-    const int *sxz,
-    const int *gxz,
     const float *derr,
-    float epsil
+    float epsil,
+    const EnquistAbc2d &fmMethod,
+    const ShotPosition &allSrcPos,
+    const ShotPosition &allGeoPos
     )
 {
   int nt = params.nt;
@@ -153,9 +155,6 @@ float calVelUpdateStepLen(const FwiParams &params,
   int nx = params.nx;
   int ng = params.ng;
   int ns = params.ns;
-  float dt = params.dt;
-  float dx = params.dx;
-  float dz = params.dz;
 
   std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
   std::vector<float> sp0(nz * nx); /* source wavefield p0 */
@@ -165,21 +164,19 @@ float calVelUpdateStepLen(const FwiParams &params,
   std::vector<float> alpha1(ng, 0); /* numerator of alpha, length=ng */
   std::vector<float> alpha2(ng, 0); /* denominator of alpha, length=ng */
 
-  float dtx = dt / dx;
-  float dtz = dt / dz;
-  int nb = 0; // no expanded boundary
-
   for (int is = 0; is < ns; is++) {
     std::fill(sp0.begin(), sp0.end(), 0);
     std::fill(sp1.begin(), sp1.end(), 0);
+    ShotPosition currSrcPos = allSrcPos.clip(is);
+
     for (int it = 0; it < nt; it++) {
-      add_source(&sp1[0], &wlt[it], &sxz[is], 1, nz, nb, true);
-      step_forward(&sp0[0], &sp1[0], &sp2[0], &vtmp[0], dtz, dtx, nz, nx);
+      fmMethod.addSource(&sp1[0], &wlt[it], currSrcPos);
+      fmMethod.stepForward(&sp0[0], &sp1[0], &sp2[0]);
 
-      std::swap(sp0, sp1);
-      std::swap(sp1, sp2);
+      cycleSwap(sp0, sp1, sp2);
 
-      record_seis(&dcal[0], gxz, &sp0[0], ng, nz, nb);
+      fmMethod.recordSeis(&dcal[0], &sp0[0], allGeoPos);
+
       sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
     }
   }
@@ -198,26 +195,25 @@ int main(int argc, char *argv[]) {
 
   FwiParams &params = FwiParams::instance();
 
-  std::vector<float> vv(params.nz * params.nx, 0);    /* updated velocity */
   std::vector<float> dobs(params.ns * params.nt * params.ng); /* observed data */
   std::vector<float> cg(params.nz * params.nx, 0);    /* conjugate gradient */
   std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
   std::vector<float> wlt(params.nt); /* ricker wavelet */
-  std::vector<int> sxz(params.ns); /* source positions */
-  std::vector<int> gxz(params.ng); /* geophone positions */
   std::vector<float> objval(params.niter, 0); /* objective/misfit function */
 
-  /* initialize varibles */
+  /* initialize wavelet */
   rickerWavelet(&wlt[0], params.nt, params.fm, params.dt, params.amp);
-  sg_init(&sxz[0], params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
-  sg_init(&gxz[0], params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
+
+  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, params.ns, params.nz);
+  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
   // read velocity
-  SfVelocityReader velReader(params.vinit);
-  velReader.read(&vv[0], vv.size());
+  Velocity vel = SfVelocityReader::read(params.vinit, params.nx, params.nz);
 
   // read observed data
   ShotDataReader::serialRead(params.shots, &dobs[0], params.ns, params.nt, params.ng);
+
+  EnquistAbc2d fmMethod(params.dt, params.dx, params.dz);
 
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
@@ -225,12 +221,14 @@ int main(int argc, char *argv[]) {
     std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
     std::vector<float> derr(params.ns * params.ng * params.nt, 0); /* residual/error between synthetic and observation */
     std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
-    std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
+    Velocity vtmp = vel;  /* temporary velocity computed with epsil */
+
+    fmMethod.bindVelocity(vel);
 
     /**
      * calculate local objective function & derr & illum & g1(gradient)
      */
-    float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &vv[0], &wlt[0], &dobs[0], &sxz[0], &gxz[0]);
+    float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &wlt[0], &dobs[0], fmMethod, allSrcPos, allGeoPos);
 
     DEBUG() << format("sum_derr %f, sum_illum %f, sum_g1 %f") % sum(derr) % sum(illum) % sum(g1);
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
@@ -239,7 +237,7 @@ int main(int argc, char *argv[]) {
     float beta = 0;
     sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
 
-    scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
+    scale_gradient(&g1[0], &vel.dat[0], &illum[0], params.nz, params.nx, params.precon);
     bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
     bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
     sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
@@ -248,16 +246,17 @@ int main(int argc, char *argv[]) {
     beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
 
     cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
-    epsil = cal_epsilon(&vv[0], &cg[0], params.nz, params.nx);
-    cal_vtmp(&vtmp[0], &vv[0], &cg[0], epsil, params.nz, params.nx);
+    epsil = cal_epsilon(&vel.dat[0], &cg[0], params.nz, params.nx);
+    cal_vtmp(&vtmp.dat[0], &vel.dat[0], &cg[0], epsil, params.nz, params.nx);
 
     std::swap(g1, g0); // let g0 be the previous gradient
 
-    float alpha = calVelUpdateStepLen(params, &vtmp[0], &wlt[0], &dobs[0], &sxz[0], &gxz[0], &derr[0], epsil);
+    fmMethod.bindVelocity(vtmp);
+    float alpha = calVelUpdateStepLen(params, &wlt[0], &dobs[0], &derr[0], epsil, fmMethod, allSrcPos, allGeoPos);
 
-    update_vel(&vv[0], &cg[0], alpha, params.nz, params.nx);
+    update_vel(&vel.dat[0], &cg[0], alpha, params.nz, params.nx);
 
-    sf_floatwrite(&vv[0], params.nz * params.nx, params.vupdates);
+    sf_floatwrite(&vel.dat[0], params.nz * params.nx, params.vupdates);
 
     // output important information at each FWI iteration
     INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;

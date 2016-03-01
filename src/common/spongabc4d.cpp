@@ -6,6 +6,7 @@
  */
 
 #include <ostream>
+#include <cmath>
 #include "spongabc4d.h"
 #include "sum.h"
 #include "logger.h"
@@ -121,7 +122,7 @@ void SpongAbc4d::applySponge(float* p) {
   }
 }
 
-void SpongAbc4d::setVelocity(const Velocity& _vel) {
+void SpongAbc4d::bindVelocity(const Velocity& _vel) {
   this->vel = &_vel;
 }
 
@@ -130,14 +131,8 @@ void SpongAbc4d::setVelocity(const Velocity& _vel) {
 void SpongAbc4d::initbndr() {
   for(int ib=0;ib<nb;ib++){
     float tmp=0.015*(nb-ib);
-    bndr[ib]=expf(-tmp*tmp);
+    bndr[ib]=std::exp(-tmp*tmp);
   }
-
-//  static bool init = false;
-//  if (!init) {
-//    init = true;
-//    fprintf(stderr, "sum bndr %.20f\n", sum(bndr));
-//  }
 }
 
 

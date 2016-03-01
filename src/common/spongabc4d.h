@@ -9,7 +9,6 @@
 #define SRC_FM2D_SPONGABC4D_H_
 
 #include "velocity.h"
-#include "fm-params.h"
 #include "shot-position.h"
 
 class SpongAbc4d {
@@ -17,7 +16,7 @@ public:
   SpongAbc4d(float _dt, float _dx, float _dz, int _nb);
   Velocity transformVelocityForModeling(const Velocity &v0);
   void stepForward(float *p0, float *p1);
-  void setVelocity(const Velocity &_vel);
+  void bindVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, int ns, const int *sxz, int snz);
   void addSource(float *p, const float *source, const ShotPosition &pos);
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);

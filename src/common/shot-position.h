@@ -13,7 +13,8 @@
 class ShotPosition {
 public:
   ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int ns, int nz);
-  ShotPosition clip(int begin, int end);
+  ShotPosition clipRange(int begin, int end) const;
+  ShotPosition clip(int idx) const;
   int getx(int idx) const;
   int getz(int idx) const;
 

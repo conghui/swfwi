@@ -61,7 +61,7 @@ dirs = dict(dirlist)
 
 # normally, you don't need to modify from the line below
 # ---------------------------------------------------------------------- #
-is_debug_mode = ARGUMENTS.get('debug', 1)
+is_debug_mode = ARGUMENTS.get('debug', 0)
 if int(is_debug_mode):
   print "Debug mode"
   cur_cflags = debug_flags + warn_flags + other_flags

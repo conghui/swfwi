@@ -17,7 +17,7 @@ public:
   Velocity transformVelocityForModeling(const Velocity &vel);
 
   void stepForward(float *p0, float *p1);
-  void setVelocity(const Velocity &_vel);
+  void bindVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, const ShotPosition &pos);
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);
 

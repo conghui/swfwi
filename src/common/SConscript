@@ -13,6 +13,9 @@ lib_modules = """
 			  encoder.cpp
 			  velocity.cpp
 			  shot-position.cpp
+			  spongabc4d.cpp
+			  damp4t10d.cpp
+			  enquistabc2d.cpp
               """.split()
 
 extra_include_dir = [

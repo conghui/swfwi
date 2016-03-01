@@ -36,6 +36,7 @@ void SfVelocityReader::read(float* vv, size_t count) {
 
 Velocity SfVelocityReader::read(sf_file file, int nx, int nz) {
   Velocity v(nx, nz);
+  sf_seek(file, 0, SEEK_SET);
   sf_floatread(&v.dat[0], nx * nz, file);
 
   return v;

@@ -9,7 +9,7 @@
 #include <algorithm>
 
 ShotPosition::ShotPosition(int szbeg, int sxbeg, int jsz, int jsx, int _ns, int _nz) :
-    pos(_ns), ns(_ns), nz(_nz)
+    ns(_ns), pos(_ns), nz(_nz)
 
 {
   for (int is = 0; is < ns; is++) {
@@ -23,7 +23,7 @@ int ShotPosition::getx(int idx) const {
   return pos[idx] / nz;
 }
 
-ShotPosition ShotPosition::clip(int begin, int end) {
+ShotPosition ShotPosition::clipRange(int begin, int end) const {
   ShotPosition ret = *this;
   ret.ns = end - begin + 1;
   ret.pos.resize(ret.ns);
@@ -34,4 +34,8 @@ ShotPosition ShotPosition::clip(int begin, int end) {
 
 int ShotPosition::getz(int idx) const {
   return pos[idx] % nz;
+}
+
+ShotPosition ShotPosition::clip(int idx) const {
+  return clipRange(idx, idx);
 }

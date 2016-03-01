@@ -108,7 +108,7 @@ void Damp4t10d::stepForward(float* p0, float* p1) {
   fd4t10s_bd1_2d(p0, p1);
 }
 
-void Damp4t10d::setVelocity(const Velocity& _vel) {
+void Damp4t10d::bindVelocity(const Velocity& _vel) {
   this->vel = &_vel;
 }
 

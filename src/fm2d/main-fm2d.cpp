@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 
   Velocity exvel = fmMethod.transformVelocityForModeling(v0);
 
-  fmMethod.setVelocity(exvel);
+  fmMethod.bindVelocity(exvel);
 
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
     std::vector<float> trans(params.nt * params.ng, 0);
-    ShotPosition curSrcPos = allSrcPos.clip(is, is);
+    ShotPosition curSrcPos = allSrcPos.clipRange(is, is);
 
     for(int it=0; it<nt; it++) {
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
