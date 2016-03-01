@@ -55,6 +55,7 @@ dirlist = [
    ('serial-fwi', 'src/serial-fwi2d'),
    ('fm2d', 'src/fm2d'),
    ('common', 'src/common'),
+   ('modeling', 'src/modeling'),
    ('util', 'src/util')
 ]
 dirs = dict(dirlist)

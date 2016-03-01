@@ -1,23 +1,19 @@
 import os
 Import('*')
 
-lib = "common"
+lib = "modeling"
 # these modules will compiled in to library
 lib_modules = """
-			  common.cpp
-			  ricker-wavelet.cpp
-			  mpi-utility.cpp
-			  sf-velocity-reader.cpp
-			  shotdata-reader.cpp
-			  random-code.cpp
-			  encoder.cpp
-			  velocity.cpp
-			  shot-position.cpp
+
+			  spongabc4d.cpp
+			  damp4t10d.cpp
+			  enquistabc2d.cpp
               """.split()
 
 extra_include_dir = [
   os.environ['RSFROOT'] + '/include',
-  "#" + dirs['util']
+  "#" + dirs['util'],
+  '#' + dirs['common'],
 ]
 
 ############################### for library ###########################
