@@ -63,7 +63,7 @@ SpongAbc4d::SpongAbc4d(float _dt, float _dx, float _dz, int _nb)
   initbndr();
 }
 
-void SpongAbc4d::stepForward(float *p0, float *p1) const {
+void SpongAbc4d::stepForward(float *p0, const float *p1) const {
   int nx = vel->nx;
   int nz = vel->nz;
   const std::vector<float> &vv = vel->dat;
@@ -79,9 +79,6 @@ void SpongAbc4d::stepForward(float *p0, float *p1) const {
       p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + vv[ix * nz + iz] * tmp;
     }
   }
-
-  applySponge(p0);
-  applySponge(p1);
 
 }
 
