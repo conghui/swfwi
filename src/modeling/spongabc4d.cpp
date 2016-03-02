@@ -9,6 +9,7 @@
 #include <cmath>
 #include "spongabc4d.h"
 #include "sum.h"
+#include <cstdio>
 #include "logger.h"
 
 static void expand(Velocity &exvel, const Velocity &v0, int nb) {
@@ -20,18 +21,11 @@ static void expand(Velocity &exvel, const Velocity &v0, int nb) {
   std::vector<float> &b = exvel.dat;
 
   /// internal
-
-  DEBUG() << format("000: %.20f") % sum(b);
-  DEBUG() << format("000: sum a %.20f") % sum(a);
   for (int ix = 0; ix < nx; ix++) {
     for (int iz = 0; iz < nz; iz++) {
       b[(nb + ix) * nzpad + iz] = a[ix * nz + iz];
-//      DEBUG() << format("ix %d, iz %d, nb %d, aidx %d, vv[%d] %.20f") %
-//          ix % iz % nb % (ix * nz + iz) % ((nb + ix) * nzpad + iz) % b[(nb + ix) * nzpad + iz];
     }
   }
-
-  DEBUG() << format("111: %.20f") % sum(b);
 
   /// boundary
   for (int ix = 0; ix < nxpad; ix++) {
@@ -122,6 +116,8 @@ void SpongAbc4d::applySponge(float* p) const {
   }
 }
 
+
+
 void SpongAbc4d::initbndr() {
   for(int ib=0;ib<nb;ib++){
     float tmp=0.015*(nb-ib);
@@ -187,4 +183,75 @@ void SpongAbc4d::recordSeis(float* seis_it, const float* p,
 }
 
 std::vector<float> SpongAbc4d::initBndryVector(int nt) const {
+  if (vel == NULL) {
+    ERROR() << __PRETTY_FUNCTION__ << ": you should bind velocity first";
+    exit(1);
+  }
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nx = nxpad - 2*nb;
+  int nz = nzpad - nb;
+
+  bndrSize = FDLEN * (
+             nx +   /* bottom */
+             2 * nz /* left + right */
+             );
+  return std::vector<float>(nt*bndrSize, 0);
+}
+
+void SpongAbc4d::writeBndry(float* _bndr, const float* p, int it) const {
+  /**
+   * say the FDLEN = 2, then the boundary we should save is mark by (*)
+   * we omit the upper layer
+   *
+   *    **+-------------+**
+   *    **-             -**
+   *    **-             -**
+   *    **-             -**
+   *    **-             -**
+   *    **-             -**
+   *    **+-------------+**
+   *      ***************
+   *      ***************
+   *
+   */
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nx = nxpad - 2 * nb;
+  int nz = nzpad - nb;
+  float *bndr = &_bndr[it * bndrSize];
+
+  for (int ix = 0; ix < nx; ix++) {
+    for(int iz = 0; iz < FDLEN; iz++) {
+      bndr[iz + FDLEN*ix] = p[(ix+nb)*nzpad + (iz+nz)]; // bottom
+    }
+  }
+
+  for (int iz = 0; iz < nz; iz++) {
+    for(int ix=0; ix < FDLEN; ix++) {
+      bndr[FDLEN*nx+iz+nz*ix]         = p[(ix-2+nb)*nzpad + (iz)];   // left
+      bndr[FDLEN*nx+iz+nz*(ix+FDLEN)] = p[(ix+nx+nb)*nzpad + (iz)];  // right
+    }
+  }
+}
+
+void SpongAbc4d::readBndry(const float* _bndr, float* p, int it) const {
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nx = nxpad - 2 * nb;
+  int nz = nzpad - nb;
+  const float *bndr = &_bndr[it * bndrSize];
+
+  for (int ix = 0; ix < nx; ix++) {
+    for(int iz = 0; iz < FDLEN; iz++) {
+      p[(ix+nb)*nzpad + (iz+nz)] = bndr[iz + FDLEN*ix]; // bottom
+    }
+  }
+
+  for (int iz = 0; iz < nz; iz++) {
+    for(int ix=0; ix < FDLEN; ix++) {
+      p[(ix-2+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*ix];   // left
+      p[(ix+nx+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*(ix+FDLEN)];  // right
+    }
+  }
 }
