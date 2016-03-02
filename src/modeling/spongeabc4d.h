@@ -21,7 +21,6 @@ public: // overrice
 
 public:
   void stepForward(float *p0, const float *p1) const;
-  void addSource(float *p, const float *source, int ns, const int *sxz, int snz);
   void addSource(float *p, const float *source, const ShotPosition &pos);
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);
   std::vector<float> initBndryVector(int nt) const;

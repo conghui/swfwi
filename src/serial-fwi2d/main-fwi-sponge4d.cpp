@@ -86,18 +86,17 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 
   std::vector<float> sp0(nz * nx); /* source wavefield p0 */
   std::vector<float> sp1(nz * nx); /* source wavefield p1 */
-  std::vector<float> sp2(nz * nx); /* source wavefield p2 */
   std::vector<float> gp0(nz * nx); /* geophone/receiver wavefield p0 */
   std::vector<float> gp1(nz * nx); /* geophone/receiver wavefield p1 */
   std::vector<float> gp2(nz * nx); /* geophone/receiver wavefield p2 */
   std::vector<float> lap(nz * nx); /* laplace of the source wavefield */
 
   for (int is = 0; is < ns; is++) {
-//    std::fill(sp0.begin(), sp0.end(), 0);
-//    std::fill(sp1.begin(), sp1.end(), 0);
-//
-//    ShotPosition curSrcPos = allSrcPos.clip(is);
-//
+    std::fill(sp0.begin(), sp0.end(), 0);
+    std::fill(sp1.begin(), sp1.end(), 0);
+
+    ShotPosition curSrcPos = allSrcPos.clip(is);
+
 //    for (int it = 0; it < nt; it++) {
 //      fmMethod.addSource(&sp1[0], &wlt[it], curSrcPos);
 //      fmMethod.stepForward(&sp0[0], &sp1[0], &sp2[0]);

@@ -5,7 +5,7 @@ lib = "modeling"
 # these modules will compiled in to library
 lib_modules = """
 			  i-modeling.cpp
-			  spongabc4d.cpp
+			  spongeabc4d.cpp
 			  damp4t10d.cpp
 			  enquistabc2d.cpp
               """.split()

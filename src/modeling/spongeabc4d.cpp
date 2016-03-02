@@ -139,18 +139,6 @@ Velocity SpongeAbc4d::transformVelocityForModeling(const Velocity& v0) const {
 }
 
 
-void SpongeAbc4d::addSource(float* p, const float* source, int ns,
-    const int* sxz, int snz)
-{
-  int nzpad = snz + nb;
-
-  for (int is = 0; is < ns; is++) {
-    int sx = sxz[is] / snz + nb;
-    int sz = sxz[is] % snz;
-    p[sx * nzpad + sz] += source[is];
-  }
-}
-
 void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) {
   int nzpad = vel->nz;
 
