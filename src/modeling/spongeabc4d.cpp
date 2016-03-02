@@ -63,6 +63,7 @@ void SpongeAbc4d::stepForward(float *p0, const float *p1) const {
 //  DEBUG() << format("in sponge, nx %d, nz %d") % nx % nz;
   const std::vector<float> &vv = vel->dat;
 
+#pragma omp parallel for
   for (int ix = 2; ix < nx - 2; ix++) {
     for (int iz = 2; iz < nz - 2; iz++) {
       float tmp = c0 * p1[ix * nz + iz] +
@@ -232,6 +233,7 @@ void SpongeAbc4d::stepBackward(float* illum, float* lap, float* p0,
   int nz = vel->nz;
   const std::vector<float> &vv = vel->dat;
 
+#pragma omp parallel for
   for (int ix = 2; ix < nx - 2; ix++) {
     for (int iz = 2; iz < nz - 2; iz++) {
       float tmp = c0 * p1[ix * nz + iz] +
@@ -275,4 +277,18 @@ void SpongeAbc4d::manipSource(float* p, const float* source,
 
 const Velocity& SpongeAbc4d::getVelocity() const {
   return *vel;
+}
+
+void SpongeAbc4d::shrinkDomain(float* dst, const float* src, int shrinkNx,
+    int shrinkNz) const {
+  int nx = shrinkNx;
+  int nz = shrinkNz;
+  int nzpad = nz + nb;
+
+  /// internal
+  for (int ix = 0; ix < nx; ix++) {
+    for (int iz = 0; iz < nz; iz++) {
+      dst[ix * nz + iz] = src[(nb + ix) * nzpad + iz];
+    }
+  }
 }

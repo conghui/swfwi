@@ -138,21 +138,21 @@ float cal_obj_derr_illum_grad(
   return obj;
 }
 
-float calVelUpdateStepLen(const FwiParams &params,
+float calVelUpdateStepLen(
     const float *wlt,
     const float *dobs,
     const float *derr,
     float epsil,
+    int nt,
     const SpongeAbc4d &fmMethod,
     const ShotPosition &allSrcPos,
     const ShotPosition &allGeoPos
     )
 {
-  int nt = params.nt;
-  int nz = params.nz;
-  int nx = params.nx;
-  int ng = params.ng;
-  int ns = params.ns;
+  int nz = fmMethod.getVelocity().nz;
+  int nx = fmMethod.getVelocity().nx;
+  int ng = allGeoPos.ns;
+  int ns = allSrcPos.ns;
 
   std::vector<float> dcal(ng, 0); /* calculated/synthetic seismic data */
   std::vector<float> sp0(nz * nx, 0); /* source wavefield p0 */
@@ -236,8 +236,8 @@ int main(int argc, char *argv[]) {
     std::vector<float> g1(nxpad * nzpad, 0);    /* gradient at curret step */
     std::vector<float> derr(ns * ng * nt, 0);   /* residual/error between synthetic and observation */
     std::vector<float> illum(nxpad * nxpad, 0); /* illumination of the source wavefield */
+    std::vector<float> tmpForWrite(mnx * mnz);  /* model size for write */
     Velocity vtmp = exvel;                      /* temporary velocity computed with epsil */
-
     fmMethod.bindVelocity(exvel);
 
     /**
@@ -247,37 +247,40 @@ int main(int argc, char *argv[]) {
 
     DEBUG() << format("sum_derr %f, sum_illum %f, sum_g1 %f") % sum(derr) % sum(illum) % sum(g1);
 
-    exit(0);
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
 
     float epsil = 0;
     float beta = 0;
-    sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
+    fmMethod.shrinkDomain(&tmpForWrite[0], &illum[0], mnx, mnz);
+    sf_floatwrite(&tmpForWrite[0], tmpForWrite.size(), params.illums);
 
-    scale_gradient(&g1[0], &exvel.dat[0], &illum[0], params.nz, params.nx, params.precon);
-    bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
-    bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
-    sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
+    scale_gradient(&g1[0], &exvel.dat[0], &illum[0], nzpad, nxpad, params.precon);
+    bell_smoothz(&g1[0], &illum[0], params.rbell, nzpad, nxpad);
+    bell_smoothx(&illum[0], &g1[0], params.rbell, nzpad, nxpad);
+
+    fmMethod.shrinkDomain(&tmpForWrite[0], &g1[0], mnx, mnz);
+    sf_floatwrite(&tmpForWrite[0], tmpForWrite.size(), params.grads);
 
     DEBUG() << format("before beta: sum_g0: %f, sum_g1: %f, sum_cg: %f") % sum(g0) % sum(g1) % sum(cg);
-    beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
+    beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], nzpad, nxpad);
 
-    cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
-    epsil = cal_epsilon(&exvel.dat[0], &cg[0], params.nz, params.nx);
-    cal_vtmp(&vtmp.dat[0], &exvel.dat[0], &cg[0], epsil, params.nz, params.nx);
+    cal_conjgrad(&g1[0], &cg[0], beta, nzpad, nxpad);
+    epsil = cal_epsilon(&exvel.dat[0], &cg[0], nzpad, nxpad);
+    cal_vtmp(&vtmp.dat[0], &exvel.dat[0], &cg[0], epsil, nzpad, nxpad);
 
     std::swap(g1, g0); // let g0 be the previous gradient
 
     fmMethod.bindVelocity(vtmp);
-    float alpha = calVelUpdateStepLen(params, &wlt[0], &dobs[0], &derr[0], epsil, fmMethod, allSrcPos, allGeoPos);
+    float alpha = calVelUpdateStepLen(&wlt[0], &dobs[0], &derr[0], epsil, nt, fmMethod, allSrcPos, allGeoPos);
 
-    update_vel(&exvel.dat[0], &cg[0], alpha, params.nz, params.nx);
+    update_vel(&exvel.dat[0], &cg[0], alpha, nzpad, nxpad);
 
-    sf_floatwrite(&exvel.dat[0], params.nz * params.nx, params.vupdates);
+    fmMethod.shrinkDomain(&tmpForWrite[0], &exvel.dat[0], mnx, mnz);
+    sf_floatwrite(&tmpForWrite[0], tmpForWrite.size(), params.vupdates);
 
     // output important information at each FWI iteration
     INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
-//    INFO() << timer.format(2);
+    INFO() << timer.format(2);
 
   } /// end of iteration
 

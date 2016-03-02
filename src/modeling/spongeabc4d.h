@@ -31,7 +31,7 @@ public:
   void readBndry(const float *bndr, float *p, int it) const;
   void applySponge(float *p) const;
   const Velocity &getVelocity() const;
-
+  void shrinkDomain(float *dst, const float *src, int shrinkNx, int shrinkNz) const;
 private:
   const static int FDLEN = 2;
 
