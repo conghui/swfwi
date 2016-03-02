@@ -30,7 +30,7 @@ private:
 private:
   static FwiParams *ins;
 
-public:
+public: // command line arguments
   sf_file vinit;        /* initial velocity model, unit=m/s */
   sf_file shots;        /* recorded shots from exact velocity model */
   sf_file vupdates;     /* updated velocity in iterations */
@@ -38,13 +38,16 @@ public:
   sf_file illums;       /* source illumination in iterations */
   sf_file objs;         /* values of objective function in iterations */
   bool verb;            // verbosity
+  bool precon;
+  int niter;
+  int rbell;
+  int nb;               // boundary
+
+public: // parameters from input files
   int nz;
   int nx;
   float dz;
   float dx;
-  bool precon;
-  int niter;
-  int rbell;
   int nt;
   int ng;
   int ns;

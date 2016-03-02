@@ -63,13 +63,13 @@ static void numericTrans(Velocity &v0, float dt) {
 }
 
 SpongAbc4d::SpongAbc4d(float _dt, float _dx, float _dz, int _nb)
-  : vel(NULL), bndr(_nb), dt(_dt), dx(_dx), dz(_dz), nb(_nb)
+  : IModeling(), bndr(_nb), dt(_dt), dx(_dx), dz(_dz), nb(_nb)
 {
   initCoeff();
   initbndr();
 }
 
-void SpongAbc4d::stepForward(float *p0, float *p1) {
+void SpongAbc4d::stepForward(float *p0, float *p1) const {
   int nx = vel->nx;
   int nz = vel->nz;
   const std::vector<float> &vv = vel->dat;
@@ -102,7 +102,7 @@ void SpongAbc4d::initCoeff() {
   c0=-2.0*(c11+c12+c21+c22);
 }
 
-void SpongAbc4d::applySponge(float* p) {
+void SpongAbc4d::applySponge(float* p) const {
   int nz = vel->nz;
   int nx = vel->nx;
 
@@ -122,12 +122,6 @@ void SpongAbc4d::applySponge(float* p) {
   }
 }
 
-void SpongAbc4d::bindVelocity(const Velocity& _vel) {
-  this->vel = &_vel;
-}
-
-
-
 void SpongAbc4d::initbndr() {
   for(int ib=0;ib<nb;ib++){
     float tmp=0.015*(nb-ib);
@@ -137,7 +131,7 @@ void SpongAbc4d::initbndr() {
 
 
 
-Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) {
+Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) const {
   int nxpad = v0.nx + 2 * nb;
   int nzpad = v0.nz + nb; // free surface
   Velocity exvel(nxpad, nzpad);
@@ -190,4 +184,7 @@ void SpongAbc4d::recordSeis(float* seis_it, const float* p,
 //    DEBUG() << format("ig %d, idx %d, v %.20f") % ig % idx % seis_it[ig];
   }
 
+}
+
+std::vector<float> SpongAbc4d::initBndryVector(int nt) const {
 }

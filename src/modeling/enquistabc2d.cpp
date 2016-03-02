@@ -10,7 +10,7 @@
 #include "enquistabc2d.h"
 
 EnquistAbc2d::EnquistAbc2d(float dt, float dx, float dz) :
-  vel(NULL), dt(dt), dx(dx), dz(dz), dtx(dt/dx), dtz(dt/dz)
+  IModeling(), dt(dt), dx(dx), dz(dz), dtx(dt/dx), dtz(dt/dz)
 {
 
 }
@@ -95,10 +95,6 @@ void EnquistAbc2d::addSource(float* p, const float* source,
   manipSource(p, source, pos, std::plus<float>());
 }
 
-void EnquistAbc2d::bindVelocity(const Velocity& vel) {
-  this->vel = &vel;
-}
-
 void EnquistAbc2d::recordSeis(float* seis_it, const float* p,
     const ShotPosition& geoPos) const {
   int ng = geoPos.ns;
@@ -178,6 +174,10 @@ void EnquistAbc2d::stepBackward(float* illum, float* lap, const float* p0,
       illum[ix * nz + iz] += p1[ix * nz + iz] * p1[ix * nz + iz];
     }
   }
+}
+
+Velocity EnquistAbc2d::transformVelocityForModeling(const Velocity& v0) const {
+  return v0;
 }
 
 void EnquistAbc2d::manipSource(float* p, const float* source,

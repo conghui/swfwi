@@ -131,6 +131,10 @@ void FwiParams::getInputParams() {
      sf_error("cannot find observed data file path");
    }
 
+   /* # layer of boundary */
+   if (!sf_getint("nb", &nb)) {
+     sf_error("nb is not set");
+   }
 }
 
 void FwiParams::putOutputParams() {

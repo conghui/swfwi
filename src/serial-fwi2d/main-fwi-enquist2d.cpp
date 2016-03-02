@@ -208,12 +208,13 @@ int main(int argc, char *argv[]) {
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, params.ng, params.nz);
 
   // read velocity
-  Velocity vel = SfVelocityReader::read(params.vinit, params.nx, params.nz);
+  Velocity v0 = SfVelocityReader::read(params.vinit, params.nx, params.nz);
 
   // read observed data
   ShotDataReader::serialRead(params.shots, &dobs[0], params.ns, params.nt, params.ng);
 
   EnquistAbc2d fmMethod(params.dt, params.dx, params.dz);
+  Velocity vel = fmMethod.transformVelocityForModeling(v0);
 
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
