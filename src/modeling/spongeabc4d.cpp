@@ -5,9 +5,10 @@
  *      Author: rice
  */
 
+#include "spongeabc4d.h"
+
 #include <ostream>
 #include <cmath>
-#include "spongabc4d.h"
 #include "sum.h"
 #include <cstdio>
 #include "logger.h"
@@ -56,14 +57,14 @@ static void numericTrans(Velocity &v0, float dt) {
 
 }
 
-SpongAbc4d::SpongAbc4d(float _dt, float _dx, float _dz, int _nb)
+SpongeAbc4d::SpongeAbc4d(float _dt, float _dx, float _dz, int _nb)
   : IModeling(), bndr(_nb), dt(_dt), dx(_dx), dz(_dz), nb(_nb)
 {
   initCoeff();
   initbndr();
 }
 
-void SpongAbc4d::stepForward(float *p0, const float *p1) const {
+void SpongeAbc4d::stepForward(float *p0, const float *p1) const {
   int nx = vel->nx;
   int nz = vel->nz;
   const std::vector<float> &vv = vel->dat;
@@ -82,7 +83,7 @@ void SpongAbc4d::stepForward(float *p0, const float *p1) const {
 
 }
 
-void SpongAbc4d::initCoeff() {
+void SpongeAbc4d::initCoeff() {
   /*< initialize 4-th order FD coefficients >*/
   float tmp = 1.0/(dz*dz);
   c11 = 4.0*tmp/3.0;
@@ -93,7 +94,7 @@ void SpongAbc4d::initCoeff() {
   c0=-2.0*(c11+c12+c21+c22);
 }
 
-void SpongAbc4d::applySponge(float* p) const {
+void SpongeAbc4d::applySponge(float* p) const {
   int nz = vel->nz;
   int nx = vel->nx;
 
@@ -115,7 +116,7 @@ void SpongAbc4d::applySponge(float* p) const {
 
 
 
-void SpongAbc4d::initbndr() {
+void SpongeAbc4d::initbndr() {
   for(int ib=0;ib<nb;ib++){
     float tmp=0.015*(nb-ib);
     bndr[ib]=std::exp(-tmp*tmp);
@@ -124,7 +125,7 @@ void SpongAbc4d::initbndr() {
 
 
 
-Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) const {
+Velocity SpongeAbc4d::transformVelocityForModeling(const Velocity& v0) const {
   int nxpad = v0.nx + 2 * nb;
   int nzpad = v0.nz + nb; // free surface
   Velocity exvel(nxpad, nzpad);
@@ -138,7 +139,7 @@ Velocity SpongAbc4d::transformVelocityForModeling(const Velocity& v0) const {
 }
 
 
-void SpongAbc4d::addSource(float* p, const float* source, int ns,
+void SpongeAbc4d::addSource(float* p, const float* source, int ns,
     const int* sxz, int snz)
 {
   int nzpad = snz + nb;
@@ -150,7 +151,7 @@ void SpongAbc4d::addSource(float* p, const float* source, int ns,
   }
 }
 
-void SpongAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) {
+void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) {
   int nzpad = vel->nz;
 
   for (int is = 0; is < pos.ns; is++) {
@@ -161,7 +162,7 @@ void SpongAbc4d::addSource(float* p, const float* source, const ShotPosition& po
   }
 }
 
-void SpongAbc4d::recordSeis(float* seis_it, const float* p,
+void SpongeAbc4d::recordSeis(float* seis_it, const float* p,
     const ShotPosition& geoPos) {
 
   int ng = geoPos.ns;
@@ -179,7 +180,7 @@ void SpongAbc4d::recordSeis(float* seis_it, const float* p,
 
 }
 
-std::vector<float> SpongAbc4d::initBndryVector(int nt) const {
+std::vector<float> SpongeAbc4d::initBndryVector(int nt) const {
   if (vel == NULL) {
     ERROR() << __PRETTY_FUNCTION__ << ": you should bind velocity first";
     exit(1);
@@ -196,7 +197,7 @@ std::vector<float> SpongAbc4d::initBndryVector(int nt) const {
   return std::vector<float>(nt*bndrSize, 0);
 }
 
-void SpongAbc4d::writeBndry(float* _bndr, const float* p, int it) const {
+void SpongeAbc4d::writeBndry(float* _bndr, const float* p, int it) const {
   /**
    * say the FDLEN = 2, then the boundary we should save is mark by (*)
    * we omit the upper layer
@@ -232,7 +233,7 @@ void SpongAbc4d::writeBndry(float* _bndr, const float* p, int it) const {
   }
 }
 
-void SpongAbc4d::readBndry(const float* _bndr, float* p, int it) const {
+void SpongeAbc4d::readBndry(const float* _bndr, float* p, int it) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
   int nx = nxpad - 2 * nb;

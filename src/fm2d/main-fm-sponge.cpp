@@ -1,3 +1,4 @@
+
 extern "C" {
 #include <rsf.h>
 }
@@ -18,7 +19,7 @@ extern "C" {
 #include "common.h"
 #include "shot-position.h"
 
-#include "spongabc4d.h"
+#include "../modeling/spongeabc4d.h"
 #include "damp4t10d.h"
 
 int main(int argc, char* argv[])
@@ -46,7 +47,7 @@ int main(int argc, char* argv[])
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
 
-  SpongAbc4d fmMethod(dt, params.dx, params.dz, nb);
+  SpongeAbc4d fmMethod(dt, params.dx, params.dz, nb);
 //  Damp4t10d fmMethod(dt, params.dx, nb);
 
   Velocity exvel = fmMethod.transformVelocityForModeling(v0);

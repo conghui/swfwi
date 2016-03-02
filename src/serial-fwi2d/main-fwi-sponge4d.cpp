@@ -63,7 +63,7 @@ extern "C"
 #include "shotdata-reader.h"
 #include "velocity.h"
 #include "shot-position.h"
-#include "spongabc4d.h"
+#include "../modeling/spongeabc4d.h"
 
 float cal_obj_derr_illum_grad(const FwiParams &params,
     float *derr,  /* output */
@@ -71,7 +71,7 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
     float *g1,    /* output */
     const float *wlt,
     const float *dobs,
-    const SpongAbc4d &fmMethod,
+    const SpongeAbc4d &fmMethod,
     const ShotPosition &allSrcPos,
     const ShotPosition &allGeoPos)
 {
@@ -145,7 +145,7 @@ float calVelUpdateStepLen(const FwiParams &params,
     const float *dobs,
     const float *derr,
     float epsil,
-    const SpongAbc4d &fmMethod,
+    const SpongeAbc4d &fmMethod,
     const ShotPosition &allSrcPos,
     const ShotPosition &allGeoPos
     )
@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
   // read observed data
   ShotDataReader::serialRead(params.shots, &dobs[0], params.ns, params.nt, params.ng);
 
-  SpongAbc4d fmMethod(params.dt, params.dx, params.dz, params.nb);
+  SpongeAbc4d fmMethod(params.dt, params.dx, params.dz, params.nb);
   Velocity vel = fmMethod.transformVelocityForModeling(v0);
 
   float obj0 = 0;

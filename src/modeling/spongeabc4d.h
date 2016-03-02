@@ -12,9 +12,9 @@
 #include "shot-position.h"
 #include "i-modeling.h"
 
-class SpongAbc4d : public IModeling {
+class SpongeAbc4d : public IModeling {
 public:
-  SpongAbc4d(float _dt, float _dx, float _dz, int _nb);
+  SpongeAbc4d(float _dt, float _dx, float _dz, int _nb);
 
 public: // overrice
   Velocity transformVelocityForModeling(const Velocity &v0) const;
