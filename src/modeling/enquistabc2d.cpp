@@ -176,7 +176,7 @@ void EnquistAbc2d::stepBackward(float* illum, float* lap, const float* p0,
   }
 }
 
-Velocity EnquistAbc2d::expandVelocity(const Velocity& v0) const {
+Velocity EnquistAbc2d::expandDomain(const Velocity& v0) const {
   return v0;
 }
 

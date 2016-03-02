@@ -9,6 +9,7 @@
 
 #include <ostream>
 #include <cmath>
+#include <functional>
 #include "sum.h"
 #include <cstdio>
 #include "logger.h"
@@ -50,7 +51,7 @@ static inline float velTransform(float vv, float dt) {
 }
 
 SpongeAbc4d::SpongeAbc4d(float _dt, float _dx, float _dz, int _nb)
-  : IModeling(), bndr(_nb), dt(_dt), dx(_dx), dz(_dz), nb(_nb)
+  : IModeling(), bndr(_nb, 0), dt(_dt), dx(_dx), dz(_dz), nb(_nb)
 {
   initCoeff();
   initbndr();
@@ -59,6 +60,7 @@ SpongeAbc4d::SpongeAbc4d(float _dt, float _dx, float _dz, int _nb)
 void SpongeAbc4d::stepForward(float *p0, const float *p1) const {
   int nx = vel->nx;
   int nz = vel->nz;
+//  DEBUG() << format("in sponge, nx %d, nz %d") % nx % nz;
   const std::vector<float> &vv = vel->dat;
 
   for (int ix = 2; ix < nx - 2; ix++) {
@@ -118,7 +120,7 @@ void SpongeAbc4d::initbndr() {
 
 
 
-Velocity SpongeAbc4d::expandVelocity(const Velocity& v0) const {
+Velocity SpongeAbc4d::expandDomain(const Velocity& v0) const {
   int nxpad = v0.nx + 2 * nb;
   int nzpad = v0.nz + nb; // free surface
   Velocity exvel(nxpad, nzpad);
@@ -129,14 +131,7 @@ Velocity SpongeAbc4d::expandVelocity(const Velocity& v0) const {
 
 
 void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) const {
-  int nzpad = vel->nz;
-
-  for (int is = 0; is < pos.ns; is++) {
-    int sx = pos.getx(is) + nb;
-    int sz = pos.getz(is);
-    p[sx * nzpad + sz] += source[is];
-//    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
-  }
+  manipSource(p, source, pos, std::plus<float>());
 }
 
 void SpongeAbc4d::recordSeis(float* seis_it, const float* p,
@@ -247,6 +242,37 @@ void SpongeAbc4d::stepBackward(float* illum, float* lap, float* p0,
 
       float transvel = velTransform(vv[ix * nz + iz], dt);
       p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + transvel * tmp;
+
+      lap[ix * nz + iz] = -4.0 * p1[ix * nz + iz] +
+                    p1[ix * nz + (iz - 1)] + p1[ix * nz + (iz + 1)] +
+                    p1[(ix - 1) * nz + iz] + p1[(ix + 1) * nz + iz];
+
+//      lap[ix * nz + iz] = -8.0 * p1[ix * nz + iz] +
+//                    p1[ix * nz + (iz - 1)] + p1[ix * nz + (iz - 2)] +
+//                    p1[ix * nz + (iz + 1)] + p1[ix * nz + (iz + 2)] +
+//                    p1[(ix - 1) * nz + iz] + p1[(ix - 2) * nz + iz] +
+//                    p1[(ix + 1) * nz + iz] + p1[(ix + 2) * nz + iz];
+
+      illum[ix * nz + iz] += p1[ix * nz + iz] * p1[ix * nz + iz];
     }
   }
+}
+
+void SpongeAbc4d::subSource(float* p, const float* source,
+    const ShotPosition& pos) const {
+  manipSource(p, source, pos, std::minus<float>());
+}
+
+void SpongeAbc4d::manipSource(float* p, const float* source,
+    const ShotPosition& pos, boost::function2<float, float, float> op) const {
+  int nzpad = vel->nz;
+  for (int is = 0; is < pos.ns; is++) {
+    int sx = pos.getx(is) + nb;
+    int sz = pos.getz(is);
+    p[sx * nzpad + sz] = op(p[sx * nzpad + sz], source[is]);
+  }
+}
+
+const Velocity& SpongeAbc4d::getVelocity() const {
+  return *vel;
 }

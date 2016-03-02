@@ -14,7 +14,7 @@
 class Damp4t10d {
 public:
   Damp4t10d(float dt, float dx, int nb);
-  Velocity expandVelocity(const Velocity &vel);
+  Velocity expandDomain(const Velocity &vel);
 
   void stepForward(float *p0, float *p1);
   void bindVelocity(const Velocity &_vel);

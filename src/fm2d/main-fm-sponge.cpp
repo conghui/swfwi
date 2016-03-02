@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
   SpongeAbc4d fmMethod(dt, params.dx, params.dz, nb);
 //  Damp4t10d fmMethod(dt, params.dx, nb);
 
-  Velocity exvel = fmMethod.expandVelocity(v0);
+  Velocity exvel = fmMethod.expandDomain(v0);
 
   fmMethod.bindVelocity(exvel);
 
