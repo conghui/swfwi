@@ -16,7 +16,7 @@ public:
   void bindVelocity(const Velocity &vel);
 
 public: // virtual
-  virtual Velocity transformVelocityForModeling(const Velocity &v0) const = 0;
+  virtual Velocity expandVelocity(const Velocity &v0) const = 0;
   virtual ~IModeling();
 
 protected:

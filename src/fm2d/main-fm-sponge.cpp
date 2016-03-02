@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
   SpongeAbc4d fmMethod(dt, params.dx, params.dz, nb);
 //  Damp4t10d fmMethod(dt, params.dx, nb);
 
-  Velocity exvel = fmMethod.transformVelocityForModeling(v0);
+  Velocity exvel = fmMethod.expandVelocity(v0);
 
   fmMethod.bindVelocity(exvel);
 
@@ -74,9 +74,9 @@ int main(int argc, char* argv[])
       fmMethod.stepForward(&p0[0], &p1[0]);
       TRACE() << format("it %d, sum p after fd %.20f") % it % sum(p0);
 
-      std::swap(p1, p0);
       fmMethod.applySponge(&p0[0]);
       fmMethod.applySponge(&p1[0]);
+      std::swap(p1, p0);
 
       fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
       TRACE() << format("it %d, sum dobs %.20f") % it % sum(&dobs[it * ng], ng);

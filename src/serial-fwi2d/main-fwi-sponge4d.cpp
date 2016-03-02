@@ -97,27 +97,27 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 
     ShotPosition curSrcPos = allSrcPos.clip(is);
 
-//    for (int it = 0; it < nt; it++) {
-//      fmMethod.addSource(&sp1[0], &wlt[it], curSrcPos);
-//      fmMethod.stepForward(&sp0[0], &sp1[0], &sp2[0]);
-//
-//      // cycle swap
-//      cycleSwap(sp0, sp1, sp2);
-//
-//      fmMethod.writeBndry(&bndr[0], &sp0[0], it);
-//      fmMethod.recordSeis(&dcal[0], &sp0[0], allGeoPos);
-//
-//      cal_residuals(&dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
-//    }
-//
-//    std::swap(sp0, sp1);
-//
-//    std::fill(gp0.begin(), gp0.end(), 0);
-//    std::fill(gp1.begin(), gp1.end(), 0);
-//
-//    for (int it = nt - 1; it > -1; it--) {
-//      /// backward propagate source wavefield
-//      fmMethod.readBndry(&bndr[0], &sp1[0], it);
+    for (int it = 0; it < nt; it++) {
+      fmMethod.addSource(&sp1[0], &wlt[it], curSrcPos);
+      fmMethod.stepForward(&sp0[0], &sp1[0]);
+      fmMethod.applySponge(&sp0[0]);
+      fmMethod.applySponge(&sp1[0]);
+
+      swap(sp0, sp1);
+
+      fmMethod.writeBndry(&bndr[0], &sp0[0], it);
+      fmMethod.recordSeis(&dcal[0], &sp0[0], allGeoPos);
+
+      cal_residuals(&dcal[0], &dobs[is * nt * ng + it * ng], &derr[is * ng * nt + it * ng], ng);
+    }
+
+    std::fill(gp0.begin(), gp0.end(), 0);
+    std::fill(gp1.begin(), gp1.end(), 0);
+
+    for (int it = nt - 1; it > -1; it--) {
+      /// backward propagate source wavefield
+      fmMethod.readBndry(&bndr[0], &sp0[0], it);
+      std::swap(sp0, sp1);
 //      fmMethod.stepBackward(illum, &lap[0], &sp0[0], &sp1[0], &sp2[0]);
 //      fmMethod.subSource(&sp1[0], &wlt[it], curSrcPos);
 //
@@ -130,7 +130,7 @@ float cal_obj_derr_illum_grad(const FwiParams &params,
 //
 //      cycleSwap(sp0, sp1, sp2);
 //      cycleSwap(gp0, gp1, gp2);
-//    }
+    }
 
   } /// output: derr, g1, illum
 
@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
   ShotDataReader::serialRead(params.shots, &dobs[0], params.ns, params.nt, params.ng);
 
   SpongeAbc4d fmMethod(params.dt, params.dx, params.dz, params.nb);
-  Velocity vel = fmMethod.transformVelocityForModeling(v0);
+  Velocity vel = fmMethod.expandVelocity(v0);
 
   float obj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {

@@ -88,7 +88,7 @@ Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
 
 }
 
-Velocity Damp4t10d::transformVelocityForModeling(const Velocity& _vel) {
+Velocity Damp4t10d::expandVelocity(const Velocity& _vel) {
   Velocity vv = _vel;
 
   // expand for boundary

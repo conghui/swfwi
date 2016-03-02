@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
 
   Damp4t10d fmMethod(dt, params.dx, nb);
 
-  Velocity exvel = fmMethod.transformVelocityForModeling(v0);
+  Velocity exvel = fmMethod.expandVelocity(v0);
 
   fmMethod.bindVelocity(exvel);
 

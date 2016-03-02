@@ -43,18 +43,10 @@ static void expand(Velocity &exvel, const Velocity &v0, int nb) {
   }
 }
 
-static void numericTrans(Velocity &v0, float dt) {
-  int nx = v0.nx;
-  int nz = v0.nz;
-  std::vector<float> &vv = v0.dat;
 
-  for(int ix=0;ix<nx;ix++){
-    for(int iz=0;iz<nz;iz++){
-      float tmp=vv[ix * nz + iz]*dt;
-      vv[ix * nz + iz]=tmp*tmp;/* vv=vv^2*dt^2 */
-    }
-  }
-
+static inline float velTransform(float vv, float dt) {
+  float tmp=vv*dt;
+  return tmp*tmp;/* vv=vv^2*dt^2 */
 }
 
 SpongeAbc4d::SpongeAbc4d(float _dt, float _dx, float _dz, int _nb)
@@ -77,7 +69,8 @@ void SpongeAbc4d::stepForward(float *p0, const float *p1) const {
                   c21 * (p1[(ix - 1) * nz + iz] + p1[(ix + 1) * nz + iz]) +
                   c22 * (p1[(ix - 2) * nz + iz] + p1[(ix + 2) * nz + iz]);
 
-      p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + vv[ix * nz + iz] * tmp;
+      float transvel = velTransform(vv[ix * nz + iz], dt);
+      p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + transvel * tmp;
     }
   }
 
@@ -125,21 +118,17 @@ void SpongeAbc4d::initbndr() {
 
 
 
-Velocity SpongeAbc4d::transformVelocityForModeling(const Velocity& v0) const {
+Velocity SpongeAbc4d::expandVelocity(const Velocity& v0) const {
   int nxpad = v0.nx + 2 * nb;
   int nzpad = v0.nz + nb; // free surface
   Velocity exvel(nxpad, nzpad);
 
   expand(exvel, v0, nb);
-  DEBUG() << format("before trans sum exvel: %.20f") % sum(exvel.dat);
-
-  numericTrans(exvel, dt);
-
   return exvel;
 }
 
 
-void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) {
+void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& pos) const {
   int nzpad = vel->nz;
 
   for (int is = 0; is < pos.ns; is++) {
@@ -151,7 +140,7 @@ void SpongeAbc4d::addSource(float* p, const float* source, const ShotPosition& p
 }
 
 void SpongeAbc4d::recordSeis(float* seis_it, const float* p,
-    const ShotPosition& geoPos) {
+    const ShotPosition& geoPos) const {
 
   int ng = geoPos.ns;
   int nzpad = vel->nz;
@@ -238,6 +227,26 @@ void SpongeAbc4d::readBndry(const float* _bndr, float* p, int it) const {
     for(int ix=0; ix < FDLEN; ix++) {
       p[(ix-2+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*ix];   // left
       p[(ix+nx+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*(ix+FDLEN)];  // right
+    }
+  }
+}
+
+void SpongeAbc4d::stepBackward(float* illum, float* lap, float* p0,
+    const float* p1) const {
+  int nx = vel->nx;
+  int nz = vel->nz;
+  const std::vector<float> &vv = vel->dat;
+
+  for (int ix = 2; ix < nx - 2; ix++) {
+    for (int iz = 2; iz < nz - 2; iz++) {
+      float tmp = c0 * p1[ix * nz + iz] +
+                  c11 * (p1[ix * nz + (iz - 1)] + p1[ix * nz + (iz + 1)]) +
+                  c12 * (p1[ix * nz + (iz - 2)] + p1[ix * nz + (iz + 2)]) +
+                  c21 * (p1[(ix - 1) * nz + iz] + p1[(ix + 1) * nz + iz]) +
+                  c22 * (p1[(ix - 2) * nz + iz] + p1[(ix + 2) * nz + iz]);
+
+      float transvel = velTransform(vv[ix * nz + iz], dt);
+      p0[ix * nz + iz] = 2 * p1[ix * nz + iz] - p0[ix * nz + iz] + transvel * tmp;
     }
   }
 }
