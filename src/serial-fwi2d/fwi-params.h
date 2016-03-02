@@ -62,7 +62,6 @@ public: // parameters from input files
   int jsz;
   int jgx;
   int jgz;
-  int csd;
 
 public: // calculated
   const char *obsDataFileName;

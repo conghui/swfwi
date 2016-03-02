@@ -121,10 +121,6 @@ void FwiParams::getInputParams() {
      sf_error("no jgz");
    }
    /* receiver z-axis jump interval  */
-   if (!sf_histint(shots, "csdgather", &csd)) {
-     sf_error("csdgather or not required");
-   }
-   /* default, common shot-gather; if n, record at every point*/
 
    /* filename of the shot data */
    if (!(obsDataFileName = sf_histstring(shots, "in"))) {
