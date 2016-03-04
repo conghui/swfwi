@@ -8,6 +8,7 @@
 #include "damp4t10d.h"
 #include "logger.h"
 #include "sum.h"
+#include "fd4t10s-damp-zjh.h"
 
 extern "C" {
 #include <rsf.h>
@@ -105,7 +106,8 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) {
-  fd4t10s_bd1_2d(p0, p1);
+//  fd4t10s_bd1_2d(p0, p1);
+  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb);
 }
 
 void Damp4t10d::bindVelocity(const Velocity& _vel) {
