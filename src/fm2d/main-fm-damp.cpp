@@ -19,8 +19,9 @@ extern "C" {
 #include "common.h"
 #include "shot-position.h"
 
-#include "../modeling/spongeabc4d.h"
+#include "spongeabc4d.h"
 #include "damp4t10d.h"
+#include "sfutil.h"
 
 int main(int argc, char* argv[])
 {
@@ -60,6 +61,8 @@ int main(int argc, char* argv[])
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
   for(int is=0; is<ns; is++) {
+    boost::timer::cpu_timer timer;
+
     std::vector<float> p0(exvel.nz * exvel.nx, 0);
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
@@ -67,22 +70,26 @@ int main(int argc, char* argv[])
     ShotPosition curSrcPos = allSrcPos.clipRange(is, is);
 
     for(int it=0; it<nt; it++) {
+
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
+
       TRACE() << format("it %d, sum p after adding source %.20f") % it % sum(p1);
 
       fmMethod.stepForward(&p0[0], &p1[0]);
       TRACE() << format("it %d, sum p after fd %.20f") % it % sum(p0);
 
+
       fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
       TRACE() << format("it %d, sum dobs %.20f") % it % sum(&dobs[it * ng], ng);
 
       std::swap(p1, p0);
+
     }
 
     matrix_transpose(&dobs[0], &trans[0], ng, nt);
-    sf_floatwrite(&trans[0], ng*nt, params.shots);
-    DEBUG() << format("shot %d, sum dobs %.20f") % is % sum(trans);
+    DEBUG() << format("shot %d, time %s") % is % timer.format(2).c_str();
 
+    sf_floatwrite(&trans[0], ng*nt, params.shots);
   }
 
   return 0;

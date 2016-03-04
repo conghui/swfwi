@@ -22,8 +22,6 @@ public:
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);
 
 private:
-  void fd4t10s_bd1_2d(float *prev_wave, const float *curr_wave);
-private:
   const static int FDLEN = 5;
 
 private:

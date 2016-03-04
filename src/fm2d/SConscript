@@ -20,6 +20,7 @@ include_dir = [
   '#' + dirs['util'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
+  '#' + dirs['mdlib'],
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']

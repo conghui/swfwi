@@ -63,7 +63,7 @@ extern "C"
 #include "shotdata-reader.h"
 #include "velocity.h"
 #include "shot-position.h"
-#include "../modeling/spongeabc4d.h"
+#include "spongeabc4d.h"
 
 float cal_obj_derr_illum_grad(
     float *derr,  /* output */
