@@ -24,6 +24,7 @@ public:
   void subSource(float *p, const float *source, const ShotPosition &pos) const;
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos) const;
   const Velocity &getVelocity() const;
+  void maskGradient(float *grad) const;
 
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;

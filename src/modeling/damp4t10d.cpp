@@ -166,3 +166,17 @@ void Damp4t10d::manipSource(float* p, const float* source,
 //    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }
+
+void Damp4t10d::maskGradient(float* grad) const {
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int bx = nb + FDLEN;
+  int bz = nb + FDLEN;
+  for (int ix = 0; ix < nxpad; ix++) {
+    for (int iz = 0; iz < nzpad; iz++) {
+      if (ix < bx || ix >= nxpad - bx || iz >= nzpad - bz) {
+        grad[ix  * nzpad + iz] = 0.f;
+      }
+    }
+  }
+}

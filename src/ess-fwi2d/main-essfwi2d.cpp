@@ -70,6 +70,39 @@ extern "C"
 #include "sfutil.h"
 #include "aux.h"
 
+
+void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float *update_direction,
+                           int model_size, int iter) {
+  if (iter == 0) {
+    std::copy(cur_gradient, cur_gradient + model_size, update_direction);
+    std::copy(cur_gradient, cur_gradient + model_size, pre_gradient);
+  } else {
+    float beta = 0.0f;
+    float a = 0.0f;
+    float b = 0.0f;
+    float c = 0.0f;
+    int   i = 0;
+    for (i = 0; i < model_size; i ++) {
+      a += (cur_gradient[i] * cur_gradient[i]);
+      b += (cur_gradient[i] * pre_gradient[i]);
+      c += (pre_gradient[i] * pre_gradient[i]);
+    }
+
+    beta = (a - b) / c;
+
+    if (beta < 0.0f) {
+      beta = 0.0f;
+    }
+
+    for (i = 0; i < model_size; i ++) {
+      update_direction[i] = cur_gradient[i] + beta * update_direction[i];
+    }
+
+    TRACE() << "Save current gradient to pre_gradient for the next iteration's computation";
+    std::copy(cur_gradient, cur_gradient + model_size, pre_gradient);
+  }
+}
+
 float cal_obj_derr_illum_grad(const EssFwiParams &params,
     float *derr,  /* output */
     float *illum, /* output */
@@ -472,7 +505,7 @@ int main(int argc, char *argv[]) {
 
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
 //  std::vector<float> cg(params.nz * params.nx, 0);    /* conjugate gradient */
-//  std::vector<float> g0(params.nz * params.nx, 0);    /* gradient at previous step */
+  std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
 //  std::vector<float> objval(params.niter, 0); /* objective/misfit function */
 
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
@@ -510,10 +543,18 @@ int main(int argc, char *argv[]) {
 
     forwardPropagate(fmMethod, allSrcPos, encsrc, nt);
 
-    std::vector<float> grad(exvel.nx * exvel.nz, 0);
-    hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, grad, nt, dt);
-    sfFloatWrite2d("grad.rsf", &grad[0], exvel.nz, exvel.nx);
+    std::vector<float> g1(exvel.nx * exvel.nz, 0);
+    hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
+    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
 
+    fmMethod.maskGradient(&g1[0]);
+    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
+
+    std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
+    prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+
+    sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
+    sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
     exit(0);
     /**
      * calculate local objective function & derr & illum & g1(gradient)
