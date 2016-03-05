@@ -42,9 +42,6 @@ int main(int argc, char* argv[])
   float dt = params.dt;
   float fm = params.fm;
 
-  std::vector<int> sxz(params.ns); /* source positions */
-  std::vector<int> gxz(params.ng); /* geophone positions */
-
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
 

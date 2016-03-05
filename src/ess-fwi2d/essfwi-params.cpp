@@ -121,10 +121,10 @@ void EssFwiParams::getInputParams() {
      sf_error("no jgz");
    }
    /* receiver z-axis jump interval  */
-   if (!sf_histint(shots, "csdgather", &csd)) {
-     sf_error("csdgather or not required");
-   }
-   /* default, common shot-gather; if n, record at every point*/
+
+   if (!sf_getint("nb",&nb))   nb=30;
+   /* thickness of sponge ABC  */
+
 
    /* filename of the shot data */
    if (!(obsDataFileName = sf_histstring(shots, "in"))) {

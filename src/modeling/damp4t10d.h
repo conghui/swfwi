@@ -8,6 +8,7 @@
 #ifndef SRC_FM2D_DAMP4T10D_H_
 #define SRC_FM2D_DAMP4T10D_H_
 
+#include <boost/function.hpp>
 #include "velocity.h"
 #include "shot-position.h"
 
@@ -16,10 +17,16 @@ public:
   Damp4t10d(float dt, float dx, int nb);
   Velocity expandDomain(const Velocity &vel);
 
-  void stepForward(float *p0, float *p1);
+  void stepForward(float *p0, float *p1) const;
+  void stepBackward(float *p0, float *p1) const;
   void bindVelocity(const Velocity &_vel);
-  void addSource(float *p, const float *source, const ShotPosition &pos);
-  void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos);
+  void addSource(float *p, const float *source, const ShotPosition &pos) const;
+  void subSource(float *p, const float *source, const ShotPosition &pos) const;
+  void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos) const;
+  const Velocity &getVelocity() const;
+
+private:
+  void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;
 
 private:
   const static int FDLEN = 5;

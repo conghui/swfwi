@@ -80,6 +80,7 @@ void FmParams::putOutputParams() {
   sf_putfloat(shots,"d1",dt);
   sf_putfloat(shots,"d2",jgx*dx);
   sf_putfloat(shots,"o1",0);
+  sf_putfloat(shots,"o2",0);
   sf_putstring(shots,"label1","Time");
   sf_putstring(shots,"label2","Lateral");
   sf_putstring(shots,"label3","Shot");

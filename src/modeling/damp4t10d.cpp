@@ -5,10 +5,12 @@
  *      Author: rice
  */
 
+#include <functional>
 #include "damp4t10d.h"
 #include "logger.h"
 #include "sum.h"
 #include "fd4t10s-damp-zjh.h"
+#include "fd4t10s-zjh.h"
 
 extern "C" {
 #include <rsf.h>
@@ -105,7 +107,7 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   return exvelForStencil;
 }
 
-void Damp4t10d::stepForward(float* p0, float* p1) {
+void Damp4t10d::stepForward(float* p0, float* p1) const {
   fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb, dx, dt);
 }
 
@@ -114,7 +116,7 @@ void Damp4t10d::bindVelocity(const Velocity& _vel) {
 }
 
 void Damp4t10d::recordSeis(float* seis_it, const float* p,
-    const ShotPosition& geoPos) {
+    const ShotPosition& geoPos) const {
 
   int ng = geoPos.ns;
   int nzpad = vel->nz;
@@ -132,15 +134,35 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p,
 
 }
 
+
+
+const Velocity& Damp4t10d::getVelocity() const {
+  return *vel;
+}
+
+void Damp4t10d::stepBackward(float* p0, float* p1) const {
+  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb, dx, dt);
+}
+
 void Damp4t10d::addSource(float* p, const float* source,
-    const ShotPosition& pos)
+    const ShotPosition& pos) const
 {
+  manipSource(p, source, pos, std::plus<float>());
+}
+
+void Damp4t10d::subSource(float* p, const float* source,
+    const ShotPosition& pos) const {
+  manipSource(p, source, pos, std::minus<float>());
+}
+
+void Damp4t10d::manipSource(float* p, const float* source,
+    const ShotPosition& pos, boost::function2<float, float, float> op) const {
   int nzpad = vel->nz;
 
   for (int is = 0; is < pos.ns; is++) {
     int sx = pos.getx(is) + nb + FDLEN;
     int sz = pos.getz(is) + FDLEN;
-    p[sx * nzpad + sz] += source[is];
+    p[sx * nzpad + sz] = op(p[sx * nzpad + sz], source[is]);
 //    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }
