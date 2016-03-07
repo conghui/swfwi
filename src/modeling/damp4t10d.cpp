@@ -65,7 +65,7 @@ static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
   /// internal
   for (int ix = 0; ix < nx; ix++) {
     for (int iz = 0; iz < nz; iz++) {
-      b[(nb + ix) * nzpad + iz] = a[ix * nx + iz];
+      b[(nb + ix) * nzpad + iz] = a[ix * nz + iz];
     }
   }
 
