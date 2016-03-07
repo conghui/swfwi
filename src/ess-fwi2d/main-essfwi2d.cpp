@@ -457,7 +457,46 @@ void hello(const Damp4t10d &fmMethod,
  }
 }
 
+void calMaxAlpha2_3(const Velocity &exvel,  const float *grad, float dt, float dx, float maxdv,
+                    float &ret_alpha2, float &ret_alpha3) {
+  const int nx = exvel.nx;
+  const int nz = exvel.nz;
 
+  const std::vector<float> &vel = exvel.dat;
+  float alpha2 = FLT_MAX;
+  for (int i = 0; i < nx * nz; i++) {
+    float tmpv = dx / (dt * std::sqrt(vel[i]));
+    tmpv -= maxdv;
+    tmpv = (dx / (dt * tmpv)) * (dx / (dt * tmpv));
+    if (std::fabs(grad[i]) < 1e-10 ) {
+      continue;
+    }
+    if (alpha2 > (tmpv - vel[i]) / std::fabs(grad[i])) {
+      alpha2 = (tmpv - vel[i]) / std::fabs(grad[i]);
+    }
+  }
+
+  /// return the value
+  ret_alpha2 = alpha2;
+  ret_alpha3 =  2 * alpha2;
+}
+
+void calStepLen(float dt, float dx) {
+  TRACE() << "Calcuate step length";
+  const float vmax = 5500;
+  const float vmin = 1500;
+  float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
+  float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
+  DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
+
+//  DEBUG() << format
+  TRACE() << "calculate the initial value of alpha2 and alpha3";
+  float max_alpha2, max_alpha3;
+//  calMaxAlpha2_3(dim, config, grad, vel, max_alpha2, max_alpha3)
+
+//  float min_vel = (dim.dx / config.dt / config.velocity_max) * (dim.dx / config.dt / config.velocity_max);
+//  float max_vel = (dim.dx / config.dt / config.velocity_min) * (dim.dx / config.dt / config.velocity_min);
+}
 //float subSquareSum(const std::vector<float> &a, const std::vector<float> &b) {
 //  float sum = 0;
 //  for (size_t i = 0; i < a.size(); i++) {
@@ -555,6 +594,8 @@ int main(int argc, char *argv[]) {
 
     sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
     sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
+
+    calStepLen(dt, params.dx);
     exit(0);
     /**
      * calculate local objective function & derr & illum & g1(gradient)

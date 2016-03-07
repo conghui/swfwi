@@ -91,8 +91,16 @@ Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
 
 }
 
+static void transvel(std::vector<float> &vel, float dx, float dt) {
+  for (size_t i = 0; i < vel.size(); i ++) {
+    vel[i] = (dx * dx) / (vel[i] * vel[i] * dt * dt);
+  }
+}
+
 Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   Velocity vv = _vel;
+
+  transvel(vv.dat, dx, dt);
 
   // expand for boundary
   Velocity exvelForBndry(vv.nx + 2 * nb, vv.nz + nb);
