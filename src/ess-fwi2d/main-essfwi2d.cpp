@@ -855,6 +855,15 @@ int main(int argc, char *argv[]) {
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
 
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "exvel%d.rsf", iter);
+//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+//
+//      sprintf(buf, "dobs%d.rsf", iter);
+//      sfFloatWrite1d(buf, &dobs[0], nt * ng * ns);
+//    }
+
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
     std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
@@ -863,8 +872,14 @@ int main(int argc, char *argv[]) {
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-    //    sfFloatWrite2d("encobs.rsf", &encobs[0], nt, ng);
-    //    sfFloatWrite1d("encsrc.rsf", &encsrc[0], encsrc.size());
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "encobs%d.rsf", iter);
+//      sfFloatWrite2d(buf, &encobs[0], nt, ng);
+//
+//      sprintf(buf, "encsrc%d.rsf", iter);
+//      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+//    }
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
@@ -872,7 +887,11 @@ int main(int argc, char *argv[]) {
     remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
     remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
 
-    //    sfFloatWrite2d("calobs.rsf", &dcal[0], ng, nt);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "calobs%d.rsf", iter);
+//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+//    }
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
