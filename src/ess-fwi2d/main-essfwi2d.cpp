@@ -339,6 +339,47 @@ static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, i
 
 }
 
+void remove_dirc_arrival(const Velocity &exvel, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+    std::vector<float> &data, float nt, float t_width, float dt) {
+  int half_len = t_width / dt;
+  int sx = allSrcPos.getx(0);
+  int selav = allSrcPos.getz(0);
+
+  // Here we assumed all receivers are located at the same depth
+  int gelav = allGeoPos.getz(0);
+  float vel_average = 0.0;
+  int gmin = (selav < gelav) ? selav : gelav;
+  int gmax = (selav > gelav) ? selav : gelav;
+
+  const std::vector<float> &vel = exvel.dat;
+  int nx = exvel.nx;
+  int nz = exvel.nz;
+  for (int i = 0; i < nx; i ++) {
+    for (int k = gmin; k <= gmax; k ++) {
+      vel_average += vel[i * nz + k];
+    }
+  }
+  vel_average /= nx * (gmax - gmin + 1);
+
+
+  int ng = allGeoPos.ns;
+  std::vector<float> trans(nt * ng);
+  matrix_transpose(&data[0], &trans[0], ng, nt);
+
+  for (int itr = 0; itr < ng; itr ++) {
+    float dist = (allGeoPos.getx(itr) - sx) * (allGeoPos.getx(itr) - sx) +
+        (allGeoPos.getz(itr) - selav) * (allGeoPos.getz(itr) - selav);
+    int t = (int)sqrt(dist * vel_average);
+    int start = t;
+    int end = ((t + 2 * half_len) > nt) ? nt : (t + 2 * half_len);
+
+    for (int j = start; j < end; j ++) {
+      trans[itr * nt + j] = 0.f;
+    }
+  }
+
+  matrix_transpose(&trans[0], &data[0], nt, ng);
+}
 
 void hello(const Damp4t10d &fmMethod,
     const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
@@ -571,6 +612,10 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
+
+    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
+    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
+
     sfFloatWrite2d("calobs.rsf", &dcal[0], ng, nt);
 
     std::vector<float> vsrc(nt * ng, 0);
