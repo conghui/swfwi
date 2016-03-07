@@ -53,6 +53,7 @@ extern "C"
 #include <cstdlib>
 #include <functional>
 #include <vector>
+#include <set>
 
 #include <boost/timer/timer.hpp>
 #include "logger.h"
@@ -69,7 +70,17 @@ extern "C"
 #include "damp4t10d.h"
 #include "sfutil.h"
 #include "aux.h"
+#include "preserved-alpha.h"
 
+static const int max_iter_select_alpha3 = 5;
+static const float vmax = 5500;
+static const float vmin = 1500;
+static const float maxdv = 200;
+typedef std::pair<float, float> ParaPoint;
+
+bool parabolicLessComp(const ParaPoint &a, const ParaPoint &b) {
+  return a.second - b.second < 1e-10;
+}
 
 void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float *update_direction,
                            int model_size, int iter) {
@@ -228,7 +239,8 @@ float calVelUpdateStepLen(const EssFwiParams &params,
 
 void forwardModeling(const Damp4t10d &fmMethod,
     const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
-    const std::vector<float> &encSrc, std::vector<float> &dobs,
+    const std::vector<float> &encSrc,
+    std::vector<float> &dobs, /* output (fast: ng, slow: nt) */
     int nt)
 {
     int nxpad = fmMethod.getVelocity().nx;
@@ -522,21 +534,267 @@ void calMaxAlpha2_3(const Velocity &exvel,  const float *grad, float dt, float d
   ret_alpha3 =  2 * alpha2;
 }
 
-void calStepLen(float dt, float dx) {
+void update_vel(const float *vel, const float *grad, float size, float steplen, float vmin, float vmax, float *new_vel) {
+  if (vmax <= vmin) {
+    ERROR() << format("vmax(%f) < vmin(%f)") % vmax % vmin;
+    exit(0);
+  }
+
+  for (int i = 0; i < size; i++) {
+    new_vel[i] = vel[i] + steplen * grad[i];
+    if (new_vel[i] > vmax) {
+      new_vel[i] = vmax;
+    }
+    if (new_vel[i] < vmin) {
+      new_vel[i] = vmin;
+    }
+  }
+}
+
+void initAlpha2_3(int ivel, float max_alpha3, float &initAlpha2, float &initAlpha3) {
+  const float minAlpha   = 1.0E-7;
+  const float resetAlpha = 1.0E-4;
+
+  if (!PreservedAlpha::instance().getIsInit()[ivel]) {
+    PreservedAlpha::instance().getIsInit()[ivel] = true;
+    PreservedAlpha::instance().getAlpha()[ivel] = max_alpha3;
+  }
+
+  initAlpha3 = PreservedAlpha::instance().getAlpha()[ivel];
+  initAlpha3 = initAlpha3 < minAlpha ? resetAlpha : initAlpha3;
+  initAlpha2 = initAlpha3 * 0.5;
+}
+
+int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+    const std::vector<float> &encsrc, const std::vector<float> &encobs,
+    const float *grad, const float *vel,
+    int nt, float dt, float fm,
+                      float vmin, float vmax, float steplen, float *obj_val_out) {
+  int nx = fmMethod.getVelocity().nx;
+  int nz = fmMethod.getVelocity().nz;
+  int size = nx *  nz;
+
+  float *new_vel = (float *)malloc(sizeof(float) * size);
+
+  update_vel(vel, grad, size, steplen, vmin, vmax, new_vel);
+
+  Damp4t10d updateMethod = fmMethod;
+  Velocity updateVel(std::vector<float>(new_vel, new_vel + size), nx, nz);
+  updateMethod.bindVelocity(updateVel);
+
+  //forward modeling
+  int ng = allGeoPos.ns;
+  std::vector<float> dcal(nt * ng);
+  forwardModeling(updateMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
+
+  //now we don't do apply data mask (dwht)   // Add mask.
+  //TODO: 1.5/config.peak_freq
+  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
+
+  std::vector<float> vdiff(nt * ng, 0);
+  vectorMinus(encobs, dcal, vdiff);
+  float val = cal_objective(&vdiff[0], vdiff.size());
+
+  *obj_val_out = val;
+
+  return 0;
+}
+
+void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+    const std::vector<float> &encsrc, const std::vector<float> &encobs, const float *grad,
+    int nt, float dt, float fm,
+                 float obj_val1, float vmin, float vmax, float maxAlpha3,
+                 float &_alpha2, float &_obj_val2, float &_alpha3, float &_obj_val3, bool &toParabolicFit) {
+  TRACE() << "SELECTING THE RIGHT OBJECTIVE VALUE 3";
+
+  float alpha3 = _alpha3;
+  float alpha2 = _alpha2;
+  float obj_val2, obj_val3 = 0;
+
+  const float *vel = &fmMethod.getVelocity().dat[0];
+
+  calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+  calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+
+  DEBUG() << "BEFORE TUNNING";
+  DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
+  DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % alpha2 % obj_val2;
+  DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
+
+  TRACE() << "maintain a set to store alpha2 that we ever tuned";
+  std::set<ParaPoint, bool (*)(const ParaPoint &, const ParaPoint &) > tunedAlpha(parabolicLessComp);
+  tunedAlpha.insert(std::make_pair(alpha2, obj_val2));
+
+  DEBUG() << "BEGIN TUNING";
+  /// obj_val2 might be quite large, so we should make it smaller by halfing alpha2
+
+  int iter = 0;
+  for (; iter < max_iter_select_alpha3 && obj_val2 > obj_val1; iter++) {
+
+    /// pass the property of alpha2 to alpha3
+    alpha3 = alpha2;
+    obj_val3 = obj_val2;
+
+    /// update alpha2
+    alpha2 /= 2;
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha2, &obj_val2);
+
+    /// store it
+    tunedAlpha.insert(std::make_pair(alpha2, obj_val2));
+    DEBUG() << __FUNCTION__ << format(" iter = %d, alpha2 = %e, obj_val2 = %e") % iter % alpha2 % obj_val2;
+    DEBUG() << __FUNCTION__ << format(" iter = %d, alpha3 = %e, obj_val3 = %e\n") % iter % alpha3 % obj_val3;
+  }
+
+  DEBUG() << "SELECT A BETTER ALPHA2 IN " << iter << " ITERS";
+
+  TRACE() << "check if we need to forward tuning";
+  TRACE() << "after halfing in the previous step, obj_val2 might still be larger than obj_val1"
+          "then we should stop tunting and choose a best alpha2 ever got";
+  if (obj_val2 > obj_val1) {
+    DEBUG() << "UNABLE TO TUNING A ALPHA2 BY HALFING";
+    DEBUG() << "SELECT A BEST ALPHA2 EVER GOT";
+    std::set<ParaPoint>::iterator it = tunedAlpha.begin();
+    _alpha2 = it->first;
+    _obj_val2 = it->second;
+
+    _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha3, &_obj_val3);
+
+    toParabolicFit = false;
+
+    DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
+    DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
+    return;
+  }
+
+  TRACE() << "now we can make sure that obj_val2 < obj_val1";
+
+  const float alpha1 = 0;
+  float linearFitAlph3 = (obj_val2 - obj_val1) / (alpha2 - alpha1) * (alpha3 - alpha1) + obj_val1;
+  DEBUG() << __FUNCTION__ << format(" linear fit alpha3 = %e ") % linearFitAlph3;
+
+  TRACE() << "keep the alpha we tuned";
+  tunedAlpha.clear();
+  tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
+
+  while (obj_val3 < linearFitAlph3 && obj_val3 < obj_val1 && alpha3 < maxAlpha3) {
+    TRACE() << "if in this case, we should enlarge alpha3";
+    alpha2 = alpha3;
+    obj_val2 = obj_val3;
+
+    alpha3 = std::min(alpha3 * 2, maxAlpha3);
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha3, &obj_val3);
+
+    tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
+
+    DEBUG() << __FUNCTION__ << format(" tune alpha3, alpha2 = %e, obj_val2 = %e") % alpha2 % obj_val2;
+    DEBUG() << __FUNCTION__ << format(" tune alpha3, alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
+  }
+
+  TRACE() << "If we couldnot tune a good alpha3";
+  if (alpha3 > maxAlpha3 + 0.1) {
+    DEBUG() << "UNABLE TO TUNING A ALPHA3 BY DOUBLING";
+    DEBUG() << "SELECT A BEST ALPHA3 EVER GOT";
+    std::set<ParaPoint>::iterator it = tunedAlpha.begin();
+    _alpha3 = it->first;
+    _obj_val3 = it->second;
+
+    _alpha2 = _alpha3 / 2;
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha2, &_obj_val2);
+
+    toParabolicFit = false;
+
+    DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
+    DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
+    return;
+  }
+
+  /// return objval2 and objval3
+  toParabolicFit = true;
+  _alpha2 = alpha2;
+  _alpha3 = alpha3;
+  _obj_val2 = obj_val2;
+  _obj_val3 = obj_val3;
+
+  DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
+  DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
+}
+
+void calcParabolaVertex(float x1, float y1, float x2, float y2, float x3, float y3, float &xv, float &yv) {
+  double denom = (x1 - x2) * (x1 - x3) * (x2 - x3);
+  double A     = (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denom;
+  double B     = (x3 * x3 * (y1 - y2) + x2 * x2 * (y3 - y1) + x1 * x1 * (y2 - y3)) / denom;
+  double C     = (x2 * x3 * (x2 - x3) * y1 + x3 * x1 * (x3 - x1) * y2 + x1 * x2 * (x1 - x2) * y3) / denom;
+
+  xv = -B / (2 * A);
+  yv = C - B * B / (4 * A);
+}
+
+void calcParabolaVertexEnhanced(float x1, float y1, float x2, float y2, float x3, float y3, float max_alpha3, float &xv, float &yv) {
+  double k2 = (y3 - y2) / (x3 - x2);
+  double k1 = (y2 - y1) / (x2 - x1);
+
+  calcParabolaVertex(x1, y1, x2, y2, x3, y3, xv, yv);
+
+  if (std::abs(k2 - k1) < 0.001 * (std::max(std::abs(k2), std::abs(k1))) ||
+      (xv == -std::numeric_limits<double>::quiet_NaN())) {
+    WARNING() << "THE SET OF POINTS DON'T FIT PARABOLIC WELL, SET y TO -NAN ON PURPOSE JUST FOR INDICATION";
+    xv = std::min(2 * x3, max_alpha3);
+    yv = -std::numeric_limits<double>::quiet_NaN(); /// indicating what's happening
+  }
+}
+
+
+float calStepLen(const Damp4t10d &fmMethod,
+    const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+    const std::vector<float> &encsrc, const std::vector<float> &encobs,
+    const std::vector<float> &updateDirection, int iter, int nt, int ivel, float dt, float dx, float fm,
+    float obj_val1, float min_vel, float max_vel) {
   TRACE() << "Calcuate step length";
-  const float vmax = 5500;
-  const float vmin = 1500;
-  float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
-  float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
-  DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
 
 //  DEBUG() << format
   TRACE() << "calculate the initial value of alpha2 and alpha3";
   float max_alpha2, max_alpha3;
-//  calMaxAlpha2_3(dim, config, grad, vel, max_alpha2, max_alpha3)
+  calMaxAlpha2_3(fmMethod.getVelocity(), &updateDirection[0], dt, dx, maxdv, max_alpha2, max_alpha3);
+  DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
 
-//  float min_vel = (dim.dx / config.dt / config.velocity_max) * (dim.dx / config.dt / config.velocity_max);
-//  float max_vel = (dim.dx / config.dt / config.velocity_min) * (dim.dx / config.dt / config.velocity_min);
+  float alpha1 = 0, alpha2, alpha3;
+  initAlpha2_3(ivel, max_alpha3, alpha2, alpha3);
+  DEBUG() << format("after init alpha,  alpha2 = %e,      alpha3: = %e") % alpha2 % alpha3;
+
+  float obj_val2, obj_val3;
+  bool toParabolic;
+
+  selectAlpha(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, &updateDirection[0], nt, dt, fm, obj_val1, min_vel, max_vel, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
+
+//  selectAlpha(fmMethod, &updateDirection[0], obj_val1, vmin, vmax, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
+
+  float alpha4, obj_val4;
+  if (toParabolic) {
+    DEBUG() << "parabolic fit";
+    calcParabolaVertexEnhanced(alpha1, obj_val1, alpha2, obj_val2, alpha3, obj_val3, max_alpha3, alpha4, obj_val4);
+    if (alpha4 > max_alpha3) {
+      DEBUG() << format("alpha4 = %e, max_alpha3 = %e") % alpha4 % max_alpha3;
+      DEBUG() << format("alpha4 is greater than max_alpha3, set it to alpha3");
+      alpha4 = max_alpha3;
+    }
+  } else {
+    DEBUG() << "NO need to perform parabolic fit";
+    alpha4 = alpha3;
+    obj_val4 = obj_val3;
+  }
+
+  INFO() << format("In calculate_steplen(): iter %d  alpha  = %e total obj_val1 = %e") % iter % alpha1 % obj_val1;
+  INFO() << format("In calculate_steplen(): iter %d  alpha2 = %e total obj_val2 = %e") % iter % alpha2 % obj_val2;
+  INFO() << format("In calculate_steplen(): iter %d  alpha3 = %e total obj_val3 = %e") % iter % alpha3 % obj_val3;
+  INFO() << format("In calculate_steplen(): iter %d  alpha4 = %e total obj_val4 = %e\n") % iter % alpha4 % obj_val4;
+
+  PreservedAlpha::instance().getAlpha()[ivel] = alpha4;
+  return alpha4;
 }
 //float subSquareSum(const std::vector<float> &a, const std::vector<float> &b) {
 //  float sum = 0;
@@ -546,6 +804,8 @@ void calStepLen(float dt, float dx) {
 //
 //  return sum;
 //}
+
+
 
 int main(int argc, char *argv[]) {
 
@@ -564,6 +824,7 @@ int main(int argc, char *argv[]) {
   int ns = params.ns;
   float dt = params.dt;
   float fm = params.fm;
+  float dx = params.dx;
 
   // set random seed
   const int seed = 10;
@@ -593,10 +854,6 @@ int main(int argc, char *argv[]) {
 
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
-//    std::vector<float> g1(params.nz * params.nx, 0);    /* gradient at curret step */
-//    std::vector<float> derr(params.ng * params.nt, 0); /* residual/error between synthetic and observation */
-//    std::vector<float> illum(params.nz * params.nx, 0); /* illumination of the source wavefield */
-//    std::vector<float> vtmp(params.nz * params.nx, 0);  /* temporary velocity computed with epsil */
 
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
@@ -604,11 +861,10 @@ int main(int argc, char *argv[]) {
 
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
-    DEBUG() << format("sum encdobs %f") % sum(encobs);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-    sfFloatWrite2d("encobs.rsf", &encobs[0], nt, ng);
-    sfFloatWrite1d("encsrc.rsf", &encsrc[0], encsrc.size());
+    //    sfFloatWrite2d("encobs.rsf", &encobs[0], nt, ng);
+    //    sfFloatWrite1d("encsrc.rsf", &encsrc[0], encsrc.size());
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
@@ -616,12 +872,12 @@ int main(int argc, char *argv[]) {
     remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
     remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
 
-    sfFloatWrite2d("calobs.rsf", &dcal[0], ng, nt);
+    //    sfFloatWrite2d("calobs.rsf", &dcal[0], ng, nt);
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
-    float obj = cal_objective(&vsrc[0], vsrc.size());
-    DEBUG() << format("obj: %e") % obj;
+    float obj1 = cal_objective(&vsrc[0], vsrc.size());
+    DEBUG() << format("obj: %e") % obj1;
 
     transVsrc(vsrc, nt, ng, dt);
 
@@ -629,56 +885,32 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
     hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
-    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
+    //    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
 
     fmMethod.maskGradient(&g1[0]);
-    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
+    //    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
 
     std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
     prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
-    sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
-    sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
+    //    sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
+    //    sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
 
-    calStepLen(dt, params.dx);
-    exit(0);
-    /**
-     * calculate local objective function & derr & illum & g1(gradient)
-     */
-//    float obj = cal_obj_derr_illum_grad(params, &derr[0], &illum[0], &g1[0], &vv[0], &encsrc[0], &encdobs[0], &sxz[0], &gxz[0]);
+    const int ivel = 0;
+    float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
+    float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
 
-//    objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
-//
-//    float epsil = 0;
-//    float beta = 0;
-//    sf_floatwrite(&illum[0], params.nz * params.nx, params.illums);
-//
-//    scale_gradient(&g1[0], &vv[0], &illum[0], params.nz, params.nx, params.precon);
-//    bell_smoothz(&g1[0], &illum[0], params.rbell, params.nz, params.nx);
-//    bell_smoothx(&illum[0], &g1[0], params.rbell, params.nz, params.nx);
-//    sf_floatwrite(&g1[0], params.nz * params.nx, params.grads);
-//
-//    beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], params.nz, params.nx);
-//
-//    cal_conjgrad(&g1[0], &cg[0], beta, params.nz, params.nx);
-//    epsil = cal_epsilon(&vv[0], &cg[0], params.nz, params.nx);
-//    cal_vtmp(&vtmp[0], &vv[0], &cg[0], epsil, params.nz, params.nx);
-//
-//    std::swap(g1, g0); // let g0 be the previous gradient
-//
-//    float alpha = calVelUpdateStepLen(params, &vtmp[0], &encsrc[0], &encdobs[0], &sxz[0], &gxz[0], &derr[0], epsil);
-//
-//    update_vel(&vv[0], &cg[0], alpha, params.nz, params.nx);
-//
-//    sf_floatwrite(&vv[0], params.nz * params.nx, params.vupdates);
+    DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
+    float steplen = calStepLen(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, updateDirection, iter, nt, ivel, dt, params.dx, fm, obj1, min_vel, max_vel);
 
-    // output important information at each FWI iteration
-//    INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
-//    INFO() << timer.format(2);
+    TRACE() << "Update velocity model";
+    update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
+//    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
+
+    fmMethod.refillBoundary(&exvel.dat[0]);
+//    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
 
   } /// end of iteration
-
-//  sf_floatwrite(&objval[0], params.niter, params.objs);
 
   sf_close();
 

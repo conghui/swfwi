@@ -188,3 +188,30 @@ void Damp4t10d::maskGradient(float* grad) const {
     }
   }
 }
+
+void Damp4t10d::refillBoundary(float* gradient) const {
+  int nz = vel->nz;
+  int nx = vel->nx;
+  int bx = nb + FDLEN;
+  int bz = nb + FDLEN;
+
+  const float *srcx0 = gradient + bx * nz;
+  const float *srcxn = gradient + (nx - bx - 1) * nz;
+
+  TRACE() << "fill x[0, bx] and x[nx - bx, nx]";
+  for (int ix = 0; ix < bx; ix++) {
+    float *dstx0 = gradient + ix * nz;
+    float *dstxn = gradient + (ix + nx - bx) * nz;
+    std::copy(srcx0, srcx0 + nz, dstx0);
+    std::copy(srcxn, srcxn + nz, dstxn);
+  }
+
+  TRACE() << "fill z[nz - bz, nz]";
+  for (int ix = 0; ix < nx; ix++) {
+    for (int iz = nz - bx; iz < nz; iz++) {
+      int srcIdx = ix * nz + (nz - bz - 1);
+      int dstIdx = ix * nz + iz;
+      gradient[dstIdx] = gradient[srcIdx];
+    }
+  }
+}
