@@ -235,7 +235,7 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   int gmin = (sz < gz) ? sz : gz;
   int gmax = (sz > gz) ? sz : gz;
 
-//  printf("dt %f, half_len %d, sx %d, selav %d, gelav %d\n", dt, half_len, sx, selav, gelav);
+//  printf("dt %f, half_len %d, sx %d, selav %d, gelav %d\n", dt, half_len, sx, sz, gz);
 //  printf("gmin %d, gmax %d\n", gmin, gmax);
 
   const std::vector<float> &vv = this->vel->dat;

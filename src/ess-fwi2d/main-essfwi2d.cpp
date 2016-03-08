@@ -554,19 +554,27 @@ int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, 
   Velocity updateVel(std::vector<float>(new_vel, new_vel + size), nx, nz);
   updateMethod.bindVelocity(updateVel);
 
+//  sfFloatWrite2d("upvel.rsf", &updateMethod.getVelocity().dat[0], nz, nx);
+
   //forward modeling
   int ng = allGeoPos.ns;
   std::vector<float> dcal(nt * ng);
   forwardModeling(updateMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
 
+//  sfFloatWrite2d("11dcal.rsf", &dcal[0], ng, nt);
+
   //now we don't do apply data mask (dwht)   // Add mask.
   //TODO: 1.5/config.peak_freq
 //  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
-  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
+  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 0.15);
+
+//  sfFloatWrite2d("22dcal.rsf", &dcal[0], ng, nt);
 
   std::vector<float> vdiff(nt * ng, 0);
   vectorMinus(encobs, dcal, vdiff);
   float val = cal_objective(&vdiff[0], vdiff.size());
+
+  DEBUG() << format("curr_alpha = %e, pure object value = %e") % steplen % val;
 
   *obj_val_out = val;
 
@@ -593,6 +601,8 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
   DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
   DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % alpha2 % obj_val2;
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
+
+//  exit(0);
 
   TRACE() << "maintain a set to store alpha2 that we ever tuned";
   std::set<ParaPoint, bool (*)(const ParaPoint &, const ParaPoint &) > tunedAlpha(parabolicLessComp);
@@ -621,6 +631,13 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
 
   DEBUG() << "SELECT A BETTER ALPHA2 IN " << iter << " ITERS";
 
+
+  DEBUG() << "tunedAlpha size: " << tunedAlpha.size();
+  for (std::set<ParaPoint, bool (*)(const ParaPoint &, const ParaPoint &) >::iterator it = tunedAlpha.begin();
+      it != tunedAlpha.end(); ++it) {
+    DEBUG() << format("alpha %e, obj %e") % it->first % it->second;
+  }
+
   TRACE() << "check if we need to forward tuning";
   TRACE() << "after halfing in the previous step, obj_val2 might still be larger than obj_val1"
           "then we should stop tunting and choose a best alpha2 ever got";
@@ -632,7 +649,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     _obj_val2 = it->second;
 
     _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &_obj_val3);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha3, &_obj_val3);
 
     toParabolicFit = false;
@@ -667,6 +684,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     DEBUG() << __FUNCTION__ << format(" tune alpha3, alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
   }
 
+
   TRACE() << "If we couldnot tune a good alpha3";
   if (alpha3 > maxAlpha3 + 0.1) {
     DEBUG() << "UNABLE TO TUNING A ALPHA3 BY DOUBLING";
@@ -676,7 +694,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     _obj_val3 = it->second;
 
     _alpha2 = _alpha3 / 2;
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &_obj_val2);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha2, &_obj_val2);
 
     toParabolicFit = false;
@@ -882,7 +900,7 @@ int main(int argc, char *argv[]) {
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
     hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
     sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
-    exit(0);
+//    exit(0);
 
     fmMethod.maskGradient(&g1[0]);
     sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
