@@ -30,6 +30,7 @@ public:
   void maskGradient(float *grad) const;
   void refillBoundary(float *vel) const;
   void sfWriteVel(sf_file file) const;
+  void removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const;
 
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;

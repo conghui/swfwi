@@ -351,48 +351,6 @@ static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, i
 
 }
 
-void remove_dirc_arrival(const Velocity &exvel, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
-    std::vector<float> &data, float nt, float t_width, float dt) {
-  int half_len = t_width / dt;
-  int sx = allSrcPos.getx(0);
-  int selav = allSrcPos.getz(0);
-
-  // Here we assumed all receivers are located at the same depth
-  int gelav = allGeoPos.getz(0);
-  float vel_average = 0.0;
-  int gmin = (selav < gelav) ? selav : gelav;
-  int gmax = (selav > gelav) ? selav : gelav;
-
-  const std::vector<float> &vel = exvel.dat;
-  int nx = exvel.nx;
-  int nz = exvel.nz;
-  for (int i = 0; i < nx; i ++) {
-    for (int k = gmin; k <= gmax; k ++) {
-      vel_average += vel[i * nz + k];
-    }
-  }
-  vel_average /= nx * (gmax - gmin + 1);
-
-
-  int ng = allGeoPos.ns;
-  std::vector<float> trans(nt * ng);
-  matrix_transpose(&data[0], &trans[0], ng, nt);
-
-  for (int itr = 0; itr < ng; itr ++) {
-    float dist = (allGeoPos.getx(itr) - sx) * (allGeoPos.getx(itr) - sx) +
-        (allGeoPos.getz(itr) - selav) * (allGeoPos.getz(itr) - selav);
-    int t = (int)sqrt(dist * vel_average);
-    int start = t;
-    int end = ((t + 2 * half_len) > nt) ? nt : (t + 2 * half_len);
-
-    for (int j = start; j < end; j ++) {
-      trans[itr * nt + j] = 0.f;
-    }
-  }
-
-  matrix_transpose(&trans[0], &data[0], nt, ng);
-}
-
 void hello(const Damp4t10d &fmMethod,
     const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
     const ShotPosition &allGeoPos, const std::vector<float> &vsrc,
@@ -589,7 +547,8 @@ int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, 
 
   //now we don't do apply data mask (dwht)   // Add mask.
   //TODO: 1.5/config.peak_freq
-  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
+//  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
+  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
 
   std::vector<float> vdiff(nt * ng, 0);
   vectorMinus(encobs, dcal, vdiff);
@@ -855,15 +814,6 @@ int main(int argc, char *argv[]) {
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "exvel%d.rsf", iter);
-//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
-//
-//      sprintf(buf, "dobs%d.rsf", iter);
-//      sfFloatWrite1d(buf, &dobs[0], nt * ng * ns);
-//    }
-
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
 //    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
@@ -871,36 +821,45 @@ int main(int argc, char *argv[]) {
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
-//
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "encobs%d.rsf", iter);
-//      sfFloatWrite2d(buf, &encobs[0], nt, ng);
-//
-//      sprintf(buf, "encsrc%d.rsf", iter);
-//      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
-//
-//      sprintf(buf, "exvel%d.rsf", iter);
-//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
-//    }
+
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "encobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &encobs[0], nt, ng);
+
+      sprintf(buf, "encsrc%d.rsf", iter);
+      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+
+      sprintf(buf, "exvel%d.rsf", iter);
+      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+    }
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
 
-    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
-    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
-
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "calobs%d.rsf", iter);
-//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "calobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+    }
 //    exit(0);
+
+//    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
+//    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
+    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &encobs[0], nt, 1.5 / fm);
+    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
+
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "rmdcalobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+    }
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
     float obj1 = cal_objective(&vsrc[0], vsrc.size());
     DEBUG() << format("obj: %e") % obj1;
+//    exit(0);
 
     transVsrc(vsrc, nt, ng, dt);
 
@@ -908,16 +867,17 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
     hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
-    //    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
+    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
+    exit(0);
 
     fmMethod.maskGradient(&g1[0]);
-    //    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
+    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
 
     std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
     prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
-    //    sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
-    //    sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
+        sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
+        sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
 
     const int ivel = 0;
     float min_vel = (dx / dt / vmax) * (dx / dt / vmax);

@@ -12,6 +12,7 @@
 #include "fd4t10s-damp-zjh.h"
 #include "fd4t10s-zjh.h"
 #include "sfutil.h"
+#include "common.h"
 
 extern "C" {
 #include <rsf.h>
@@ -102,6 +103,7 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   // expand for boundary, free surface
   Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
   expandBndry(exvelForBndry, _vel, nb);
+  sfFloatWrite2d("000vel.rsf", &exvelForBndry.dat[0], exvelForBndry.nz, exvelForBndry.nx);
 
   transvel(exvelForBndry.dat, dx, dt);
 
@@ -221,4 +223,50 @@ void Damp4t10d::sfWriteVel(sf_file file) const {
   for (int ix = FDLEN + nb; ix < nxpad - FDLEN - nb; ix++) {
     sf_floatwrite(const_cast<float *>(&vel->dat[ix * nzpad + FDLEN]), nz, file);
   }
+}
+
+void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
+  int half_len = t_width / dt;
+  int sx = allSrcPos.getx(0) + FDLEN + nb;
+  int sz = allSrcPos.getz(0) + FDLEN;
+  int gz = allGeoPos.getz(0) + FDLEN; // better to assume all receivers are located at the same depth
+
+  float vel_average = 0.0;
+  int gmin = (sz < gz) ? sz : gz;
+  int gmax = (sz > gz) ? sz : gz;
+
+//  printf("dt %f, half_len %d, sx %d, selav %d, gelav %d\n", dt, half_len, sx, selav, gelav);
+//  printf("gmin %d, gmax %d\n", gmin, gmax);
+
+  const std::vector<float> &vv = this->vel->dat;
+  int nx = this->vel->nx;
+  int nz = this->vel->nz;
+  for (int i = 0; i < nx; i ++) {
+    for (int k = gmin; k <= gmax; k ++) {
+      vel_average += vv[i * nz + k];
+    }
+  }
+  vel_average /= nx * (gmax - gmin + 1);
+//  printf("vel_average: %.20f\n", vel_average);
+
+
+  int ng = allGeoPos.ns;
+  std::vector<float> trans(nt * ng);
+  matrix_transpose(&data[0], &trans[0], ng, nt);
+
+  for (int itr = 0; itr < ng; itr ++) {
+    int gx = allGeoPos.getx(itr) + FDLEN + nb;
+    int gz = allGeoPos.getz(itr) + FDLEN;
+
+    float dist = (gx-sx)*(gx-sx) + (gz-sz)*(gz-sz);
+    int t = (int)sqrt(dist * vel_average);
+    int start = t;
+    int end = ((t + 2 * half_len) > nt) ? nt : (t + 2 * half_len);
+
+    for (int j = start; j < end; j ++) {
+      trans[itr * nt + j] = 0.f;
+    }
+  }
+
+  matrix_transpose(&trans[0], &data[0], nt, ng);
 }
