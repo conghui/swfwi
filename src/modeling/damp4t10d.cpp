@@ -148,7 +148,7 @@ const Velocity& Damp4t10d::getVelocity() const {
 }
 
 void Damp4t10d::stepBackward(float* p0, float* p1) const {
-  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb, dx, dt);
+  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
 }
 
 void Damp4t10d::addSource(float* p, const float* source,

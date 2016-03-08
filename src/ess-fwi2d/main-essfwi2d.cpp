@@ -309,7 +309,7 @@ void forwardPropagate(const Damp4t10d &fmMethod,
     const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
     int nt)
 {
-  const int check_step = 5;
+  const int check_step = 50;
 
   int nxpad = fmMethod.getVelocity().nx;
   int nzpad = fmMethod.getVelocity().nz;
@@ -368,6 +368,13 @@ void hello(const Damp4t10d &fmMethod,
   std::vector<float> sp1(nzpad * nxpad, 0);
   std::vector<float> gp0(nzpad * nxpad, 0);
   std::vector<float> gp1(nzpad * nxpad, 0);
+
+  for (size_t i = 0; i < sp0.size(); i++) {
+    sp0[i] = rand() % 100;
+    sp1[i] = rand() % 100;
+    gp0[i] = rand() % 100;
+    gp1[i] = rand() % 100;
+  }
 
   for(int it = nt - 1; it >= 0 ; it--) {
 //    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
@@ -436,9 +443,15 @@ void hello(const Damp4t10d &fmMethod,
 //      char buf[256];
 //      sprintf(buf, "gp1aftadd%d.rsf", it);
 //      sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
+//
+//      sprintf(buf, "gp0aftadd%d.rsf", it);
+//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
+//
+//      sprintf(buf, "velaftadd%d.rsf", it);
+//      sfFloatWrite2d(buf, &fmMethod.getVelocity().dat[0], nzpad, nxpad);
 //    }
 
-    fmMethod.stepBackward(&gp0[0], &gp1[0]);
+    fmMethod.stepForward(&gp0[0], &gp1[0]);
 //    {
 //      char buf[256];
 //      sprintf(buf, "gp0aftfm%d.rsf", it);
@@ -447,16 +460,13 @@ void hello(const Damp4t10d &fmMethod,
 
     std::swap(gp1, gp0);
 
-//    if (it == 0) {
-//      char buf[256];
-//      sprintf(buf, "sfield%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp0[0], nzpad, nxpad);
+//    char buf[256];
+//    sprintf(buf, "sfield%d.rsf", it);
+//    sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
 //
-//      sprintf(buf, "vfield%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
-////    }
-//
-//      if (it == 397) exit(0);
+//    sprintf(buf, "vfield%d.rsf", it);
+//    sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
+
 
     if (dt * it > 0.4) {
       cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
@@ -465,6 +475,10 @@ void hello(const Damp4t10d &fmMethod,
     } else {
       break;
     }
+
+//    sprintf(buf, "img%d.rsf", it);
+//    sfFloatWrite2d(buf, &g0[0], nzpad, nxpad);
+//    if (it == 1999) exit(0);
  }
 }
 
