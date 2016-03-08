@@ -212,3 +212,13 @@ void Damp4t10d::refillBoundary(float* gradient) const {
     }
   }
 }
+
+void Damp4t10d::sfWriteVel(sf_file file) const {
+  int nzpad = vel->nz;
+  int nxpad = vel->nx;
+  int nz = nzpad - 2 * FDLEN - nb;
+
+  for (int ix = FDLEN + nb; ix < nxpad - FDLEN - nb; ix++) {
+    sf_floatwrite(const_cast<float *>(&vel->dat[ix * nzpad + FDLEN]), nz, file);
+  }
+}

@@ -8,6 +8,9 @@
 #ifndef SRC_FM2D_DAMP4T10D_H_
 #define SRC_FM2D_DAMP4T10D_H_
 
+extern "C" {
+#include <rsf.h>
+}
 #include <boost/function.hpp>
 #include "velocity.h"
 #include "shot-position.h"
@@ -26,6 +29,7 @@ public:
   const Velocity &getVelocity() const;
   void maskGradient(float *grad) const;
   void refillBoundary(float *vel) const;
+  void sfWriteVel(sf_file file) const;
 
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;

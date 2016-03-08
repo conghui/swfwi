@@ -432,7 +432,7 @@ void hello(const Damp4t10d &fmMethod,
       sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
       readBin(std::string(check_file_name1), &sp1[0], sp1.size() * sizeof(float));
       readBin(std::string(check_file_name2), &sp0[0], sp0.size() * sizeof(float));
-      printf("reading %s and %s\n", check_file_name1, check_file_name2);
+//      printf("reading %s and %s\n", check_file_name1, check_file_name2);
     }
 
 //    printf("it %d, check_step: %d\n", it, check_step);
@@ -866,12 +866,12 @@ int main(int argc, char *argv[]) {
 
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
-    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+//    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
 
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
-
+//
 //    {
 //      char buf[BUFSIZ];
 //      sprintf(buf, "encobs%d.rsf", iter);
@@ -879,6 +879,9 @@ int main(int argc, char *argv[]) {
 //
 //      sprintf(buf, "encsrc%d.rsf", iter);
 //      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+//
+//      sprintf(buf, "exvel%d.rsf", iter);
+//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
 //    }
 
     std::vector<float> dcal(nt * ng, 0);
@@ -892,6 +895,7 @@ int main(int argc, char *argv[]) {
 //      sprintf(buf, "calobs%d.rsf", iter);
 //      sfFloatWrite2d(buf, &dcal[0], ng, nt);
 //    }
+//    exit(0);
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
@@ -928,7 +932,7 @@ int main(int argc, char *argv[]) {
 
     fmMethod.refillBoundary(&exvel.dat[0]);
 //    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
-
+    fmMethod.sfWriteVel(params.vupdates);
   } /// end of iteration
 
   sf_close();
