@@ -11,6 +11,7 @@
 #include "sum.h"
 #include "fd4t10s-damp-zjh.h"
 #include "fd4t10s-zjh.h"
+#include "sfutil.h"
 
 extern "C" {
 #include <rsf.h>
@@ -22,8 +23,8 @@ static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
   int nxpad = nx + 2 * halo;
   int nzpad = nz + 2 * halo;
 
-  std::vector<float> &vel_e = exvel.dat;
   const std::vector<float> &vel = v0.dat;
+  std::vector<float> &vel_e = exvel.dat;
 
   //copy the vel into vel_e
   for (int ix = halo; ix < nx + halo; ix++) {
@@ -69,21 +70,21 @@ static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
     }
   }
 
-  /// boundary
-  for (int ix = 0; ix < nxpad; ix++) {
-    for (int iz = 0; iz < nb; iz++) {
-      b[ix * nzpad + iz] = b[ix * nzpad + nb];                              /* top */
-      b[ix * nzpad + (nzpad - iz - 1)] = b[ix * nzpad + (nzpad - nb - 1)];  /* bottom*/
+  /// boundary, free surface
+  for (int ix = 0; ix < nb; ix++) {
+    for (int iz = 0; iz < nz; iz++) {
+      b[ix * nzpad + iz] = a[iz];                              /* left */
+      b[(nb + nx + ix) * nzpad + iz] = a[(nx - 1) * nz + iz];  /* right */
     }
   }
 
-  for (int ix = 0; ix < nb; ix++) {
-    for (int iz = 0; iz < nzpad; iz++) {
-      b[ix * nzpad + iz] = b[nb * nzpad + iz];                              /* left */
-      b[(nxpad - ix - 1) * nzpad + iz] = b[(nxpad - nb - 1) * nzpad + iz];  /* right */
+  for (int ix = 0; ix < nxpad; ix++) {
+    for (int iz = 0; iz < nb; iz++) {
+      b[ix * nzpad + (nz + iz)] = b[ix * nzpad + (nz - 1)];  /* bottom*/
     }
   }
 }
+
 
 Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
   vel(NULL), dt(_dt), dx(_dx), nb(_nb)
@@ -98,21 +99,17 @@ static void transvel(std::vector<float> &vel, float dx, float dt) {
 }
 
 Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
-  Velocity vv = _vel;
+  // expand for boundary, free surface
+  Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
+  expandBndry(exvelForBndry, _vel, nb);
 
-  transvel(vv.dat, dx, dt);
-
-  // expand for boundary
-  Velocity exvelForBndry(vv.nx + 2 * nb, vv.nz + nb);
-  expandBndry(exvelForBndry, vv, nb);
+  transvel(exvelForBndry.dat, dx, dt);
 
   // expand for stencil
-  Velocity exvelForStencil(exvelForBndry.nx+2*FDLEN, exvelForBndry.nz+2*FDLEN);
-  expandForStencil(exvelForStencil, vv, FDLEN);
+  Velocity ret(exvelForBndry.nx+2*FDLEN, exvelForBndry.nz+2*FDLEN);
+  expandForStencil(ret, exvelForBndry, FDLEN);
 
-  DEBUG() << format("sum exvel %.20f") % sum(exvelForStencil.dat);
-
-  return exvelForStencil;
+  return ret;
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {

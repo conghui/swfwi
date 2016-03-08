@@ -44,10 +44,12 @@ int main(int argc, char* argv[])
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
+  sfFloatWrite2d("v0.rsf", &v0.dat[0], nz, nx);
 
   Damp4t10d fmMethod(dt, params.dx, nb);
 
   Velocity exvel = fmMethod.expandDomain(v0);
+  sfFloatWrite2d("exvel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
 
   fmMethod.bindVelocity(exvel);
 
@@ -67,26 +69,16 @@ int main(int argc, char* argv[])
     ShotPosition curSrcPos = allSrcPos.clipRange(is, is);
 
     for(int it=0; it<nt; it++) {
-
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
-
-      TRACE() << format("it %d, sum p after adding source %.20f") % it % sum(p1);
-
       fmMethod.stepForward(&p0[0], &p1[0]);
-      TRACE() << format("it %d, sum p after fd %.20f") % it % sum(p0);
-
-
       fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
-      TRACE() << format("it %d, sum dobs %.20f") % it % sum(&dobs[it * ng], ng);
-
       std::swap(p1, p0);
-
     }
 
     matrix_transpose(&dobs[0], &trans[0], ng, nt);
-    DEBUG() << format("shot %d, time %s") % is % timer.format(2).c_str();
-
     sf_floatwrite(&trans[0], ng*nt, params.shots);
+
+    DEBUG() << format("shot %d, time %s") % is % timer.format(2).c_str();
   }
 
   return 0;
