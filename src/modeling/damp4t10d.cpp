@@ -113,7 +113,7 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
-  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb, dx, dt);
+  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
 }
 
 void Damp4t10d::bindVelocity(const Velocity& _vel) {
