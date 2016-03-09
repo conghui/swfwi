@@ -15,7 +15,7 @@ if compiler_set == 'gnu':
   warn_flags      = ["-Wall", "-Wextra", "-Wno-write-strings"]
   optimize_flags  = ["-O2"]
   debug_flags     = ["-O0", "-g"]
-  other_flags     = ["-DNO_BLAS -DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  other_flags     = ["-DNO_BLAS", "-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
   link_flags      = ["-O1"]
 
 elif compiler_set == 'intel':
@@ -25,7 +25,7 @@ elif compiler_set == 'intel':
   warn_flags      = ["-Wall"]
   optimize_flags  = ["-O2"]
   debug_flags     = ["-O0", "-g"]
-  other_flags     = ["-DNO_BLAS -DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  other_flags     = ["-DNO_BLAS", "-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
   link_flags      = ["-O1"]
 
 else:
