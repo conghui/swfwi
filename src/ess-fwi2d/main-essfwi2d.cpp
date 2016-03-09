@@ -260,7 +260,7 @@ void forwardModeling(const Damp4t10d &fmMethod,
 
       fmMethod.stepForward(&p0[0], &p1[0]);
 
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
 
       std::swap(p1, p0);
 
@@ -424,7 +424,8 @@ void hello(const Damp4t10d &fmMethod,
 //      sfFloatWrite2d(buf, &sp0[0], nzpad, nxpad);
 //    }
 
-    fmMethod.subSource(&sp0[0], &encSrc[it * ns], allSrcPos);
+    fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
+//    fmMethod.subSource(&sp0[0], &encSrc[it * ns], all);
 //    {
 //      char buf[256];
 //      sprintf(buf, "subw%d.rsf", it);
@@ -567,7 +568,8 @@ int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, 
   //now we don't do apply data mask (dwht)   // Add mask.
   //TODO: 1.5/config.peak_freq
 //  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
-  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 0.15);
+//  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 0.15);
+  updateMethod.removeDirectArrival(&dcal[0], nt, 0.15);
 
 //  sfFloatWrite2d("22dcal.rsf", &dcal[0], ng, nt);
 
@@ -822,27 +824,25 @@ int main(int argc, char *argv[]) {
   const int seed = 10;
   srand(seed);
 
+  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
+  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, params.dx, nb);
+
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
-
-  Damp4t10d fmMethod(dt, params.dx, nb);
-
   Velocity exvel = fmMethod.expandDomain(v0);
+
   fmMethod.bindVelocity(exvel);
 
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
-  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
-  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
-//  std::vector<float> cg(params.nz * params.nx, 0);    /* conjugate gradient */
   std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
-//  std::vector<float> objval(params.niter, 0); /* objective/misfit function */
 
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
-//  sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
+  sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
 
   std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
 
@@ -857,38 +857,38 @@ int main(int argc, char *argv[]) {
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "encobs%d.rsf", iter);
-//      sfFloatWrite2d(buf, &encobs[0], nt, ng);
-//
-//      sprintf(buf, "encsrc%d.rsf", iter);
-//      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
-//
-//      sprintf(buf, "exvel%d.rsf", iter);
-//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "encobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &encobs[0], nt, ng);
+
+      sprintf(buf, "encsrc%d.rsf", iter);
+      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+
+      sprintf(buf, "exvel%d.rsf", iter);
+      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+    }
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "calobs%d.rsf", iter);
-//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "calobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+    }
 //    exit(0);
 
-//    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
-//    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
-    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &encobs[0], nt, 1.5 / fm);
-    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
+//    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &encobs[0], nt, 1.5 / fm);
+//    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
+    fmMethod.removeDirectArrival(&encobs[0], nt, 1.5 / fm);
+    fmMethod.removeDirectArrival(&dcal[0], nt, 1.5 / fm);
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "rmdcalobs%d.rsf", iter);
-//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "rmdcalobs%d.rsf", iter);
+      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+    }
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
@@ -902,36 +902,36 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
     hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "grad%d.rsf", iter);
-//      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "grad%d.rsf", iter);
+      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+    }
 //    exit(0);
 
     fmMethod.maskGradient(&g1[0]);
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "mgrad%d.rsf", iter);
-//      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "mgrad%d.rsf", iter);
+      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+    }
 
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "pre%d.rsf", iter);
-//      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "pre%d.rsf", iter);
+      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+    }
     prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
-//    {
-//      char buf[BUFSIZ];
-//      sprintf(buf, "g0%d.rsf", iter);
-//      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-//
-//      sprintf(buf, "update%d.rsf", iter);
-//      sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
-//    }
+    {
+      char buf[BUFSIZ];
+      sprintf(buf, "g0%d.rsf", iter);
+      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+
+      sprintf(buf, "update%d.rsf", iter);
+      sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
+    }
 
     const int ivel = 0;
     float min_vel = (dx / dt / vmax) * (dx / dt / vmax);

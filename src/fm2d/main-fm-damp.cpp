@@ -42,11 +42,14 @@ int main(int argc, char* argv[])
   float dt = params.dt;
   float fm = params.fm;
 
+  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
+  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, params.dx, nb);
+
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
   sfFloatWrite2d("v0.rsf", &v0.dat[0], nz, nx);
 
-  Damp4t10d fmMethod(dt, params.dx, nb);
 
   Velocity exvel = fmMethod.expandDomain(v0);
   sfFloatWrite2d("exvel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
@@ -56,8 +59,6 @@ int main(int argc, char* argv[])
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
-  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
-  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
   for(int is=0; is<ns; is++) {
     boost::timer::cpu_timer timer;
@@ -71,7 +72,7 @@ int main(int argc, char* argv[])
     for(int it=0; it<nt; it++) {
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
       fmMethod.stepForward(&p0[0], &p1[0]);
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
       std::swap(p1, p0);
     }
 

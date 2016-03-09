@@ -7,7 +7,7 @@
 import os
 
 # host compiler options
-compiler_set = 'intel'
+compiler_set = 'gnu'
 if compiler_set == 'gnu':
   c_compiler      = ["mpicc",  "-cc=gcc",  "-fopenmp"]
   cxx_compiler    = ["mpicxx", "-cxx=g++", "-fopenmp"]

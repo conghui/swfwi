@@ -87,13 +87,6 @@ static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
   }
 }
 
-
-Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
-  vel(NULL), dt(_dt), dx(_dx), nb(_nb)
-{
-
-}
-
 static void transvel(std::vector<float> &vel, float dx, float dt) {
   for (size_t i = 0; i < vel.size(); i ++) {
     vel[i] = (dx * dx) / (vel[i] * vel[i] * dt * dt);
@@ -278,4 +271,26 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   }
 
   matrix_transpose(&trans[0], &data[0], nt, ng);
+}
+
+Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos,
+    const ShotPosition& _allGeoPos, float _dt, float _dx, int _nb) :
+      vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos), dt(_dt), dx(_dx), nb(_nb)
+{
+}
+
+void Damp4t10d::addEncodedSource(float* p, const float* encsrc) const {
+  this->addSource(p, encsrc, *this->allSrcPos);
+}
+
+void Damp4t10d::subEncodedSource(float* p, const float* source) const {
+  this->subSource(p, source, *this->allSrcPos);
+}
+
+void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
+  this->recordSeis(seis_it, p, *this->allGeoPos);
+}
+
+void Damp4t10d::removeDirectArrival(float* data, int nt, float t_width) const {
+  this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);
 }
