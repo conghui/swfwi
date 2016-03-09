@@ -540,7 +540,7 @@ void initAlpha2_3(int ivel, float max_alpha3, float &initAlpha2, float &initAlph
 
 int calculate_obj_val(const Damp4t10d &fmMethod,
     const std::vector<float> &encsrc, const std::vector<float> &encobs,
-    const float *grad, const float *vel,
+    const float *grad,
     float vmin, float vmax, float steplen, float *obj_val_out) {
 
   int nx = fmMethod.getVelocity().nx;
@@ -549,8 +549,8 @@ int calculate_obj_val(const Damp4t10d &fmMethod,
 
   int size = nx *  nz;
 
+  const float *vel = &fmMethod.getVelocity().dat[0];
   float *new_vel = (float *)malloc(sizeof(float) * size);
-
   update_vel(vel, grad, size, steplen, vmin, vmax, new_vel);
 
   Damp4t10d updateMethod = fmMethod;
@@ -587,16 +587,12 @@ void selectAlpha(const Damp4t10d &fmMethod,
     float &_alpha2, float &_obj_val2, float &_alpha3, float &_obj_val3, bool &toParabolicFit) {
   TRACE() << "SELECTING THE RIGHT OBJECTIVE VALUE 3";
 
-  int nt = fmMethod.getnt();
-
   float alpha3 = _alpha3;
   float alpha2 = _alpha2;
   float obj_val2, obj_val3 = 0;
 
-  const float *vel = &fmMethod.getVelocity().dat[0];
-
-  calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, vmin, vmax, alpha2, &obj_val2);
-  calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, vmin, vmax, alpha3, &obj_val3);
+  calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha2, &obj_val2);
+  calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha3, &obj_val3);
 
   DEBUG() << "BEFORE TUNNING";
   DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
@@ -621,7 +617,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
     /// update alpha2
     alpha2 /= 2;
-    calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, vmin, vmax, alpha2, &obj_val2);
+    calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha2, &obj_val2);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha2, &obj_val2);
 
     /// store it
@@ -650,7 +646,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
     _obj_val2 = it->second;
 
     _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, vmin, vmax, alpha3, &_obj_val3);
+    calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha3, &_obj_val3);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha3, &_obj_val3);
 
     toParabolicFit = false;
@@ -676,7 +672,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
     obj_val2 = obj_val3;
 
     alpha3 = std::min(alpha3 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vel, vmin, vmax, alpha3, &obj_val3);
+    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha3, &obj_val3);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha3, &obj_val3);
 
     tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
@@ -695,7 +691,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
     _obj_val3 = it->second;
 
     _alpha2 = _alpha3 / 2;
-    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vel, vmin, vmax, alpha2, &_obj_val2);
+    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha2, &_obj_val2);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha2, &_obj_val2);
 
     toParabolicFit = false;
@@ -764,8 +760,6 @@ float calStepLen(const Damp4t10d &fmMethod,
 
   selectAlpha(fmMethod, encsrc, encobs, &updateDirection[0], obj_val1, min_vel, max_vel, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
 
-//  selectAlpha(fmMethod, &updateDirection[0], obj_val1, vmin, vmax, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
-
   float alpha4, obj_val4;
   if (toParabolic) {
     DEBUG() << "parabolic fit";
@@ -789,15 +783,6 @@ float calStepLen(const Damp4t10d &fmMethod,
   PreservedAlpha::instance().getAlpha()[ivel] = alpha4;
   return alpha4;
 }
-//float subSquareSum(const std::vector<float> &a, const std::vector<float> &b) {
-//  float sum = 0;
-//  for (size_t i = 0; i < a.size(); i++) {
-//    sum += (a[i] - b[i]) * (a[i] - b[i]);
-//  }
-//
-//  return sum;
-//}
-
 
 
 int main(int argc, char *argv[]) {
