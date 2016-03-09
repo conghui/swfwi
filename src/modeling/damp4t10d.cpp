@@ -19,6 +19,31 @@ extern "C" {
 #include <rsf.h>
 }
 
+static void initbndr(std::vector<float> &bndr, int nb) {
+  for(int ib=0;ib<nb;ib++){
+    float tmp=0.015*(nb-ib);
+    bndr[ib]=std::exp(-tmp*tmp);
+  }
+}
+
+static void applySponge(float* p, const float *bndr, int nx, int nz, int nb) {
+  for(int ib=0; ib<nb; ib++) {
+    float w = bndr[ib];
+
+    int ibz = nz-ib-1;
+    for(int ix=0; ix<nx; ix++) {
+      p[ix * nz + ibz] *= w; /* bottom sponge */
+    }
+
+    int ibx = nx-ib-1;
+    for(int iz=0; iz<nz; iz++) {
+      p[ib  * nz + iz] *= w; /*   left sponge */
+      p[ibx * nz + iz] *= w; /*  right sponge */
+    }
+  }
+}
+
+
 static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
   int nx = v0.nx;
   int nz = v0.nz;
@@ -115,7 +140,10 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
-  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
+//  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
+  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
+  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
+  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
 }
 
 void Damp4t10d::bindVelocity(const Velocity& _vel) {
@@ -278,6 +306,9 @@ Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos, const ShotPosition& _allGeo
       vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
       dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
 {
+  int totalNb = nb + FDLEN;
+  bndr.resize(totalNb);
+  initbndr(bndr, bndr.size());
 }
 
 void Damp4t10d::addEncodedSource(float* p, const float* encsrc) const {

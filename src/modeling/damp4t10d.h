@@ -62,6 +62,10 @@ private:
   float fm;
   int nb;
   int nt;
+
+private:
+  std::vector<float> bndr;
+
 };
 
 #endif /* SRC_FM2D_DAMP4T10D_H_ */
