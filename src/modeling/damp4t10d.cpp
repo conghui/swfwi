@@ -5,6 +5,7 @@
  *      Author: rice
  */
 
+#include <cmath>
 #include <functional>
 #include "damp4t10d.h"
 #include "logger.h"
@@ -96,6 +97,12 @@ Damp4t10d::Damp4t10d(float _dt, float _dx, int _nb) :
 static void transvel(std::vector<float> &vel, float dx, float dt) {
   for (size_t i = 0; i < vel.size(); i ++) {
     vel[i] = (dx * dx) / (vel[i] * vel[i] * dt * dt);
+  }
+}
+
+static void recoverVel(std::vector<float> &vel, float dx, float dt) {
+  for (size_t i = 0; i < vel.size(); i ++) {
+    vel[i] = std::sqrt(dx*dx / (dt*dt*vel[i]));
   }
 }
 
@@ -220,8 +227,10 @@ void Damp4t10d::sfWriteVel(sf_file file) const {
   int nxpad = vel->nx;
   int nz = nzpad - 2 * FDLEN - nb;
 
+  std::vector<float> vv = vel->dat;
+  recoverVel(vv, dx, dt);
   for (int ix = FDLEN + nb; ix < nxpad - FDLEN - nb; ix++) {
-    sf_floatwrite(const_cast<float *>(&vel->dat[ix * nzpad + FDLEN]), nz, file);
+    sf_floatwrite(&vv[ix * nzpad + FDLEN], nz, file);
   }
 }
 
