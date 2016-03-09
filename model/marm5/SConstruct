@@ -34,7 +34,7 @@ datapath = './rsfdata/'
 checkpointdir='./checkpoingdir/'
 os.environ['DATAPATH'] = datapath
 os.environ['CHECKPOINTDIR'] = checkpointdir
-os.environ['OMP_NUM_THREADS'] = '2'
+#os.environ['OMP_NUM_THREADS'] = '2'
 mkdir(datapath)
 mkdir(checkpointdir)
 
@@ -47,7 +47,7 @@ if task == 'fm':
 elif task == 'essfwi':
   system('''./essfwi vin=smvel.rsf  shots=shots.rsf
   grads=grads.rsf objs=objs.rsf illums=illums.rsf
-  niter=1 nb=30 vout=vsnaps.rsf
+  niter=300 nb=30 vout=vsnaps.rsf
   '''.replace('\n', ''))
 
 

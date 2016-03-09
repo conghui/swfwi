@@ -101,6 +101,7 @@ void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float
 
     beta = (a - b) / c;
 
+    DEBUG() << format("beta %e") % beta;
     if (beta < 0.0f) {
       beta = 0.0f;
     }
@@ -369,12 +370,12 @@ void hello(const Damp4t10d &fmMethod,
   std::vector<float> gp0(nzpad * nxpad, 0);
   std::vector<float> gp1(nzpad * nxpad, 0);
 
-  for (size_t i = 0; i < sp0.size(); i++) {
-    sp0[i] = rand() % 100;
-    sp1[i] = rand() % 100;
-    gp0[i] = rand() % 100;
-    gp1[i] = rand() % 100;
-  }
+//  for (size_t i = 0; i < sp0.size(); i++) {
+//    sp0[i] = rand() % 100;
+//    sp1[i] = rand() % 100;
+//    gp0[i] = rand() % 100;
+//    gp1[i] = rand() % 100;
+//  }
 
   for(int it = nt - 1; it >= 0 ; it--) {
 //    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
@@ -843,37 +844,39 @@ int main(int argc, char *argv[]) {
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
 //  sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
 
+  std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
+
   for (int iter = 0; iter < params.niter; iter++) {
     boost::timer::cpu_timer timer;
 
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
-//    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
 
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "encobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &encobs[0], nt, ng);
-
-      sprintf(buf, "encsrc%d.rsf", iter);
-      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
-
-      sprintf(buf, "exvel%d.rsf", iter);
-      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
-    }
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "encobs%d.rsf", iter);
+//      sfFloatWrite2d(buf, &encobs[0], nt, ng);
+//
+//      sprintf(buf, "encsrc%d.rsf", iter);
+//      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+//
+//      sprintf(buf, "exvel%d.rsf", iter);
+//      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+//    }
 
     std::vector<float> dcal(nt * ng, 0);
     forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
 
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "calobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &dcal[0], ng, nt);
-    }
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "calobs%d.rsf", iter);
+//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+//    }
 //    exit(0);
 
 //    remove_dirc_arrival(exvel, allSrcPos, allGeoPos, encobs, nt, 1.5 / fm, dt);
@@ -881,11 +884,11 @@ int main(int argc, char *argv[]) {
     fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &encobs[0], nt, 1.5 / fm);
     fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
 
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "rmdcalobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &dcal[0], ng, nt);
-    }
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "rmdcalobs%d.rsf", iter);
+//      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+//    }
 
     std::vector<float> vsrc(nt * ng, 0);
     vectorMinus(encobs, dcal, vsrc);
@@ -899,17 +902,36 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
     hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
-    sfFloatWrite2d("grad.rsf", &g1[0], exvel.nz, exvel.nx);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "grad%d.rsf", iter);
+//      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//    }
 //    exit(0);
 
     fmMethod.maskGradient(&g1[0]);
-    sfFloatWrite2d("mgrad.rsf", &g1[0], exvel.nz, exvel.nx);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "mgrad%d.rsf", iter);
+//      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//    }
 
-    std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
+
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "pre%d.rsf", iter);
+//      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//    }
     prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
-        sfFloatWrite2d("g0.rsf", &g0[0], exvel.nz, exvel.nx);
-        sfFloatWrite2d("update.rsf", &updateDirection[0], exvel.nz, exvel.nx);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "g0%d.rsf", iter);
+//      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//
+//      sprintf(buf, "update%d.rsf", iter);
+//      sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
+//    }
 
     const int ivel = 0;
     float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
