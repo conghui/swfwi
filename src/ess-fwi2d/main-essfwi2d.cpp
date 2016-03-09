@@ -300,7 +300,7 @@ void transVsrc(std::vector<float> &vsrc, int nt, int ng, float dt) {
     second_order_virtual_source_forth_accuracy(&trans[ig * nt], nt, dt);
   }
 
-  sfFloatWrite2d("vsrc.rsf", &trans[0], nt, ng);
+  //sfFloatWrite2d("vsrc.rsf", &trans[0], nt, ng);
 
   matrix_transpose(&trans[0], &vsrc[0], nt, ng);
 }
@@ -827,7 +827,7 @@ int main(int argc, char *argv[]) {
   std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
 
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
-  sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
+  //sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
 
   std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
 
@@ -845,13 +845,13 @@ int main(int argc, char *argv[]) {
     {
       char buf[BUFSIZ];
       sprintf(buf, "encobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &encobs[0], nt, ng);
+      //sfFloatWrite2d(buf, &encobs[0], nt, ng);
 
       sprintf(buf, "encsrc%d.rsf", iter);
-      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+      //sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
 
       sprintf(buf, "exvel%d.rsf", iter);
-      sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
     }
 
     std::vector<float> dcal(nt * ng, 0);
@@ -860,7 +860,7 @@ int main(int argc, char *argv[]) {
     {
       char buf[BUFSIZ];
       sprintf(buf, "calobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
     }
 
     fmMethod.removeDirectArrival(&encobs[0]);
@@ -869,7 +869,7 @@ int main(int argc, char *argv[]) {
     {
       char buf[BUFSIZ];
       sprintf(buf, "rmdcalobs%d.rsf", iter);
-      sfFloatWrite2d(buf, &dcal[0], ng, nt);
+      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
     }
 
     std::vector<float> vsrc(nt * ng, 0);
@@ -887,7 +887,7 @@ int main(int argc, char *argv[]) {
     {
       char buf[BUFSIZ];
       sprintf(buf, "grad%d.rsf", iter);
-      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
     }
 //    exit(0);
 
@@ -895,24 +895,24 @@ int main(int argc, char *argv[]) {
     {
       char buf[BUFSIZ];
       sprintf(buf, "mgrad%d.rsf", iter);
-      sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
     }
 
 
     {
       char buf[BUFSIZ];
       sprintf(buf, "pre%d.rsf", iter);
-      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
     }
     prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
     {
       char buf[BUFSIZ];
       sprintf(buf, "g0%d.rsf", iter);
-      sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
 
       sprintf(buf, "update%d.rsf", iter);
-      sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
+      //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
     }
 
     const int ivel = 0;
