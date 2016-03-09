@@ -51,8 +51,8 @@ void expand2d(float** b, float** a)
 	}
     }
 
-    for     (ix=0; ix<nxpad; ix++) 
-	for (iz=0; iz<nb;    iz++) 
+    for     (ix=0; ix<nxpad; ix++)
+	for (iz=0; iz<nb;    iz++)
 	    b[ix][nzpad-iz-1] = b[ix][nzpad-nb-1];/* bottom*/
 
     for     (ix=0; ix<nb;    ix++) {
@@ -91,10 +91,10 @@ void step_forward(float **p0, float **p1)
 #ifdef _OPENMP
 #pragma omp parallel for default(none)	\
     private(ix,iz,tmp)			\
-    shared(p1,p0,vv,nzpad,nxpad,c0,c11,c12,c21,c22)  
-#endif	
-	for (ix=2; ix < nxpad-2; ix++) 
-	for (iz=2; iz < nzpad-2; iz++) 
+    shared(p1,p0,vv,nzpad,nxpad,c0,c11,c12,c21,c22)
+#endif
+	for (ix=2; ix < nxpad-2; ix++)
+	for (iz=2; iz < nzpad-2; iz++)
 	{
 		tmp =	c0*p1[ix][iz]+
 			c11*(p1[ix][iz-1]+p1[ix][iz+1])+
@@ -197,12 +197,12 @@ int main(int argc, char* argv[])
     	/* initialize Madagascar */
     	sf_init(argc,argv);
 #ifdef _OPENMP
-    	omp_init();
+      //omp_init();
 #endif
 
     	/*< set up I/O files >*/
     	vinit=sf_input ("in");   /* initial velocity model, unit=m/s */
-    	shots=sf_output("out");  /* output image with correlation imaging condition */ 
+    	shots=sf_output("out");  /* output image with correlation imaging condition */
 
     	/* get parameters for forward modeling */
     	if (!sf_histint(vinit,"n1",&nz)) sf_error("no n1");
@@ -212,18 +212,18 @@ int main(int argc, char* argv[])
 
 	if (!sf_getfloat("amp",&amp)) amp=1000;
 	/* maximum amplitude of ricker */
-    	if (!sf_getfloat("fm",&fm)) fm=10;	
+    	if (!sf_getfloat("fm",&fm)) fm=10;
 	/* dominant freq of ricker */
     	if (!sf_getint("nb",&nb))   nb=30;
 	/* thickness of sponge ABC  */
-    	if (!sf_getfloat("dt",&dt)) sf_error("no dt");	
+    	if (!sf_getfloat("dt",&dt)) sf_error("no dt");
 	/* time interval */
-    	if (!sf_getint("nt",&nt))   sf_error("no nt");	
+    	if (!sf_getint("nt",&nt))   sf_error("no nt");
 	/* total modeling time steps */
-    	if (!sf_getint("ns",&ns))   sf_error("no ns");	
+    	if (!sf_getint("ns",&ns))   sf_error("no ns");
 	/* total shots */
-    	if (!sf_getint("ng",&ng))   sf_error("no ng");	
-	/* total receivers in each shot */	
+    	if (!sf_getint("ng",&ng))   sf_error("no ng");
+	/* total receivers in each shot */
     	if (!sf_getint("jsx",&jsx))   sf_error("no jsx");
 	/* source x-axis  jump interval  */
     	if (!sf_getint("jsz",&jsz))   jsz=0;
@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
 	if (!sf_getbool("csdgather",&csdgather)) csdgather=false;
 	/* default, common shot-gather; if n, record at every point*/
 
-	sf_putint(shots,"n1",nt);	
+	sf_putint(shots,"n1",nt);
 	sf_putint(shots,"n2",ng);
 	sf_putint(shots,"n3",ns);
 	sf_putfloat(shots,"d1",dt);
@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
 	c22= -tmp/12.0;
 	c0=-2.0*(c11+c12+c21+c22);
 
-	v0=sf_floatalloc2(nz,nx); 
+	v0=sf_floatalloc2(nz,nx);
 	vv=sf_floatalloc2(nzpad, nxpad);
 	p0=sf_floatalloc2(nzpad, nxpad);
 	p1=sf_floatalloc2(nzpad, nxpad);
@@ -301,21 +301,21 @@ int main(int argc, char* argv[])
 	for(ix=0;ix<nxpad;ix++){
 	    for(iz=0;iz<nzpad;iz++){
 		tmp=vv[ix][iz]*dt;
-		vv[ix][iz]=tmp*tmp;/* vv=vv^2*dt^2 */ 
+		vv[ix][iz]=tmp*tmp;/* vv=vv^2*dt^2 */
 	    }
-	}	
+	}
 	for(it=0; it<nt; it++){
 		tmp=SF_PI*fm*(it*dt-1.0/fm);tmp=tmp*tmp;
 		wlt[it]=amp*(1.0-2.0*tmp)*expf(-tmp);
 	}
-	if (!(sxbeg>=0 && szbeg>=0 && sxbeg+(ns-1)*jsx<nx && szbeg+(ns-1)*jsz<nz))	
+	if (!(sxbeg>=0 && szbeg>=0 && sxbeg+(ns-1)*jsx<nx && szbeg+(ns-1)*jsz<nz))
 	{ sf_error("sources exceeds the computing zone!\n"); exit(1);}
 	sg_init(sxz, szbeg, sxbeg, jsz, jsx, ns);
 	distx=sxbeg-gxbeg;
 	distz=szbeg-gzbeg;
-	if (!(gxbeg>=0 && gzbeg>=0 && gxbeg+(ng-1)*jgx<nx && gzbeg+(ng-1)*jgz<nz))	
+	if (!(gxbeg>=0 && gzbeg>=0 && gxbeg+(ng-1)*jgx<nx && gzbeg+(ng-1)*jgz<nz))
 	{ sf_error("geophones exceeds the computing zone!\n"); exit(1);}
-	if (csdgather && !((sxbeg+(ns-1)*jsx)+(ng-1)*jgx-distx <nx  && (szbeg+(ns-1)*jsz)+(ng-1)*jgz-distz <nz))	
+	if (csdgather && !((sxbeg+(ns-1)*jsx)+(ng-1)*jgx-distx <nx  && (szbeg+(ns-1)*jsz)+(ng-1)*jgz-distz <nz))
 	{ sf_error("geophones exceeds the computing zone!\n"); exit(1);}
 	sg_init(gxz, gzbeg, gxbeg, jgz, jgx, ng);
 
@@ -341,9 +341,9 @@ int main(int argc, char* argv[])
 		}
 		matrix_transpose(dobs, trans, ng, nt);
 		sf_floatwrite(trans, ng*nt, shots);
-		
+
  		end = clock();
- 		sf_warning("shot %d finished: %f", is+1,((float)(end-start))/CLOCKS_PER_SEC); 
+ 		sf_warning("shot %d finished: %f", is+1,((float)(end-start))/CLOCKS_PER_SEC);
 	}
 
 	free(sxz);
