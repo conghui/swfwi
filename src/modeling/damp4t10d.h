@@ -17,7 +17,7 @@ extern "C" {
 
 class Damp4t10d {
 public:
-  Damp4t10d(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float dt, float dx, float fm, int nb);
+  Damp4t10d(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float dt, float dx, float fm, int nb, int nt);
 
   Velocity expandDomain(const Velocity &vel);
 
@@ -34,12 +34,15 @@ public:
   void refillBoundary(float *vel) const;
   void sfWriteVel(sf_file file) const;
 
-  void removeDirectArrival(float* data, int nt) const;
+  void removeDirectArrival(float* data) const;
   void subEncodedSource(float *p, const float *source) const;
 
 public:
   int getTotalSrc() const;
   int getTotalGeo() const;
+  float getdt() const;
+  float getdx() const;
+  int getnt() const;
 
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;
@@ -56,8 +59,9 @@ private:
   const ShotPosition *allGeoPos;
   float dt;
   float dx;
-  int nb;
   float fm;
+  int nb;
+  int nt;
 };
 
 #endif /* SRC_FM2D_DAMP4T10D_H_ */

@@ -273,9 +273,10 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   matrix_transpose(&trans[0], &data[0], nt, ng);
 }
 
-Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos,
-    const ShotPosition& _allGeoPos, float _dt, float _dx, float _fm, int _nb) :
-      vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos), dt(_dt), dx(_dx), fm(_fm), nb(_nb)
+Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
+    float _dt, float _dx, float _fm, int _nb, int _nt) :
+      vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
+      dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
 {
 }
 
@@ -291,7 +292,7 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
   this->recordSeis(seis_it, p, *this->allGeoPos);
 }
 
-void Damp4t10d::removeDirectArrival(float* data, int nt) const {
+void Damp4t10d::removeDirectArrival(float* data) const {
   float t_width = 1.5 / fm;
   this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);
 }
@@ -306,4 +307,16 @@ int Damp4t10d::getTotalSrc() const {
 
 int Damp4t10d::getTotalGeo() const {
   return allGeoPos->ns;
+}
+
+float Damp4t10d::getdt() const {
+  return dt;
+}
+
+float Damp4t10d::getdx() const {
+  return dx;
+}
+
+int Damp4t10d::getnt() const {
+  return nt;
 }

@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
 
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, params.dx, params.fm, nb);
+  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, params.dx, params.fm, nb, nt);
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
