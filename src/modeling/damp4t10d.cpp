@@ -294,3 +294,15 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
 void Damp4t10d::removeDirectArrival(float* data, int nt, float t_width) const {
   this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);
 }
+
+void Damp4t10d::addSource(float* p, const float* source, int is) const {
+
+}
+
+int Damp4t10d::getTotalSrc() const {
+  return allSrcPos->ns;
+}
+
+int Damp4t10d::getTotalGeo() const {
+  return allGeoPos->ns;
+}

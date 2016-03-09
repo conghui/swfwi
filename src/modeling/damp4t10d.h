@@ -26,6 +26,7 @@ public:
   void stepBackward(float *p0, float *p1) const;
   void bindVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, const ShotPosition &pos) const;
+  void addSource(float *p, const float *source, int is) const;
   void addEncodedSource(float *p, const float *encsrc) const;
   void recordSeis(float *seis_it, const float *p) const;
   const Velocity &getVelocity() const;
@@ -35,6 +36,11 @@ public:
 
   void removeDirectArrival(float* data, int nt, float t_width) const;
   void subEncodedSource(float *p, const float *source) const;
+
+public:
+  int getTotalSrc() const;
+  int getTotalGeo() const;
+
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos) const;

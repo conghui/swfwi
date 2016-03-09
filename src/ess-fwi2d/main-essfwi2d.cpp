@@ -239,15 +239,14 @@ float calVelUpdateStepLen(const EssFwiParams &params,
 }
 
 void forwardModeling(const Damp4t10d &fmMethod,
-    const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
     const std::vector<float> &encSrc,
     std::vector<float> &dobs, /* output (fast: ng, slow: nt) */
     int nt)
 {
     int nxpad = fmMethod.getVelocity().nx;
     int nzpad = fmMethod.getVelocity().nz;
-    int ns = allSrcPos.ns;
-    int ng = allGeoPos.ns;
+    int ns = fmMethod.getTotalSrc();
+    int ng = fmMethod.getTotalGeo();
 
     boost::timer::cpu_timer timer;
 
@@ -256,7 +255,7 @@ void forwardModeling(const Damp4t10d &fmMethod,
 
     for(int it=0; it<nt; it++) {
 
-      fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
+      fmMethod.addEncodedSource(&p1[0], &encSrc[it * ns]);
 
       fmMethod.stepForward(&p0[0], &p1[0]);
 
@@ -539,7 +538,7 @@ void initAlpha2_3(int ivel, float max_alpha3, float &initAlpha2, float &initAlph
   initAlpha2 = initAlpha3 * 0.5;
 }
 
-int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+int calculate_obj_val(const Damp4t10d &fmMethod,
     const std::vector<float> &encsrc, const std::vector<float> &encobs,
     const float *grad, const float *vel,
     int nt, float dt, float fm,
@@ -559,9 +558,9 @@ int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, 
 //  sfFloatWrite2d("upvel.rsf", &updateMethod.getVelocity().dat[0], nz, nx);
 
   //forward modeling
-  int ng = allGeoPos.ns;
+  int ng = fmMethod.getTotalGeo();
   std::vector<float> dcal(nt * ng);
-  forwardModeling(updateMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
+  forwardModeling(updateMethod, encsrc, dcal, nt);
 
 //  sfFloatWrite2d("11dcal.rsf", &dcal[0], ng, nt);
 
@@ -584,7 +583,7 @@ int calculate_obj_val(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, 
   return 0;
 }
 
-void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
+void selectAlpha(const Damp4t10d &fmMethod,
     const std::vector<float> &encsrc, const std::vector<float> &encobs, const float *grad,
     int nt, float dt, float fm,
                  float obj_val1, float vmin, float vmax, float maxAlpha3,
@@ -597,8 +596,8 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
 
   const float *vel = &fmMethod.getVelocity().dat[0];
 
-  calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
-  calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+  calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+  calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
 
   DEBUG() << "BEFORE TUNNING";
   DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
@@ -623,7 +622,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
 
     /// update alpha2
     alpha2 /= 2;
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
+    calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &obj_val2);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha2, &obj_val2);
 
     /// store it
@@ -652,7 +651,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     _obj_val2 = it->second;
 
     _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &_obj_val3);
+    calculate_obj_val(fmMethod, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &_obj_val3);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha3, &_obj_val3);
 
     toParabolicFit = false;
@@ -678,7 +677,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     obj_val2 = obj_val3;
 
     alpha3 = std::min(alpha3 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
+    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha3, &obj_val3);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha3, &obj_val3);
 
     tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
@@ -697,7 +696,7 @@ void selectAlpha(const Damp4t10d &fmMethod, const ShotPosition &allSrcPos, const
     _obj_val3 = it->second;
 
     _alpha2 = _alpha3 / 2;
-    calculate_obj_val(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &_obj_val2);
+    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vel, nt, dt, fm, vmin, vmax, alpha2, &_obj_val2);
 //    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha2, &_obj_val2);
 
     toParabolicFit = false;
@@ -744,7 +743,6 @@ void calcParabolaVertexEnhanced(float x1, float y1, float x2, float y2, float x3
 
 
 float calStepLen(const Damp4t10d &fmMethod,
-    const ShotPosition &allSrcPos, const ShotPosition &allGeoPos,
     const std::vector<float> &encsrc, const std::vector<float> &encobs,
     const std::vector<float> &updateDirection, int iter, int nt, int ivel, float dt, float dx, float fm,
     float obj_val1, float min_vel, float max_vel) {
@@ -763,7 +761,7 @@ float calStepLen(const Damp4t10d &fmMethod,
   float obj_val2, obj_val3;
   bool toParabolic;
 
-  selectAlpha(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, &updateDirection[0], nt, dt, fm, obj_val1, min_vel, max_vel, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
+  selectAlpha(fmMethod, encsrc, encobs, &updateDirection[0], nt, dt, fm, obj_val1, min_vel, max_vel, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
 
 //  selectAlpha(fmMethod, &updateDirection[0], obj_val1, vmin, vmax, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
 
@@ -870,7 +868,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::vector<float> dcal(nt * ng, 0);
-    forwardModeling(fmMethod, allSrcPos, allGeoPos, encsrc, dcal, nt);
+    forwardModeling(fmMethod, encsrc, dcal, nt);
 
     {
       char buf[BUFSIZ];
@@ -938,7 +936,7 @@ int main(int argc, char *argv[]) {
     float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
 
     DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
-    float steplen = calStepLen(fmMethod, allSrcPos, allGeoPos, encsrc, encobs, updateDirection, iter, nt, ivel, dt, params.dx, fm, obj1, min_vel, max_vel);
+    float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, nt, ivel, dt, params.dx, fm, obj1, min_vel, max_vel);
 
     TRACE() << "Update velocity model";
     update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
