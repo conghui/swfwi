@@ -568,7 +568,7 @@ int calculate_obj_val(const Damp4t10d &fmMethod,
   //TODO: 1.5/config.peak_freq
 //  remove_dirc_arrival(updateMethod.getVelocity(), allSrcPos, allGeoPos, dcal, nt, 1.5 / fm, dt);
 //  updateMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 0.15);
-  updateMethod.removeDirectArrival(&dcal[0], nt, 0.15);
+  updateMethod.removeDirectArrival(&dcal[0], nt);
 
 //  sfFloatWrite2d("22dcal.rsf", &dcal[0], ng, nt);
 
@@ -824,7 +824,8 @@ int main(int argc, char *argv[]) {
 
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, params.dx, nb);
+
+  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb);
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
@@ -875,12 +876,9 @@ int main(int argc, char *argv[]) {
       sprintf(buf, "calobs%d.rsf", iter);
       sfFloatWrite2d(buf, &dcal[0], ng, nt);
     }
-//    exit(0);
 
-//    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &encobs[0], nt, 1.5 / fm);
-//    fmMethod.removeDirectArrival(allSrcPos, allGeoPos, &dcal[0], nt, 1.5 / fm);
-    fmMethod.removeDirectArrival(&encobs[0], nt, 1.5 / fm);
-    fmMethod.removeDirectArrival(&dcal[0], nt, 1.5 / fm);
+    fmMethod.removeDirectArrival(&encobs[0], nt);
+    fmMethod.removeDirectArrival(&dcal[0], nt);
 
     {
       char buf[BUFSIZ];
