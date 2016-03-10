@@ -369,17 +369,35 @@ void hello(const Zjh4t10dSponge &fmMethod,
   std::vector<float> gp0(nzpad * nxpad, 0);
   std::vector<float> gp1(nzpad * nxpad, 0);
 
-//  for (size_t i = 0; i < sp0.size(); i++) {
-//    sp0[i] = rand() % 100;
-//    sp1[i] = rand() % 100;
-//    gp0[i] = rand() % 100;
-//    gp1[i] = rand() % 100;
-//  }
+  std::vector<float> p0(nzpad * nxpad, 0);
+  std::vector<float> p1(nzpad * nxpad, 0);
+
+  for(int it=0; it<nt; it++) {
+    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
+    fmMethod.stepForward(&p0[0], &p1[0]);
+    std::swap(p1, p0);
+
+    if ((it > 0) && (it != (nt - 1)) && !(it % check_step)) {
+      char check_file_name1[64];
+      char check_file_name2[64];
+      const char *checkPointDir = std::getenv("CHECKPOINTDIR");
+      sprintf(check_file_name1, "%s/check_time_%d_1.su", checkPointDir, it);
+      sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
+      writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
+      writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
+    }
+  }
+
+  char check_file_name1[64];
+  char check_file_name2[64];
+  const char *checkPointDir = std::getenv("CHECKPOINTDIR");
+  sprintf(check_file_name1, "%s/check_time_last_1.su", checkPointDir);
+  sprintf(check_file_name2, "%s/check_time_last_2.su", checkPointDir);
+  writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
+  writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
+
 
   for(int it = nt - 1; it >= 0 ; it--) {
-//    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
-//    fmMethod.stepForward(&p0[0], &p1[0]);
-//
     if (it  ==  nt - 1) {
       //Load last two time_step wave field
       char check_file_name1[64];
@@ -397,76 +415,18 @@ void hello(const Zjh4t10dSponge &fmMethod,
       sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
       readBin(std::string(check_file_name1), &sp1[0], sp1.size() * sizeof(float));
       readBin(std::string(check_file_name2), &sp0[0], sp0.size() * sizeof(float));
-//      printf("reading %s and %s\n", check_file_name1, check_file_name2);
     }
-
-//    printf("it %d, check_step: %d\n", it, check_step);
-
-//    {
-//      char buf[256];
-//      sprintf(buf, "sp1aaa%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
-//
-//      sprintf(buf, "sp0aaa%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp0[0], nzpad, nxpad);
-//    }
 
     fmMethod.stepBackward(&sp0[0], &sp1[0]);
     std::swap(sp1, sp0);
-
-//    {
-//      char buf[256];
-//      sprintf(buf, "back%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
-//
-//      sprintf(buf, "sp0back%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp0[0], nzpad, nxpad);
-//    }
-
     fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
-//    fmMethod.subSource(&sp0[0], &encSrc[it * ns], all);
-//    {
-//      char buf[256];
-//      sprintf(buf, "subw%d.rsf", it);
-//      sfFloatWrite2d(buf, &sp0[0], nzpad, nxpad);
-//    }
 
     /**
      * forward propagate receviers
      */
     fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
-//    {
-//      char buf[256];
-//      sprintf(buf, "vsrc%d.rsf", it);
-//      sfFloatWrite1d(buf, &vsrc[it * ng], ng);
-//    }
-//    {
-//      char buf[256];
-//      sprintf(buf, "gp1aftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
-//
-//      sprintf(buf, "gp0aftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
-//
-//      sprintf(buf, "velaftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &fmMethod.getVelocity().dat[0], nzpad, nxpad);
-//    }
-
     fmMethod.stepForward(&gp0[0], &gp1[0]);
-//    {
-//      char buf[256];
-//      sprintf(buf, "gp0aftfm%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
-//    }
-
     std::swap(gp1, gp0);
-
-//    char buf[256];
-//    sprintf(buf, "sfield%d.rsf", it);
-//    sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
-//
-//    sprintf(buf, "vfield%d.rsf", it);
-//    sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
 
 
     if (dt * it > 0.4) {
@@ -477,9 +437,58 @@ void hello(const Zjh4t10dSponge &fmMethod,
       break;
     }
 
-//    sprintf(buf, "img%d.rsf", it);
-//    sfFloatWrite2d(buf, &g0[0], nzpad, nxpad);
-//    if (it == 1999) exit(0);
+ }
+}
+
+void hello2(const Zjh4t10dSponge &fmMethod,
+    const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
+    const ShotPosition &allGeoPos, const std::vector<float> &vsrc,
+    std::vector<float> &g0,
+    int nt, float dt)
+{
+  int nxpad = fmMethod.getVelocity().nx;
+  int nzpad = fmMethod.getVelocity().nz;
+  int ns = allSrcPos.ns;
+  int ng = allGeoPos.ns;
+
+  std::vector<float> bndr = fmMethod.initBndryVector(nt);
+  std::vector<float> sp0(nzpad * nxpad, 0);
+  std::vector<float> sp1(nzpad * nxpad, 0);
+  std::vector<float> gp0(nzpad * nxpad, 0);
+  std::vector<float> gp1(nzpad * nxpad, 0);
+
+  for(int it=0; it<nt; it++) {
+    fmMethod.addSource(&sp1[0], &encSrc[it * ns], allSrcPos);
+    fmMethod.stepForward(&sp0[0], &sp1[0]);
+    std::swap(sp1, sp0);
+
+    fmMethod.writeBndry(&bndr[0], &sp0[0], it);
+  }
+
+
+  for(int it = nt - 1; it >= 0 ; it--) {
+    fmMethod.readBndry(&bndr[0], &sp0[0], it);
+    std::swap(sp0, sp1);
+    fmMethod.stepBackward(&sp0[0], &sp1[0]);
+    fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
+
+
+    /**
+     * forward propagate receviers
+     */
+    fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
+    fmMethod.stepForward(&gp0[0], &gp1[0]);
+    std::swap(gp1, gp0);
+
+
+    if (dt * it > 0.4) {
+      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
+    } else if (dt * it > 0.3) {
+      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), (dt * it - 0.3) / 0.1);
+    } else {
+      break;
+    }
+
  }
 }
 
@@ -880,10 +889,10 @@ int main(int argc, char *argv[]) {
 
     transVsrc(vsrc, nt, ng, dt);
 
-    forwardPropagate(fmMethod, allSrcPos, encsrc, nt);
+//    forwardPropagate(fmMethod, allSrcPos, encsrc, nt);
 
     std::vector<float> g1(exvel.nx * exvel.nz, 0);
-    hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
+    hello2(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
     {
       char buf[BUFSIZ];
       sprintf(buf, "grad%d.rsf", iter);
