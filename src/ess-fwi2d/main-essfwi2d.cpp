@@ -245,8 +245,8 @@ void forwardModeling(const Damp4t10d &fmMethod,
 {
     int nxpad = fmMethod.getVelocity().nx;
     int nzpad = fmMethod.getVelocity().nz;
-    int ns = fmMethod.getTotalSrc();
-    int ng = fmMethod.getTotalGeo();
+    int ns = fmMethod.getns();
+    int ng = fmMethod.getng();
 
     boost::timer::cpu_timer timer;
 
@@ -560,7 +560,7 @@ int calculate_obj_val(const Damp4t10d &fmMethod,
 //  sfFloatWrite2d("upvel.rsf", &updateMethod.getVelocity().dat[0], nz, nx);
 
   //forward modeling
-  int ng = fmMethod.getTotalGeo();
+  int ng = fmMethod.getng();
   std::vector<float> dcal(nt * ng);
   forwardModeling(updateMethod, encsrc, dcal, nt);
 

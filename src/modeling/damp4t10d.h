@@ -38,8 +38,8 @@ public:
   void subEncodedSource(float *p, const float *source) const;
 
 public:
-  int getTotalSrc() const;
-  int getTotalGeo() const;
+  int getns() const;
+  int getng() const;
   float getdt() const;
   float getdx() const;
   int getnt() const;

@@ -128,7 +128,6 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   // expand for boundary, free surface
   Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
   expandBndry(exvelForBndry, _vel, nb);
-  sfFloatWrite2d("000vel.rsf", &exvelForBndry.dat[0], exvelForBndry.nz, exvelForBndry.nx);
 
   transvel(exvelForBndry.dat, dx, dt);
 
@@ -140,10 +139,10 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
-//  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
-  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
-  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
-  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
+  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
+//  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
+//  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
+//  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
 }
 
 void Damp4t10d::bindVelocity(const Velocity& _vel) {
@@ -332,11 +331,11 @@ void Damp4t10d::addSource(float* p, const float* source, int is) const {
 
 }
 
-int Damp4t10d::getTotalSrc() const {
+int Damp4t10d::getns() const {
   return allSrcPos->ns;
 }
 
-int Damp4t10d::getTotalGeo() const {
+int Damp4t10d::getng() const {
   return allGeoPos->ns;
 }
 
