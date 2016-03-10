@@ -1,42 +1,13 @@
-
-/* Time domain full waveform inversion
-Note: This serial FWI is merely designed to help the understanding of
-beginners. Enquist absorbing boundary condition (A2) is applied!
- */
 /*
-  Copyright (C) 2014  Xi'an Jiaotong University, UT Austin (Pengliang Yang)
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-  Important references:
-    [1] Clayton, Robert, and Björn Engquist. "Absorbing boundary
-  conditions for acoustic and elastic wave equations." Bulletin
-  of the Seismological Society of America 67.6 (1977): 1529-1540.
-    [2] Tarantola, Albert. "Inversion of seismic reflection data in the
-  acoustic approximation." Geophysics 49.8 (1984): 1259-1266.
-    [3] Pica, A., J. P. Diet, and A. Tarantola. "Nonlinear inversion
-  of seismic reflection data in a laterally invariant medium."
-  Geophysics 55.3 (1990): 284-292.
-    [4] Dussaud, E., Symes, W. W., Williamson, P., Lemaistre, L.,
-  Singer, P., Denel, B., & Cherrett, A. (2008). Computational
-  strategies for reverse-time migration. In SEG Technical Program
-  Expanded Abstracts 2008 (pp. 2267-2271).
-    [5] Hager, William W., and Hongchao Zhang. "A survey of nonlinear
-  conjugate gradient methods." Pacific journal of Optimization
-  2.1 (2006): 35-58.
+ * essfwiframework.cpp
+ *
+ *  Created on: Mar 10, 2016
+ *      Author: rice
  */
+
+#include "essfwiframework.h"
+
+
 
 extern "C"
 {
@@ -67,7 +38,6 @@ extern "C"
 #include "random-code.h"
 #include "encoder.h"
 #include "velocity.h"
-#include "damp4t10d.h"
 #include "sfutil.h"
 #include "aux.h"
 #include "preserved-alpha.h"
@@ -183,15 +153,15 @@ void transVsrc(std::vector<float> &vsrc, int nt, int ng, float dt) {
   matrix_transpose(&trans[0], &vsrc[0], nt, ng);
 }
 
-void forwardPropagate(const Damp4t10d &fmMethod,
-    const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
-    int nt)
+void forwardPropagate(const Damp4t10d &fmMethod, const std::vector<float> &encSrc)
 {
   const int check_step = 50;
 
+  const ShotPosition &allSrcPos = fmMethod.getAllSrcPos();
   int nxpad = fmMethod.getVelocity().nx;
   int nzpad = fmMethod.getVelocity().nz;
-  int ns = allSrcPos.ns;
+  int ns = fmMethod.getns();
+  int nt = fmMethod.getnt();
 
   std::vector<float> p0(nzpad * nxpad, 0);
   std::vector<float> p1(nzpad * nxpad, 0);
@@ -230,17 +200,18 @@ static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, i
 }
 
 void hello(const Damp4t10d &fmMethod,
-    const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
-    const ShotPosition &allGeoPos, const std::vector<float> &vsrc,
+    const std::vector<float> &encSrc,
+    const std::vector<float> &vsrc,
     std::vector<float> &g0,
     int nt, float dt)
 {
   const int check_step = 50;
 
-  int nxpad = fmMethod.getVelocity().nx;
-  int nzpad = fmMethod.getVelocity().nz;
-  int ns = allSrcPos.ns;
-  int ng = allGeoPos.ns;
+  int nxpad = fmMethod.getnx();
+  int nzpad = fmMethod.getnz();
+  int ns = fmMethod.getns();
+  int ng = fmMethod.getng();
+  const ShotPosition &allGeoPos = fmMethod.getAllGeoPos();
 
   std::vector<float> sp0(nzpad * nxpad, 0);
   std::vector<float> sp1(nzpad * nxpad, 0);
@@ -663,153 +634,268 @@ float calStepLen(const Damp4t10d &fmMethod,
 }
 
 
-int main(int argc, char *argv[]) {
+//int epoch(int argc, char *argv[]) {
+//
+//  /* initialize Madagascar */
+//  sf_init(argc, argv);
+//
+//  Logger::instance().init("essfwi");
+//
+//  EssFwiParams &params = EssFwiParams::instance();
+//
+//  int nz = params.nz;
+//  int nx = params.nx;
+//  int nb = params.nb;
+//  int ng = params.ng;
+//  int nt = params.nt;
+//  int ns = params.ns;
+//  float dt = params.dt;
+//  float fm = params.fm;
+//  float dx = params.dx;
+//
+//  // set random seed
+//  const int seed = 10;
+//  srand(seed);
+//
+//  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+//  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
+//
+//  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
+//
+//  SfVelocityReader velReader(params.vinit);
+//  Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
+//  Velocity exvel = fmMethod.expandDomain(v0);
+//
+//  fmMethod.bindVelocity(exvel);
+//
+//  std::vector<float> wlt(nt);
+//  rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
+//
+//
+//  std::vector<float> dobs(ns * nt * ng);     /* all observed data */
+//  std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
+//
+//  ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
+//  //sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
+//
+//  std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
+//
+//  for (int iter = 0; iter < params.niter; iter++) {
+//    boost::timer::cpu_timer timer;
+//
+//    // create random codes
+//    const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
+//    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+//
+//    Encoder encoder(encodes);
+//    std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
+//    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+//
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "encobs%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &encobs[0], nt, ng);
+//
+//      sprintf(buf, "encsrc%d.rsf", iter);
+//      //sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+//
+//      sprintf(buf, "exvel%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+//    }
+//
+//    std::vector<float> dcal(nt * ng, 0);
+//    forwardModeling(fmMethod, encsrc, dcal, nt);
+//
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "calobs%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
+//    }
+//
+//    fmMethod.removeDirectArrival(&encobs[0]);
+//    fmMethod.removeDirectArrival(&dcal[0]);
+//
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "rmdcalobs%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
+//    }
+//
+//    std::vector<float> vsrc(nt * ng, 0);
+//    vectorMinus(encobs, dcal, vsrc);
+//    float obj1 = cal_objective(&vsrc[0], vsrc.size());
+//    DEBUG() << format("obj: %e") % obj1;
+////    exit(0);
+//
+//    transVsrc(vsrc, nt, ng, dt);
+//
+//    forwardPropagate(fmMethod, allSrcPos, encsrc, nt);
+//
+//    std::vector<float> g1(exvel.nx * exvel.nz, 0);
+//    hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "grad%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//    }
+////    exit(0);
+//
+//    fmMethod.maskGradient(&g1[0]);
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "mgrad%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//    }
+//
+//
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "pre%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//    }
+//    prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+//
+//    {
+//      char buf[BUFSIZ];
+//      sprintf(buf, "g0%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//
+//      sprintf(buf, "update%d.rsf", iter);
+//      //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
+//    }
+//
+//    const int ivel = 0;
+//    float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
+//    float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
+//
+//    DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
+//    float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
+//
+//    TRACE() << "Update velocity model";
+//    update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
+////    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
+//
+//    fmMethod.refillBoundary(&exvel.dat[0]);
+////    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
+//    fmMethod.sfWriteVel(params.vupdates);
+//  } /// end of iteration
+//
+//  sf_close();
+//
+//  return 0;
+//}
 
-  /* initialize Madagascar */
-  sf_init(argc, argv);
-
-  Logger::instance().init("essfwi");
-
-  EssFwiParams &params = EssFwiParams::instance();
-
-  int nz = params.nz;
-  int nx = params.nx;
-  int nb = params.nb;
-  int ng = params.ng;
-  int nt = params.nt;
-  int ns = params.ns;
-  float dt = params.dt;
-  float fm = params.fm;
-  float dx = params.dx;
-
-  // set random seed
-  const int seed = 10;
-  srand(seed);
-
-  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
-  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-
-  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
-
-  SfVelocityReader velReader(params.vinit);
-  Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
-  Velocity exvel = fmMethod.expandDomain(v0);
-
-  fmMethod.bindVelocity(exvel);
-
-  std::vector<float> wlt(nt);
-  rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
+EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_wlt,
+    const std::vector<float> &_dobs) :
+    fmMethod(method), wlt(_wlt), dobs(_dobs),
+    ns(method.getns()), ng(method.getng()), nt(method.getnt()),
+    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()),
+    g0(nx*nz, 0), updateDirection(nx*nz, 0)
+{
 
 
-  std::vector<float> dobs(ns * nt * ng);     /* all observed data */
-  std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
+}
 
-  ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
-  //sfFloatWrite1d("orgdata.rsf", &dobs[0], ns * nt * ng);
+void EssFwiFramework::epoch(int iter) {
 
-  std::vector<float> updateDirection(exvel.nx * exvel.nz, 0);
+  // create random codes
+  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
+  std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
 
-  for (int iter = 0; iter < params.niter; iter++) {
-    boost::timer::cpu_timer timer;
+  Encoder encoder(encodes);
+  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+  std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-    // create random codes
-    const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
-    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+  {
+    char buf[BUFSIZ];
+    sprintf(buf, "encobs%d.rsf", iter);
+//    sfFloatWrite2d(buf, &encobs[0], nt, ng);
 
-    Encoder encoder(encodes);
-    std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
-    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+    sprintf(buf, "encsrc%d.rsf", iter);
+//    sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
 
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "encobs%d.rsf", iter);
-      //sfFloatWrite2d(buf, &encobs[0], nt, ng);
+    DEBUG() << format("sum wlt %.20f") % sum(wlt);
+//    sprintf(buf, "exvel%d.rsf", iter);
+    //sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+  }
+//
+  std::vector<float> dcal(nt * ng, 0);
+  forwardModeling(fmMethod, encsrc, dcal, nt);
+//
+  {
+    char buf[BUFSIZ];
+    sprintf(buf, "calobs%d.rsf", iter);
+    //sfFloatWrite2d(buf, &dcal[0], ng, nt);
+  }
+//
+  fmMethod.removeDirectArrival(&encobs[0]);
+  fmMethod.removeDirectArrival(&dcal[0]);
+//
+  {
+    char buf[BUFSIZ];
+    sprintf(buf, "rmdcalobs%d.rsf", iter);
+    //sfFloatWrite2d(buf, &dcal[0], ng, nt);
+  }
+//
+  std::vector<float> vsrc(nt * ng, 0);
+  vectorMinus(encobs, dcal, vsrc);
+  float obj1 = cal_objective(&vsrc[0], vsrc.size());
+  DEBUG() << format("obj: %e") % obj1;
+//  exit(0);
+//
+  transVsrc(vsrc, nt, ng, dt);
+//
+  forwardPropagate(fmMethod, encsrc);
+//
+  std::vector<float> g1(nx * nz, 0);
+  hello(fmMethod, encsrc, vsrc, g1, nt, dt);
+//  {
+//    char buf[BUFSIZ];
+//    sprintf(buf, "grad%d.rsf", iter);
+//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//  }
+////    exit(0);
+//
+  fmMethod.maskGradient(&g1[0]);
+//  {
+//    char buf[BUFSIZ];
+//    sprintf(buf, "mgrad%d.rsf", iter);
+//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+//  }
+//
+//
+//  {
+//    char buf[BUFSIZ];
+//    sprintf(buf, "pre%d.rsf", iter);
+//    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//  }
+  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+//
+//  {
+//    char buf[BUFSIZ];
+//    sprintf(buf, "g0%d.rsf", iter);
+//    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
+//
+//    sprintf(buf, "update%d.rsf", iter);
+//    //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
+//  }
+//
+  const int ivel = 0;
+  float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
+  float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
 
-      sprintf(buf, "encsrc%d.rsf", iter);
-      //sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
+  DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
+  float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
 
-      sprintf(buf, "exvel%d.rsf", iter);
-      //sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
-    }
+  Velocity &exvel = fmMethod.getVelocity();
+  TRACE() << "Update velocity model";
+  update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
+////    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
+//
+  fmMethod.refillBoundary(&exvel.dat[0]);
+////    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
+}
 
-    std::vector<float> dcal(nt * ng, 0);
-    forwardModeling(fmMethod, encsrc, dcal, nt);
-
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "calobs%d.rsf", iter);
-      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
-    }
-
-    fmMethod.removeDirectArrival(&encobs[0]);
-    fmMethod.removeDirectArrival(&dcal[0]);
-
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "rmdcalobs%d.rsf", iter);
-      //sfFloatWrite2d(buf, &dcal[0], ng, nt);
-    }
-
-    std::vector<float> vsrc(nt * ng, 0);
-    vectorMinus(encobs, dcal, vsrc);
-    float obj1 = cal_objective(&vsrc[0], vsrc.size());
-    DEBUG() << format("obj: %e") % obj1;
-//    exit(0);
-
-    transVsrc(vsrc, nt, ng, dt);
-
-    forwardPropagate(fmMethod, allSrcPos, encsrc, nt);
-
-    std::vector<float> g1(exvel.nx * exvel.nz, 0);
-    hello(fmMethod, allSrcPos, encsrc, allGeoPos, vsrc, g1, nt, dt);
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "grad%d.rsf", iter);
-      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-    }
-//    exit(0);
-
-    fmMethod.maskGradient(&g1[0]);
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "mgrad%d.rsf", iter);
-      //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-    }
-
-
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "pre%d.rsf", iter);
-      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-    }
-    prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
-
-    {
-      char buf[BUFSIZ];
-      sprintf(buf, "g0%d.rsf", iter);
-      //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-
-      sprintf(buf, "update%d.rsf", iter);
-      //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
-    }
-
-    const int ivel = 0;
-    float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
-    float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
-
-    DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
-    float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
-
-    TRACE() << "Update velocity model";
-    update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
-//    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
-
-    fmMethod.refillBoundary(&exvel.dat[0]);
-//    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
-    fmMethod.sfWriteVel(params.vupdates);
-  } /// end of iteration
-
-  sf_close();
-
-  return 0;
+void EssFwiFramework::writeVel(sf_file file) const {
+  fmMethod.sfWriteVel(file);
 }

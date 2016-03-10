@@ -350,3 +350,23 @@ float Damp4t10d::getdx() const {
 int Damp4t10d::getnt() const {
   return nt;
 }
+
+const ShotPosition& Damp4t10d::getAllSrcPos() const {
+  return *allSrcPos;
+}
+
+const ShotPosition& Damp4t10d::getAllGeoPos() const {
+  return *allGeoPos;
+}
+
+int Damp4t10d::getnx() const {
+  return vel->nx;
+}
+
+int Damp4t10d::getnz() const {
+  return vel->nz;
+}
+
+Velocity& Damp4t10d::getVelocity() {
+  return *const_cast<Velocity *>(vel);
+}

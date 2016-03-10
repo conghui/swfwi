@@ -29,7 +29,6 @@ public:
   void addSource(float *p, const float *source, int is) const;
   void addEncodedSource(float *p, const float *encsrc) const;
   void recordSeis(float *seis_it, const float *p) const;
-  const Velocity &getVelocity() const;
   void maskGradient(float *grad) const;
   void refillBoundary(float *vel) const;
   void sfWriteVel(sf_file file) const;
@@ -38,11 +37,17 @@ public:
   void subEncodedSource(float *p, const float *source) const;
 
 public:
+  const Velocity &getVelocity() const;
+  Velocity &getVelocity();
+  const ShotPosition &getAllSrcPos() const;
+  const ShotPosition &getAllGeoPos() const;
   int getns() const;
   int getng() const;
   float getdt() const;
   float getdx() const;
   int getnt() const;
+  int getnx() const;
+  int getnz() const;
 
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;
