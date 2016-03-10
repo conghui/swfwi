@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
-    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+//    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
 
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);
@@ -244,9 +244,12 @@ int main(int argc, char *argv[]) {
 
     float epsil = 0;
     float beta = 0;
+    fmMethod.sfWrite(illum, params.illums);
+
     scale_gradient(&g1[0], &exvel.dat[0], &illum[0], nzpad, nxpad, params.precon);
     bell_smoothz(&g1[0], &illum[0], params.rbell, nzpad, nxpad);
     bell_smoothx(&illum[0], &g1[0], params.rbell, nzpad, nxpad);
+    fmMethod.sfWrite(g1, params.grads);
 
     beta = iter == 0 ? 0.0 : cal_beta(&g0[0], &g1[0], &cg[0], nzpad, nxpad);
 
@@ -264,10 +267,12 @@ int main(int argc, char *argv[]) {
 
     // output important information at each FWI iteration
     INFO() << format("iteration %d obj=%e  beta=%e  epsil=%e  alpha=%e") % (iter + 1) % obj % beta % epsil % alpha;
-    INFO() << timer.format(2);
+//    INFO() << timer.format(2);
 
-    fmMethod.sfWriteVel(params.vupdates);
+    fmMethod.sfWrite(exvel.dat, params.vupdates);
   } /// end of iteration
+
+  sf_floatwrite(&objval[0], objval.size(), params.objs);
 
   sf_close();
 

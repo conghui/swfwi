@@ -720,7 +720,7 @@ int main(int argc, char *argv[]) {
 
     // create random codes
     const std::vector<int> encodes = RandomCode::genPlus1Minus1(params.ns);
-    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+//    std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
 
     Encoder encoder(encodes);
     std::vector<float> encobs = encoder.encodeObsData(dobs, params.nt, params.ng);

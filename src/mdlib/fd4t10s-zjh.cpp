@@ -98,12 +98,19 @@ void fd4t10s_zjh_2d_vtrans_lap_illum(float *lap, float *illum, float *prev_wave,
                            curr_wave[curPos - 5 * nz]  +  curr_wave[curPos + 5 * nz]);
 
       // update lap and illum
-      lap[ix * nz + iz] = (-3.06801592*2 * p1[ix * nz + iz] +
-                           +1.78858721*(p1[(ix-1)*nz+iz] + p1[(ix+1)*nz+iz] + p1[ix*nz+(iz-1)] + p1[ix+nz+(iz+1)]) +
-                           -0.31660756*(p1[(ix-2)*nz+iz] + p1[(ix+2)*nz+iz] + p1[ix*nz+(iz-2)] + p1[ix+nz+(iz+2)]) +
-                           +0.07612173*(p1[(ix-3)*nz+iz] + p1[(ix+3)*nz+iz] + p1[ix*nz+(iz-3)] + p1[ix+nz+(iz+3)]) +
-                           -0.01626042*(p1[(ix-4)*nz+iz] + p1[(ix+4)*nz+iz] + p1[ix*nz+(iz-4)] + p1[ix+nz+(iz+4)]) +
-                           +0.00216736*(p1[(ix-5)*nz+iz] + p1[(ix+5)*nz+iz] + p1[ix*nz+(iz-5)] + p1[ix+nz+(iz+5)])
+//      lap[ix * nz + iz] = (-3.06801592*2 * p1[ix * nz + iz] +
+//                           +1.78858721*(p1[(ix-1)*nz+iz] + p1[(ix+1)*nz+iz] + p1[ix*nz+(iz-1)] + p1[ix+nz+(iz+1)]) +
+//                           -0.31660756*(p1[(ix-2)*nz+iz] + p1[(ix+2)*nz+iz] + p1[ix*nz+(iz-2)] + p1[ix+nz+(iz+2)]) +
+//                           +0.07612173*(p1[(ix-3)*nz+iz] + p1[(ix+3)*nz+iz] + p1[ix*nz+(iz-3)] + p1[ix+nz+(iz+3)]) +
+//                           -0.01626042*(p1[(ix-4)*nz+iz] + p1[(ix+4)*nz+iz] + p1[ix*nz+(iz-4)] + p1[ix+nz+(iz+4)]) +
+//                           +0.00216736*(p1[(ix-5)*nz+iz] + p1[(ix+5)*nz+iz] + p1[ix*nz+(iz-5)] + p1[ix+nz+(iz+5)])
+//                          );
+      lap[ix * nz + iz] = (a[0]*2 * p1[ix * nz + iz] +
+                           a[1]*(p1[(ix-1)*nz+iz] + p1[(ix+1)*nz+iz] + p1[ix*nz+(iz-1)] + p1[ix+nz+(iz+1)]) +
+                           a[2]*(p1[(ix-2)*nz+iz] + p1[(ix+2)*nz+iz] + p1[ix*nz+(iz-2)] + p1[ix+nz+(iz+2)]) +
+                           a[3]*(p1[(ix-3)*nz+iz] + p1[(ix+3)*nz+iz] + p1[ix*nz+(iz-3)] + p1[ix+nz+(iz+3)]) +
+                           a[4]*(p1[(ix-4)*nz+iz] + p1[(ix+4)*nz+iz] + p1[ix*nz+(iz-4)] + p1[ix+nz+(iz+4)]) +
+                           a[5]*(p1[(ix-5)*nz+iz] + p1[(ix+5)*nz+iz] + p1[ix*nz+(iz-5)] + p1[ix+nz+(iz+5)])
                           );
 
       illum[ix * nz + iz] += p1[ix * nz + iz] * p1[ix * nz + iz];

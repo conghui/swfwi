@@ -184,14 +184,14 @@ void Zjh4t10dSpongeVelNoTrans::refillBoundary(float* gradient) const {
   }
 }
 
-void Zjh4t10dSpongeVelNoTrans::sfWriteVel(sf_file file) const {
+void Zjh4t10dSpongeVelNoTrans::sfWrite(const std::vector<float> &model, sf_file file) const {
   int nzpad = vel->nz;
   int nxpad = vel->nx;
   int nz = nzpad - 2 * EXFDBNDRYLEN - nb;
 
-  std::vector<float> vv = vel->dat;
+  const std::vector<float> &vv = model;
   for (int ix = EXFDBNDRYLEN + nb; ix < nxpad - EXFDBNDRYLEN - nb; ix++) {
-    sf_floatwrite(&vv[ix * nzpad + EXFDBNDRYLEN], nz, file);
+    sf_floatwrite(const_cast<float *>(&vv[ix * nzpad + EXFDBNDRYLEN]), nz, file);
   }
 }
 

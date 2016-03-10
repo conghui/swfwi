@@ -33,7 +33,7 @@ public:
   const Velocity &getVelocity() const;
   void maskGradient(float *grad) const;
   void refillBoundary(float *vel) const;
-  void sfWriteVel(sf_file file) const;
+  void sfWrite(const std::vector<float> &model, sf_file file) const;
 
   void removeDirectArrival(float* data) const;
   void subEncodedSource(float *p, const float *source) const;
