@@ -8,6 +8,7 @@ lib_modules = """
 			  spongeabc4d.cpp
 			  damp4t10d.cpp
 			  enquistabc2d.cpp
+			  zjh4t10dsponge.cpp
               """.split()
 
 extra_include_dir = [

@@ -16,12 +16,10 @@
 /**
  * please note that the velocity is not transformed
  */
-void fd4t10s_zjh_2d(float *prev_wave, const float *curr_wave, const float *vel, int nx, int nz, int nb, float dx, float dt) {
+void fd4t10s_zjh_2d(float *prev_wave, const float *curr_wave, const float *vel, int nx, int nz, float dx, float dt) {
   float a[6];
 
   const int d = 5;
-  const int bz = nb;
-  const int bx = nb;
   const float max_delta = 0.05;
 
   /// Zhang, Jinhai's method

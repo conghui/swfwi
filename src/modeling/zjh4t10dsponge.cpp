@@ -5,9 +5,9 @@
  *      Author: rice
  */
 
+#include "zjh4t10dsponge.h"
 #include <cmath>
 #include <functional>
-#include "damp4t10d.h"
 #include "logger.h"
 #include "sum.h"
 #include "fd4t10s-damp-zjh.h"
@@ -124,7 +124,7 @@ static void recoverVel(std::vector<float> &vel, float dx, float dt) {
   }
 }
 
-Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
+Velocity Zjh4t10dSponge::expandDomain(const Velocity& _vel) {
   // expand for boundary, free surface
   Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
   expandBndry(exvelForBndry, _vel, nb);
@@ -132,24 +132,24 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   transvel(exvelForBndry.dat, dx, dt);
 
   // expand for stencil
-  Velocity ret(exvelForBndry.nx+2*FDLEN, exvelForBndry.nz+2*FDLEN);
-  expandForStencil(ret, exvelForBndry, FDLEN);
+  Velocity ret(exvelForBndry.nx+2*EXFDBNDRYLEN, exvelForBndry.nz+2*EXFDBNDRYLEN);
+  expandForStencil(ret, exvelForBndry, EXFDBNDRYLEN);
 
   return ret;
 }
 
-void Damp4t10d::stepForward(float* p0, float* p1) const {
-  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
-//  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
-//  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
-//  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
+void Zjh4t10dSponge::stepForward(float* p0, float* p1) const {
+//  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN, dx, dt);
+  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, dx, dt);
+  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN);
+  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN);
 }
 
-void Damp4t10d::bindVelocity(const Velocity& _vel) {
+void Zjh4t10dSponge::bindVelocity(const Velocity& _vel) {
   this->vel = &_vel;
 }
 
-void Damp4t10d::recordSeis(float* seis_it, const float* p,
+void Zjh4t10dSponge::recordSeis(float* seis_it, const float* p,
     const ShotPosition& geoPos) const {
 
   int ng = geoPos.ns;
@@ -158,8 +158,8 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p,
 //  DEBUG() << format("ng %d") % ng;
 //  float sum = 0;
   for (int ig = 0; ig < ng; ig++) {
-    int gx = geoPos.getx(ig) + nb + FDLEN;
-    int gz = geoPos.getz(ig) + FDLEN;
+    int gx = geoPos.getx(ig) + nb + EXFDBNDRYLEN;
+    int gz = geoPos.getz(ig) + EXFDBNDRYLEN;
     int idx = gx * nzpad + gz;
     seis_it[ig] = p[idx];
 //    DEBUG() << format("ig %d, idx %d, v %.20f") % ig % idx % seis_it[ig];
@@ -170,42 +170,42 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p,
 
 
 
-const Velocity& Damp4t10d::getVelocity() const {
+const Velocity& Zjh4t10dSponge::getVelocity() const {
   return *vel;
 }
 
-void Damp4t10d::stepBackward(float* p0, float* p1) const {
+void Zjh4t10dSponge::stepBackward(float* p0, float* p1) const {
   fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, dx, dt);
 }
 
-void Damp4t10d::addSource(float* p, const float* source,
+void Zjh4t10dSponge::addSource(float* p, const float* source,
     const ShotPosition& pos) const
 {
   manipSource(p, source, pos, std::plus<float>());
 }
 
-void Damp4t10d::subSource(float* p, const float* source,
+void Zjh4t10dSponge::subSource(float* p, const float* source,
     const ShotPosition& pos) const {
   manipSource(p, source, pos, std::minus<float>());
 }
 
-void Damp4t10d::manipSource(float* p, const float* source,
+void Zjh4t10dSponge::manipSource(float* p, const float* source,
     const ShotPosition& pos, boost::function2<float, float, float> op) const {
   int nzpad = vel->nz;
 
   for (int is = 0; is < pos.ns; is++) {
-    int sx = pos.getx(is) + nb + FDLEN;
-    int sz = pos.getz(is) + FDLEN;
+    int sx = pos.getx(is) + nb + EXFDBNDRYLEN;
+    int sz = pos.getz(is) + EXFDBNDRYLEN;
     p[sx * nzpad + sz] = op(p[sx * nzpad + sz], source[is]);
 //    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
 }
 
-void Damp4t10d::maskGradient(float* grad) const {
+void Zjh4t10dSponge::maskGradient(float* grad) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
-  int bx = nb + FDLEN;
-  int bz = nb + FDLEN;
+  int bx = nb + EXFDBNDRYLEN;
+  int bz = nb + EXFDBNDRYLEN;
   for (int ix = 0; ix < nxpad; ix++) {
     for (int iz = 0; iz < nzpad; iz++) {
       if (ix < bx || ix >= nxpad - bx || iz >= nzpad - bz) {
@@ -215,11 +215,11 @@ void Damp4t10d::maskGradient(float* grad) const {
   }
 }
 
-void Damp4t10d::refillBoundary(float* gradient) const {
+void Zjh4t10dSponge::refillBoundary(float* gradient) const {
   int nz = vel->nz;
   int nx = vel->nx;
-  int bx = nb + FDLEN;
-  int bz = nb + FDLEN;
+  int bx = nb + EXFDBNDRYLEN;
+  int bz = nb + EXFDBNDRYLEN;
 
   const float *srcx0 = gradient + bx * nz;
   const float *srcxn = gradient + (nx - bx - 1) * nz;
@@ -242,23 +242,23 @@ void Damp4t10d::refillBoundary(float* gradient) const {
   }
 }
 
-void Damp4t10d::sfWriteVel(sf_file file) const {
+void Zjh4t10dSponge::sfWriteVel(sf_file file) const {
   int nzpad = vel->nz;
   int nxpad = vel->nx;
-  int nz = nzpad - 2 * FDLEN - nb;
+  int nz = nzpad - 2 * EXFDBNDRYLEN - nb;
 
   std::vector<float> vv = vel->dat;
   recoverVel(vv, dx, dt);
-  for (int ix = FDLEN + nb; ix < nxpad - FDLEN - nb; ix++) {
-    sf_floatwrite(&vv[ix * nzpad + FDLEN], nz, file);
+  for (int ix = EXFDBNDRYLEN + nb; ix < nxpad - EXFDBNDRYLEN - nb; ix++) {
+    sf_floatwrite(&vv[ix * nzpad + EXFDBNDRYLEN], nz, file);
   }
 }
 
-void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
+void Zjh4t10dSponge::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
   int half_len = t_width / dt;
-  int sx = allSrcPos.getx(0) + FDLEN + nb;
-  int sz = allSrcPos.getz(0) + FDLEN;
-  int gz = allGeoPos.getz(0) + FDLEN; // better to assume all receivers are located at the same depth
+  int sx = allSrcPos.getx(0) + EXFDBNDRYLEN + nb;
+  int sz = allSrcPos.getz(0) + EXFDBNDRYLEN;
+  int gz = allGeoPos.getz(0) + EXFDBNDRYLEN; // better to assume all receivers are located at the same depth
 
   float vel_average = 0.0;
   int gmin = (sz < gz) ? sz : gz;
@@ -284,8 +284,8 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   matrix_transpose(&data[0], &trans[0], ng, nt);
 
   for (int itr = 0; itr < ng; itr ++) {
-    int gx = allGeoPos.getx(itr) + FDLEN + nb;
-    int gz = allGeoPos.getz(itr) + FDLEN;
+    int gx = allGeoPos.getx(itr) + EXFDBNDRYLEN + nb;
+    int gz = allGeoPos.getz(itr) + EXFDBNDRYLEN;
 
     float dist = (gx-sx)*(gx-sx) + (gz-sz)*(gz-sz);
     int t = (int)sqrt(dist * vel_average);
@@ -300,53 +300,53 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   matrix_transpose(&trans[0], &data[0], nt, ng);
 }
 
-Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
+Zjh4t10dSponge::Zjh4t10dSponge(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
     float _dt, float _dx, float _fm, int _nb, int _nt) :
       vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
       dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
 {
-  int totalNb = nb + FDLEN;
+  int totalNb = nb + EXFDBNDRYLEN;
   bndr.resize(totalNb);
   initbndr(bndr, bndr.size());
 }
 
-void Damp4t10d::addEncodedSource(float* p, const float* encsrc) const {
+void Zjh4t10dSponge::addEncodedSource(float* p, const float* encsrc) const {
   this->addSource(p, encsrc, *this->allSrcPos);
 }
 
-void Damp4t10d::subEncodedSource(float* p, const float* source) const {
+void Zjh4t10dSponge::subEncodedSource(float* p, const float* source) const {
   this->subSource(p, source, *this->allSrcPos);
 }
 
-void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
+void Zjh4t10dSponge::recordSeis(float* seis_it, const float* p) const {
   this->recordSeis(seis_it, p, *this->allGeoPos);
 }
 
-void Damp4t10d::removeDirectArrival(float* data) const {
+void Zjh4t10dSponge::removeDirectArrival(float* data) const {
   float t_width = 1.5 / fm;
   this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);
 }
 
-void Damp4t10d::addSource(float* p, const float* source, int is) const {
+void Zjh4t10dSponge::addSource(float* p, const float* source, int is) const {
 
 }
 
-int Damp4t10d::getns() const {
+int Zjh4t10dSponge::getns() const {
   return allSrcPos->ns;
 }
 
-int Damp4t10d::getng() const {
+int Zjh4t10dSponge::getng() const {
   return allGeoPos->ns;
 }
 
-float Damp4t10d::getdt() const {
+float Zjh4t10dSponge::getdt() const {
   return dt;
 }
 
-float Damp4t10d::getdx() const {
+float Zjh4t10dSponge::getdx() const {
   return dx;
 }
 
-int Damp4t10d::getnt() const {
+int Zjh4t10dSponge::getnt() const {
   return nt;
 }
