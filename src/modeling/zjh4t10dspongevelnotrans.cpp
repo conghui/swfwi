@@ -1,11 +1,10 @@
 /*
- * damp4t10d.cpp
+ * zjh4t10dspongevelnotrans.cpp
  *
- *  Created on: Feb 29, 2016
+ *  Created on: Mar 10, 2016
  *      Author: rice
  */
 
-#include "zjh4t10dsponge.h"
 #include <cmath>
 #include <functional>
 #include "logger.h"
@@ -14,6 +13,7 @@
 #include "fd4t10s-zjh.h"
 #include "sfutil.h"
 #include "common.h"
+#include "zjh4t10dspongevelnotrans.h"
 
 extern "C" {
 #include <rsf.h>
@@ -41,45 +41,6 @@ static void applySponge(float* p, const float *bndr, int nx, int nz, int nb) {
       p[ibx * nz + iz] *= w; /*  right sponge */
     }
   }
-}
-
-
-static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
-  int nx = v0.nx;
-  int nz = v0.nz;
-  int nxpad = nx + 2 * halo;
-  int nzpad = nz + 2 * halo;
-
-  const std::vector<float> &vel = v0.dat;
-  std::vector<float> &vel_e = exvel.dat;
-
-  //copy the vel into vel_e
-  for (int ix = halo; ix < nx + halo; ix++) {
-    for (int iz = halo; iz < nz + halo; iz++) {
-      vel_e[ix * nzpad + iz] = vel[(ix - halo) * nz +  (iz - halo)];
-    }
-  }
-
-  //expand z direction first
-  for (int ix = halo; ix < nx + halo; ix++) {
-    for (int iz = 0; iz < halo; iz++) {
-      vel_e[ix * nzpad + iz] = vel_e[ix * nzpad + halo];               // top
-    }
-    for (int iz = nz + halo; iz < nzpad; iz ++) {
-      vel_e[ix * nzpad + iz] = vel_e[ix * nzpad + (nz + halo - 1)]; // bottom
-    }
-  }
-
-  //Then x direction
-  for (int iz = 0; iz < nzpad; iz++) {
-    for (int ix = 0; ix < halo; ix++) {
-      vel_e[ix * nzpad + iz] = vel_e[halo * nzpad + iz];               // left
-    }
-    for (int ix = nx + halo; ix < nxpad; ix++) {
-      vel_e[ix * nzpad + iz] = vel_e[(nx + halo - 1) * nzpad + iz]; // right
-    }
-  }
-
 }
 
 static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
@@ -112,44 +73,25 @@ static void expandBndry(Velocity &exvel, const Velocity &v0, int nb) {
   }
 }
 
-static void transvel(std::vector<float> &vel, float dx, float dt) {
-  for (size_t i = 0; i < vel.size(); i ++) {
-    vel[i] = (dx * dx) / (vel[i] * vel[i] * dt * dt);
-  }
-}
-
-static void recoverVel(std::vector<float> &vel, float dx, float dt) {
-  for (size_t i = 0; i < vel.size(); i ++) {
-    vel[i] = std::sqrt(dx*dx / (dt*dt*vel[i]));
-  }
-}
-
-Velocity Zjh4t10dSponge::expandDomain(const Velocity& _vel) {
+Velocity Zjh4t10dSpongeVelNoTrans::expandDomain(const Velocity& _vel) {
   // expand for boundary, free surface
   Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
   expandBndry(exvelForBndry, _vel, nb);
 
-  transvel(exvelForBndry.dat, dx, dt);
-
-  // expand for stencil
-  Velocity ret(exvelForBndry.nx+2*EXFDBNDRYLEN, exvelForBndry.nz+2*EXFDBNDRYLEN);
-  expandForStencil(ret, exvelForBndry, EXFDBNDRYLEN);
-
-  return ret;
+  return exvelForBndry;
 }
 
-void Zjh4t10dSponge::stepForward(float* p0, float* p1) const {
-//  fd4t10s_damp_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN, dx, dt);
-  fd4t10s_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz);
+void Zjh4t10dSpongeVelNoTrans::stepForward(float* p0, float* p1) const {
+  fd4t10s_zjh_2d_vnotrans(p0, p1, &vel->dat[0], vel->nx, vel->nz, dx, dt);
   applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN);
   applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN);
 }
 
-void Zjh4t10dSponge::bindVelocity(const Velocity& _vel) {
+void Zjh4t10dSpongeVelNoTrans::bindVelocity(const Velocity& _vel) {
   this->vel = &_vel;
 }
 
-void Zjh4t10dSponge::recordSeis(float* seis_it, const float* p,
+void Zjh4t10dSpongeVelNoTrans::recordSeis(float* seis_it, const float* p,
     const ShotPosition& geoPos) const {
 
   int ng = geoPos.ns;
@@ -170,26 +112,26 @@ void Zjh4t10dSponge::recordSeis(float* seis_it, const float* p,
 
 
 
-const Velocity& Zjh4t10dSponge::getVelocity() const {
+const Velocity& Zjh4t10dSpongeVelNoTrans::getVelocity() const {
   return *vel;
 }
 
-void Zjh4t10dSponge::stepBackward(float* p0, float* p1) const {
-  fd4t10s_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz);
+void Zjh4t10dSpongeVelNoTrans::stepBackward(float* p0, float* p1) const {
+  fd4t10s_zjh_2d_vnotrans(p0, p1, &vel->dat[0], vel->nx, vel->nz, dx, dt);
 }
 
-void Zjh4t10dSponge::addSource(float* p, const float* source,
+void Zjh4t10dSpongeVelNoTrans::addSource(float* p, const float* source,
     const ShotPosition& pos) const
 {
   manipSource(p, source, pos, std::plus<float>());
 }
 
-void Zjh4t10dSponge::subSource(float* p, const float* source,
+void Zjh4t10dSpongeVelNoTrans::subSource(float* p, const float* source,
     const ShotPosition& pos) const {
   manipSource(p, source, pos, std::minus<float>());
 }
 
-void Zjh4t10dSponge::manipSource(float* p, const float* source,
+void Zjh4t10dSpongeVelNoTrans::manipSource(float* p, const float* source,
     const ShotPosition& pos, boost::function2<float, float, float> op) const {
   int nzpad = vel->nz;
 
@@ -201,7 +143,7 @@ void Zjh4t10dSponge::manipSource(float* p, const float* source,
   }
 }
 
-void Zjh4t10dSponge::maskGradient(float* grad) const {
+void Zjh4t10dSpongeVelNoTrans::maskGradient(float* grad) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
   int bx = nb + EXFDBNDRYLEN;
@@ -215,7 +157,7 @@ void Zjh4t10dSponge::maskGradient(float* grad) const {
   }
 }
 
-void Zjh4t10dSponge::refillBoundary(float* gradient) const {
+void Zjh4t10dSpongeVelNoTrans::refillBoundary(float* gradient) const {
   int nz = vel->nz;
   int nx = vel->nx;
   int bx = nb + EXFDBNDRYLEN;
@@ -242,19 +184,18 @@ void Zjh4t10dSponge::refillBoundary(float* gradient) const {
   }
 }
 
-void Zjh4t10dSponge::sfWriteVel(sf_file file) const {
+void Zjh4t10dSpongeVelNoTrans::sfWriteVel(sf_file file) const {
   int nzpad = vel->nz;
   int nxpad = vel->nx;
   int nz = nzpad - 2 * EXFDBNDRYLEN - nb;
 
   std::vector<float> vv = vel->dat;
-  recoverVel(vv, dx, dt);
   for (int ix = EXFDBNDRYLEN + nb; ix < nxpad - EXFDBNDRYLEN - nb; ix++) {
     sf_floatwrite(&vv[ix * nzpad + EXFDBNDRYLEN], nz, file);
   }
 }
 
-void Zjh4t10dSponge::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
+void Zjh4t10dSpongeVelNoTrans::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
   int half_len = t_width / dt;
   int sx = allSrcPos.getx(0) + EXFDBNDRYLEN + nb;
   int sz = allSrcPos.getz(0) + EXFDBNDRYLEN;
@@ -300,7 +241,7 @@ void Zjh4t10dSponge::removeDirectArrival(const ShotPosition &allSrcPos, const Sh
   matrix_transpose(&trans[0], &data[0], nt, ng);
 }
 
-Zjh4t10dSponge::Zjh4t10dSponge(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
+Zjh4t10dSpongeVelNoTrans::Zjh4t10dSpongeVelNoTrans(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
     float _dt, float _dx, float _fm, int _nb, int _nt) :
       vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
       dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
@@ -310,48 +251,48 @@ Zjh4t10dSponge::Zjh4t10dSponge(const ShotPosition& _allSrcPos, const ShotPositio
   initbndr(bndr, bndr.size());
 }
 
-void Zjh4t10dSponge::addEncodedSource(float* p, const float* encsrc) const {
+void Zjh4t10dSpongeVelNoTrans::addEncodedSource(float* p, const float* encsrc) const {
   this->addSource(p, encsrc, *this->allSrcPos);
 }
 
-void Zjh4t10dSponge::subEncodedSource(float* p, const float* source) const {
+void Zjh4t10dSpongeVelNoTrans::subEncodedSource(float* p, const float* source) const {
   this->subSource(p, source, *this->allSrcPos);
 }
 
-void Zjh4t10dSponge::recordSeis(float* seis_it, const float* p) const {
+void Zjh4t10dSpongeVelNoTrans::recordSeis(float* seis_it, const float* p) const {
   this->recordSeis(seis_it, p, *this->allGeoPos);
 }
 
-void Zjh4t10dSponge::removeDirectArrival(float* data) const {
+void Zjh4t10dSpongeVelNoTrans::removeDirectArrival(float* data) const {
   float t_width = 1.5 / fm;
   this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);
 }
 
-void Zjh4t10dSponge::addSource(float* p, const float* source, int is) const {
+void Zjh4t10dSpongeVelNoTrans::addSource(float* p, const float* source, int is) const {
 
 }
 
-int Zjh4t10dSponge::getns() const {
+int Zjh4t10dSpongeVelNoTrans::getns() const {
   return allSrcPos->ns;
 }
 
-int Zjh4t10dSponge::getng() const {
+int Zjh4t10dSpongeVelNoTrans::getng() const {
   return allGeoPos->ns;
 }
 
-float Zjh4t10dSponge::getdt() const {
+float Zjh4t10dSpongeVelNoTrans::getdt() const {
   return dt;
 }
 
-float Zjh4t10dSponge::getdx() const {
+float Zjh4t10dSpongeVelNoTrans::getdx() const {
   return dx;
 }
 
-int Zjh4t10dSponge::getnt() const {
+int Zjh4t10dSpongeVelNoTrans::getnt() const {
   return nt;
 }
 
-std::vector<float> Zjh4t10dSponge::initBndryVector(int nt) const {
+std::vector<float> Zjh4t10dSpongeVelNoTrans::initBndryVector(int nt) const {
   if (vel == NULL) {
     ERROR() << __PRETTY_FUNCTION__ << ": you should bind velocity first";
     exit(1);
@@ -368,7 +309,7 @@ std::vector<float> Zjh4t10dSponge::initBndryVector(int nt) const {
   return std::vector<float>(nt*bndrSize, 0);
 }
 
-void Zjh4t10dSponge::writeBndry(float* _bndr, const float* p, int it) const {
+void Zjh4t10dSpongeVelNoTrans::writeBndry(float* _bndr, const float* p, int it) const {
   /**
      * say the FDLEN = 2, then the boundary we should save is mark by (*)
      * we omit the upper layer
@@ -404,7 +345,7 @@ void Zjh4t10dSponge::writeBndry(float* _bndr, const float* p, int it) const {
     }
 }
 
-void Zjh4t10dSponge::readBndry(const float* _bndr, float* p, int it) const {
+void Zjh4t10dSpongeVelNoTrans::readBndry(const float* _bndr, float* p, int it) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
   int nx = nxpad - 2 * nb;
@@ -425,7 +366,7 @@ void Zjh4t10dSponge::readBndry(const float* _bndr, float* p, int it) const {
   }
 }
 
-void Zjh4t10dSponge::stepBackwardLapIllum(float* lap, float* illum, float* p0,
+void Zjh4t10dSpongeVelNoTrans::stepBackwardLapIllum(float* lap, float* illum, float* p0,
     float* p1) const {
   fd4t10s_zjh_2d_vtrans_lap_illum(lap, illum, p0, p1, &vel->dat[0], vel->nx, vel->nz);
 }

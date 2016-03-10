@@ -1,12 +1,12 @@
 /*
- * damp4t10d.h
+ * zjh4t10dspongevelnotrans.h
  *
- *  Created on: Feb 29, 2016
+ *  Created on: Mar 10, 2016
  *      Author: rice
  */
 
-#ifndef SRC_FM2D_DAMP4T10D_H_
-#define SRC_FM2D_DAMP4T10D_H_
+#ifndef SRC_MODELING_ZJH4T10DSPONGEVELNOTRANS_H_
+#define SRC_MODELING_ZJH4T10DSPONGEVELNOTRANS_H_
 
 extern "C" {
 #include <rsf.h>
@@ -15,9 +15,9 @@ extern "C" {
 #include "velocity.h"
 #include "shot-position.h"
 
-class Zjh4t10dSponge {
+class Zjh4t10dSpongeVelNoTrans {
 public:
-  Zjh4t10dSponge(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float dt, float dx, float fm, int nb, int nt);
+  Zjh4t10dSpongeVelNoTrans(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float dt, float dx, float fm, int nb, int nt);
 
   Velocity expandDomain(const Velocity &vel);
 
@@ -73,5 +73,6 @@ private:
   mutable int bndrSize;
 
 };
+#endif /* SRC_MODELING_ZJH4T10DSPONGEVELNOTRANS_H_ */
 
-#endif /* SRC_FM2D_DAMP4T10D_H_ */
+

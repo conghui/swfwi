@@ -4,6 +4,7 @@ Import('*')
 bin_list = [
 			("essfwi", "main-essfwi2d.cpp"),
 			("essfwi-sponge", "main-essfwi-sponge.cpp"),
+			("essfwi-sponge-grad", "main-essfwi-sponge-grad.cpp"),
 
            ]
 
