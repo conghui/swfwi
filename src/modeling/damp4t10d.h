@@ -35,6 +35,7 @@ public:
 
   void removeDirectArrival(float* data) const;
   void subEncodedSource(float *p, const float *source) const;
+  void refillVelStencilBndry();
 
 public:
   const Velocity &getVelocity() const;

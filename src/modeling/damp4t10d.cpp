@@ -43,22 +43,13 @@ static void applySponge(float* p, const float *bndr, int nx, int nz, int nb) {
   }
 }
 
+static void fillForStencil(Velocity &exvel, int halo) {
+  int nxpad = exvel.nx;
+  int nzpad = exvel.nz;
+  int nx = nxpad - 2 * halo;
+  int nz = nzpad - 2 * halo;
 
-static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
-  int nx = v0.nx;
-  int nz = v0.nz;
-  int nxpad = nx + 2 * halo;
-  int nzpad = nz + 2 * halo;
-
-  const std::vector<float> &vel = v0.dat;
   std::vector<float> &vel_e = exvel.dat;
-
-  //copy the vel into vel_e
-  for (int ix = halo; ix < nx + halo; ix++) {
-    for (int iz = halo; iz < nz + halo; iz++) {
-      vel_e[ix * nzpad + iz] = vel[(ix - halo) * nz +  (iz - halo)];
-    }
-  }
 
   //expand z direction first
   for (int ix = halo; ix < nx + halo; ix++) {
@@ -79,6 +70,25 @@ static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
       vel_e[ix * nzpad + iz] = vel_e[(nx + halo - 1) * nzpad + iz]; // right
     }
   }
+
+}
+
+static void expandForStencil(Velocity &exvel, const Velocity &v0, int halo) {
+  int nx = v0.nx;
+  int nz = v0.nz;
+  int nzpad = nz + 2 * halo;
+
+  const std::vector<float> &vel = v0.dat;
+  std::vector<float> &vel_e = exvel.dat;
+
+  //copy the vel into vel_e
+  for (int ix = halo; ix < nx + halo; ix++) {
+    for (int iz = halo; iz < nz + halo; iz++) {
+      vel_e[ix * nzpad + iz] = vel[(ix - halo) * nz +  (iz - halo)];
+    }
+  }
+
+  fillForStencil(exvel, halo);
 
 }
 
@@ -252,6 +262,11 @@ void Damp4t10d::sfWriteVel(sf_file file) const {
   for (int ix = FDLEN + nb; ix < nxpad - FDLEN - nb; ix++) {
     sf_floatwrite(&vv[ix * nzpad + FDLEN], nz, file);
   }
+}
+
+void Damp4t10d::refillVelStencilBndry() {
+  Velocity &exvel = getVelocity();
+  fillForStencil(exvel, FDLEN);
 }
 
 void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {

@@ -39,22 +39,17 @@ int main(int argc, char *argv[]) {
 
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-
   Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
   Velocity exvel = fmMethod.expandDomain(v0);
-
   fmMethod.bindVelocity(exvel);
 
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
-  DEBUG() << format("sum wlt %.20f") % sum(wlt);
-
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
-
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
 
   EssFwiFramework essfwi(fmMethod, wlt, dobs);
