@@ -37,6 +37,9 @@ public:
   void removeDirectArrival(float* data) const;
   void subEncodedSource(float *p, const float *source) const;
 
+  std::vector<float> initBndryVector(int nt) const;
+  void writeBndry(float *bndr, const float *p, int it) const;
+  void readBndry(const float *bndr, float *p, int it) const;
 public:
   int getns() const;
   int getng() const;
@@ -66,6 +69,7 @@ private:
 
 private:
   std::vector<float> bndr;
+  mutable int bndrSize;
 
 };
 

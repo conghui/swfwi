@@ -350,3 +350,77 @@ float Zjh4t10dSponge::getdx() const {
 int Zjh4t10dSponge::getnt() const {
   return nt;
 }
+
+std::vector<float> Zjh4t10dSponge::initBndryVector(int nt) const {
+  if (vel == NULL) {
+    ERROR() << __PRETTY_FUNCTION__ << ": you should bind velocity first";
+    exit(1);
+  }
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nx = nxpad - 2*nb;
+  int nz = nzpad - nb;
+
+  bndrSize = FDLEN * (
+             nx +   /* bottom */
+             2 * nz /* left + right */
+             );
+  return std::vector<float>(nt*bndrSize, 0);
+}
+
+void Zjh4t10dSponge::writeBndry(float* _bndr, const float* p, int it) const {
+  /**
+     * say the FDLEN = 2, then the boundary we should save is mark by (*)
+     * we omit the upper layer
+     *
+     *    **+-------------+**
+     *    **-             -**
+     *    **-             -**
+     *    **-             -**
+     *    **-             -**
+     *    **-             -**
+     *    **+-------------+**
+     *      ***************
+     *      ***************
+     *
+     */
+    int nxpad = vel->nx;
+    int nzpad = vel->nz;
+    int nx = nxpad - 2 * nb;
+    int nz = nzpad - nb;
+    float *bndr = &_bndr[it * bndrSize];
+
+    for (int ix = 0; ix < nx; ix++) {
+      for(int iz = 0; iz < FDLEN; iz++) {
+        bndr[iz + FDLEN*ix] = p[(ix+nb)*nzpad + (iz+nz)]; // bottom
+      }
+    }
+
+    for (int iz = 0; iz < nz; iz++) {
+      for(int ix=0; ix < FDLEN; ix++) {
+        bndr[FDLEN*nx+iz+nz*ix]         = p[(ix-2+nb)*nzpad + (iz)];   // left
+        bndr[FDLEN*nx+iz+nz*(ix+FDLEN)] = p[(ix+nx+nb)*nzpad + (iz)];  // right
+      }
+    }
+}
+
+void Zjh4t10dSponge::readBndry(const float* _bndr, float* p, int it) const {
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nx = nxpad - 2 * nb;
+  int nz = nzpad - nb;
+  const float *bndr = &_bndr[it * bndrSize];
+
+  for (int ix = 0; ix < nx; ix++) {
+    for(int iz = 0; iz < FDLEN; iz++) {
+      p[(ix+nb)*nzpad + (iz+nz)] = bndr[iz + FDLEN*ix]; // bottom
+    }
+  }
+
+  for (int iz = 0; iz < nz; iz++) {
+    for(int ix=0; ix < FDLEN; ix++) {
+      p[(ix-2+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*ix];   // left
+      p[(ix+nx+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*(ix+FDLEN)];  // right
+    }
+  }
+}
