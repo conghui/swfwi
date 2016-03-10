@@ -305,43 +305,7 @@ void transVsrc(std::vector<float> &vsrc, int nt, int ng, float dt) {
   matrix_transpose(&trans[0], &vsrc[0], nt, ng);
 }
 
-void forwardPropagate(const Zjh4t10dSponge &fmMethod,
-    const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
-    int nt)
-{
-  const int check_step = 50;
 
-  int nxpad = fmMethod.getVelocity().nx;
-  int nzpad = fmMethod.getVelocity().nz;
-  int ns = allSrcPos.ns;
-
-  std::vector<float> p0(nzpad * nxpad, 0);
-  std::vector<float> p1(nzpad * nxpad, 0);
-
-  for(int it=0; it<nt; it++) {
-    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
-    fmMethod.stepForward(&p0[0], &p1[0]);
-    std::swap(p1, p0);
-
-    if ((it > 0) && (it != (nt - 1)) && !(it % check_step)) {
-      char check_file_name1[64];
-      char check_file_name2[64];
-      const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-      sprintf(check_file_name1, "%s/check_time_%d_1.su", checkPointDir, it);
-      sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
-      writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
-      writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
-    }
-  }
-
-  char check_file_name1[64];
-  char check_file_name2[64];
-  const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-  sprintf(check_file_name1, "%s/check_time_last_1.su", checkPointDir);
-  sprintf(check_file_name2, "%s/check_time_last_2.su", checkPointDir);
-  writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
-  writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
-}
 
 static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, int model_size, float scale) {
   int i = 0;
@@ -349,95 +313,6 @@ static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, i
     image[i] -= src_wave[i] * vsrc_wave[i] * scale;
   }
 
-}
-
-void hello(const Zjh4t10dSponge &fmMethod,
-    const ShotPosition &allSrcPos, const std::vector<float> &encSrc,
-    const ShotPosition &allGeoPos, const std::vector<float> &vsrc,
-    std::vector<float> &g0,
-    int nt, float dt)
-{
-  const int check_step = 50;
-
-  int nxpad = fmMethod.getVelocity().nx;
-  int nzpad = fmMethod.getVelocity().nz;
-  int ns = allSrcPos.ns;
-  int ng = allGeoPos.ns;
-
-  std::vector<float> sp0(nzpad * nxpad, 0);
-  std::vector<float> sp1(nzpad * nxpad, 0);
-  std::vector<float> gp0(nzpad * nxpad, 0);
-  std::vector<float> gp1(nzpad * nxpad, 0);
-
-  std::vector<float> p0(nzpad * nxpad, 0);
-  std::vector<float> p1(nzpad * nxpad, 0);
-
-  for(int it=0; it<nt; it++) {
-    fmMethod.addSource(&p1[0], &encSrc[it * ns], allSrcPos);
-    fmMethod.stepForward(&p0[0], &p1[0]);
-    std::swap(p1, p0);
-
-    if ((it > 0) && (it != (nt - 1)) && !(it % check_step)) {
-      char check_file_name1[64];
-      char check_file_name2[64];
-      const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-      sprintf(check_file_name1, "%s/check_time_%d_1.su", checkPointDir, it);
-      sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
-      writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
-      writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
-    }
-  }
-
-  char check_file_name1[64];
-  char check_file_name2[64];
-  const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-  sprintf(check_file_name1, "%s/check_time_last_1.su", checkPointDir);
-  sprintf(check_file_name2, "%s/check_time_last_2.su", checkPointDir);
-  writeBin(std::string(check_file_name1), &p0[0], p0.size() * sizeof(float));
-  writeBin(std::string(check_file_name2), &p1[0], p1.size() * sizeof(float));
-
-
-  for(int it = nt - 1; it >= 0 ; it--) {
-    if (it  ==  nt - 1) {
-      //Load last two time_step wave field
-      char check_file_name1[64];
-      char check_file_name2[64];
-      const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-      sprintf(check_file_name1, "%s/check_time_last_1.su", checkPointDir);
-      sprintf(check_file_name2, "%s/check_time_last_2.su", checkPointDir);
-      readBin(std::string(check_file_name1), &sp1[0], sp1.size() * sizeof(float));
-      readBin(std::string(check_file_name2), &sp0[0], sp0.size() * sizeof(float));
-    }  else if ((check_step > 0) && !(it % check_step) && (it != 0)) {
-      char check_file_name1[64];
-      char check_file_name2[64];
-      const char *checkPointDir = std::getenv("CHECKPOINTDIR");
-      sprintf(check_file_name1, "%s/check_time_%d_1.su", checkPointDir, it);
-      sprintf(check_file_name2, "%s/check_time_%d_2.su", checkPointDir, it);
-      readBin(std::string(check_file_name1), &sp1[0], sp1.size() * sizeof(float));
-      readBin(std::string(check_file_name2), &sp0[0], sp0.size() * sizeof(float));
-    }
-
-    fmMethod.stepBackward(&sp0[0], &sp1[0]);
-    std::swap(sp1, sp0);
-    fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
-
-    /**
-     * forward propagate receviers
-     */
-    fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
-    fmMethod.stepForward(&gp0[0], &gp1[0]);
-    std::swap(gp1, gp0);
-
-
-    if (dt * it > 0.4) {
-      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
-    } else if (dt * it > 0.3) {
-      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), (dt * it - 0.3) / 0.1);
-    } else {
-      break;
-    }
-
- }
 }
 
 void hello2(const Zjh4t10dSponge &fmMethod,
