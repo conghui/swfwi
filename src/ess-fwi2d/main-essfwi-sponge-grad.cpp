@@ -67,7 +67,7 @@ extern "C"
 #include "random-code.h"
 #include "encoder.h"
 #include "velocity.h"
-#include "zjh4t10dsponge.h"
+#include "zjh4t10dspongevelnotrans.h"
 #include "sfutil.h"
 #include "aux.h"
 #include "preserved-alpha.h"
@@ -80,7 +80,7 @@ static float cal_obj_derr_illum_grad(
     const std::vector<float> &encsrc,
     const std::vector<float> &encobs,
     int nt,
-    const Zjh4t10dSponge &fmMethod,
+    const Zjh4t10dSpongeVelNoTrans &fmMethod,
     const ShotPosition &allSrcPos,
     const ShotPosition &allGeoPos)
 {
@@ -100,11 +100,11 @@ static float cal_obj_derr_illum_grad(
   for (int it = 0; it < nt; it++) {
     fmMethod.addSource(&sp1[0], &encsrc[it * ns], allSrcPos);
     fmMethod.stepForward(&sp0[0], &sp1[0]);
-    fmMethod.recordSeis(&dcal[0], &sp0[0]);
-    cal_residuals(&dcal[0], &encobs[it * ng], &derr[it * ng], ng);
 
     swap(sp0, sp1);
 
+    fmMethod.recordSeis(&dcal[0], &sp0[0]);
+    cal_residuals(&dcal[0], &encobs[it * ng], &derr[it * ng], ng);
     fmMethod.writeBndry(&bndr[0], &sp0[0], it);
   }
 
@@ -137,7 +137,7 @@ float calVelUpdateStepLen(
     const std::vector<float> &derr,
     float epsil,
     int nt,
-    const Zjh4t10dSponge &fmMethod,
+    const Zjh4t10dSpongeVelNoTrans &fmMethod,
     const ShotPosition &allSrcPos,
     const ShotPosition &allGeoPos
     )
@@ -162,7 +162,6 @@ float calVelUpdateStepLen(
     swap(sp0, sp1);
 
     fmMethod.recordSeis(&dcal[0], &sp0[0]);
-
     sum_alpha12(&alpha1[0], &alpha2[0], &dcal[0], &encobs[it * ng], &derr[it * ng], ng);
   }
 
@@ -198,7 +197,7 @@ int main(int argc, char *argv[]) {
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
-  Zjh4t10dSponge fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
+  Zjh4t10dSpongeVelNoTrans fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
@@ -210,8 +209,8 @@ int main(int argc, char *argv[]) {
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
 
-    int nzpad = exvel.nz;
-    int nxpad = exvel.nx;
+  int nzpad = exvel.nz;
+  int nxpad = exvel.nx;
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
   std::vector<float> g0(exvel.nx * exvel.nz, 0); /* gradient at previous step */
 
@@ -241,7 +240,6 @@ int main(int argc, char *argv[]) {
 
     float obj = cal_obj_derr_illum_grad(derr, illum, g1,encsrc, encobs, nt, fmMethod, allSrcPos, allGeoPos);
 
-    DEBUG() << format("obj1: %e") % obj;
     objval[iter] = iter == 0 ? obj0 = obj, 1.0 : obj / obj0;
 
     float epsil = 0;
@@ -258,13 +256,14 @@ int main(int argc, char *argv[]) {
 
     std::swap(g1, g0); // let g0 be the previous gradient
 
-    fmMethod.bindVelocity(vtmp);
-    float alpha = calVelUpdateStepLen(encsrc, encobs, derr, epsil, nt, fmMethod, allSrcPos, allGeoPos);
+    Zjh4t10dSpongeVelNoTrans tmpfm = fmMethod;
+    tmpfm.bindVelocity(vtmp);
+    float alpha = calVelUpdateStepLen(encsrc, encobs, derr, epsil, nt, tmpfm, allSrcPos, allGeoPos);
 
     update_vel(&exvel.dat[0], &cg[0], alpha, nzpad, nxpad);
 
     // output important information at each FWI iteration
-    INFO() << format("iteration %d obj=%f  beta=%f  epsil=%f  alpha=%f") % (iter + 1) % obj % beta % epsil % alpha;
+    INFO() << format("iteration %d obj=%e  beta=%e  epsil=%e  alpha=%e") % (iter + 1) % obj % beta % epsil % alpha;
     INFO() << timer.format(2);
 
     fmMethod.sfWriteVel(params.vupdates);
