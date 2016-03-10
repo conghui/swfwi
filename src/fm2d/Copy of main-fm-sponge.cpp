@@ -19,8 +19,8 @@ extern "C" {
 #include "common.h"
 #include "shot-position.h"
 
-#include "zjh4t10dsponge.h"
-#include "sfutil.h"
+#include "../modeling/spongeabc4d.h"
+#include "damp4t10d.h"
 
 int main(int argc, char* argv[])
 {
@@ -41,27 +41,26 @@ int main(int argc, char* argv[])
   float dt = params.dt;
   float fm = params.fm;
 
-  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
-  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-  Zjh4t10dSponge fmMethod(allSrcPos, allGeoPos, dt, params.dx, params.fm, nb, nt);
+  std::vector<int> sxz(params.ns); /* source positions */
+  std::vector<int> gxz(params.ng); /* geophone positions */
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
-  sfFloatWrite2d("v0.rsf", &v0.dat[0], nz, nx);
 
+  SpongeAbc4d fmMethod(dt, params.dx, params.dz, nb);
+//  Damp4t10d fmMethod(dt, params.dx, nb);
 
   Velocity exvel = fmMethod.expandDomain(v0);
-  sfFloatWrite2d("exvel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
 
   fmMethod.bindVelocity(exvel);
 
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
+  ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
+  ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
 
   for(int is=0; is<ns; is++) {
-    boost::timer::cpu_timer timer;
-
     std::vector<float> p0(exvel.nz * exvel.nx, 0);
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
@@ -70,15 +69,24 @@ int main(int argc, char* argv[])
 
     for(int it=0; it<nt; it++) {
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
+      TRACE() << format("it %d, sum p after adding source %.20f") % it % sum(p1);
+
       fmMethod.stepForward(&p0[0], &p1[0]);
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
+      TRACE() << format("it %d, sum p after fd %.20f") % it % sum(p0);
+
+      fmMethod.applySponge(&p0[0]);
+      fmMethod.applySponge(&p1[0]);
       std::swap(p1, p0);
+
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0], allGeoPos);
+      TRACE() << format("it %d, sum dobs %.20f") % it % sum(&dobs[it * ng], ng);
+
     }
 
     matrix_transpose(&dobs[0], &trans[0], ng, nt);
     sf_floatwrite(&trans[0], ng*nt, params.shots);
+    DEBUG() << format("shot %d, sum dobs %.20f") % is % sum(trans);
 
-    DEBUG() << format("shot %d, time %s") % is % timer.format(2).c_str();
   }
 
   return 0;
