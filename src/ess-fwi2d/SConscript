@@ -4,6 +4,7 @@ Import('*')
 bin_list = [
 			("essfwi", "main-essfwi2d.cpp"),
 			("essfwi-new", "main-essfwi2d-new.cpp"),
+			("enfwi", "main-enfwi.cpp"),
 			("essfwi-sponge", "main-essfwi-sponge.cpp"),
 			("essfwi-sponge-grad", "main-essfwi-sponge-grad.cpp"),
 
@@ -14,6 +15,9 @@ lib = 'essfwi'
 modules = """
 essfwi-params.cpp
 essfwiframework.cpp
+Matrix.cpp
+calgainmatrix.cpp
+dgesvd.cpp
           """.split()
 
 include_dir = [

@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
   EssFwiFramework essfwi(fmMethod, wlt, dobs);
   for (int iter = 0; iter < params.niter; iter++) {
-    essfwi.epoch(iter);
+    essfwi.epoch(iter, 0);
     essfwi.writeVel(params.vupdates);
   } /// end of iteration
 

@@ -14,7 +14,7 @@ class EssFwiFramework {
 public:
   EssFwiFramework(Damp4t10d &fmMethod, const std::vector<float> &wlt, const std::vector<float> &dobs);
 
-  void epoch(int iter);
+  void epoch(int iter, int ivel);
   void writeVel(sf_file file) const;
 
 private: /// from contructor, keep reference
@@ -32,8 +32,8 @@ private: /// propagate from other construction
   float dt;
 
 private:
-  std::vector<float> g0;          /// gradient in previous step
-  std::vector<float> updateDirection;
+  static std::vector<float> g0;          /// gradient in previous step
+  static std::vector<float> updateDirection;
 };
 
 #endif /* SRC_ESS_FWI2D_ESSFWIFRAMEWORK_H_ */

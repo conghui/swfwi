@@ -42,6 +42,9 @@ extern "C"
 #include "aux.h"
 #include "preserved-alpha.h"
 
+std::vector<float> EssFwiFramework::g0;
+std::vector<float> EssFwiFramework::updateDirection;
+
 static const int max_iter_select_alpha3 = 5;
 static const float vmax = 5500;
 static const float vmin = 1500;
@@ -50,6 +53,12 @@ typedef std::pair<float, float> ParaPoint;
 
 bool parabolicLessComp(const ParaPoint &a, const ParaPoint &b) {
   return a.second - b.second < 1e-10;
+}
+
+
+
+void gradUpdator(float *, float *curr_grad, float *update_direction, int size) {
+  std::copy(curr_grad, curr_grad + size, update_direction);
 }
 
 void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float *update_direction,
@@ -789,14 +798,15 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_w
     const std::vector<float> &_dobs) :
     fmMethod(method), wlt(_wlt), dobs(_dobs),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
-    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()),
-    g0(nx*nz, 0), updateDirection(nx*nz, 0)
+    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt())
+//    ,g0(nx*nz, 0), updateDirection(nx*nz, 0)
 {
-
+  g0.resize(nx*nz, 0);
+  updateDirection.resize(nx*nz, 0);
 
 }
 
-void EssFwiFramework::epoch(int iter) {
+void EssFwiFramework::epoch(int iter, int ivel) {
 
   // create random codes
   const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
@@ -869,7 +879,9 @@ void EssFwiFramework::epoch(int iter) {
 //    sprintf(buf, "pre%d.rsf", iter);
 //    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
 //  }
-  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+
+//  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+    gradUpdator(&g0[0], &g1[0], &updateDirection[0], g0.size()); /// for enfwi
 //
 //  {
 //    char buf[BUFSIZ];
@@ -880,7 +892,6 @@ void EssFwiFramework::epoch(int iter) {
 //    //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
 //  }
 //
-  const int ivel = 0;
   float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
   float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
 
