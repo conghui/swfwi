@@ -23,9 +23,10 @@ extern "C" {
 #include "sum.h"
 #include "Matrix.h"
 #include "calgainmatrix.h"
+#include "preserved-alpha.h"
 
 static const int N = 2;
-static const int enkf_update_every_essfwi_iter = 10;
+static const int enkf_update_every_essfwi_iter = 1;
 
 //static void initVelSet(const fwi_config_t &config, std::vector<float *> &velSet, int N, int modelSize) {
 //  TRACE() << "add perturbation to initial velocity";
@@ -67,47 +68,6 @@ float velTrans(float vel, float dx, float dt) {
   return dx * dx / (dt * dt * vel * vel);
 }
 
-
-static std::vector<float *> createVelocitySet(int modelSize, int num) {
-  std::vector<float *> ret(num);
-
-  for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = (float *)malloc(modelSize * sizeof * ret[i]);
-    std::fill(ret[i], ret[i] + modelSize, 0);
-  }
-
-  return ret;
-}
-
-static void initVelSet(const Damp4t10d &fm, std::vector<float *> &velSet) {
-  const Velocity &vel = fm.getVelocity();
-  int modelSize = vel.nx * vel.nz;
-  float dx = fm.getdx();
-  float dt = fm.getdt();
-
-  TRACE() << "add perturbation to initial velocity";
-//  const std::string fn = "velPerturb_" + to_str(N) + ".bin";
-  const std::string fn = "velPerturb_20.bin";
-  std::ifstream ifs(fn.c_str());
-  if (!ifs) {
-    ERROR() << "cannot open file: " << fn;
-    exit(EXIT_FAILURE);
-  }
-
-  std::vector<float> tmp(modelSize);
-  std::vector<float> velOrig = vel.dat;
-  std::transform(velOrig.begin(), velOrig.end(), velOrig.begin(), boost::bind(velRecover<float>, _1, dx, dt));
-  sfFloatWrite2d("initvel.rsf", &velOrig[0], vel.nz, vel.nx);
-
-  for (std::vector<float *>::iterator it = velSet.begin(); it != velSet.end(); ++it) {
-    float *ret = *it;
-    ifs.read(reinterpret_cast<char *>(&tmp[0]), modelSize * sizeof(tmp[0]));
-    std::transform(tmp.begin(), tmp.end(), velOrig.begin(), ret, std::plus<float>());
-    std::transform(ret, ret + modelSize, ret, boost::bind(velTrans<float>, _1, dx, dt));
-  }
-
-  ifs.close();
-}
 
 static float *createAMean(const std::vector<float *> &velSet, int modelSize) {
   float *ret = (float *)malloc(modelSize * sizeof * ret);
@@ -189,6 +149,48 @@ void enkf_analyze(Damp4t10d &fm, const std::vector<float> &wlt, const std::vecto
 
 } /// end of function
 
+std::vector<Velocity *> createVelDB(const Velocity &vel, int N, float dx, float dt) {
+  std::vector<Velocity *> veldb(N);   /// here is all the velocity samples resides, others are pointer to this
+
+  int modelSize = vel.nx * vel.nz;
+
+  TRACE() << "add perturbation to initial velocity";
+//  const std::string fn = "velPerturb_" + to_str(N) + ".bin";
+  const std::string fn = "velPerturb_20.bin";
+  std::ifstream ifs(fn.c_str());
+  if (!ifs) {
+    ERROR() << "cannot open file: " << fn;
+    exit(EXIT_FAILURE);
+  }
+
+  std::vector<float> tmp(modelSize);
+  std::vector<float> velOrig = vel.dat;
+  std::transform(velOrig.begin(), velOrig.end(), velOrig.begin(), boost::bind(velRecover<float>, _1, dx, dt));
+//  sfFloatWrite2d("initvel.rsf", &velOrig[0], vel.nz, vel.nx);
+
+  for (int iv = 0; iv < N; iv++) {
+    std::vector<float> ret(modelSize);
+    ifs.read(reinterpret_cast<char *>(&tmp[0]), modelSize * sizeof(tmp[0]));
+    std::transform(tmp.begin(), tmp.end(), velOrig.begin(), ret.begin(), std::plus<float>());
+    std::transform(ret.begin(), ret.end(), ret.begin(), boost::bind(velTrans<float>, _1, dx, dt));
+
+    veldb[iv] = new Velocity(ret, vel.nx, vel.nz);
+  }
+
+  ifs.close();
+
+  return veldb;
+}
+
+std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
+  std::vector<float *> velSet(veldb.size());
+  for (size_t iv = 0; iv < veldb.size(); iv++) {
+    velSet[iv] = &veldb[iv]->dat[0];
+  }
+
+  return velSet;
+}
+
 int main(int argc, char *argv[]) {
 
   /* initialize Madagascar */
@@ -223,6 +225,8 @@ int main(int argc, char *argv[]) {
   Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
 
+
+
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
@@ -232,8 +236,11 @@ int main(int argc, char *argv[]) {
   int modelSize = fmMethod.getnx() * fmMethod.getnz();
   TRACE() << "init velocity set";
   DEBUG() << "model size " << modelSize;
-  std::vector<float *> velSet = createVelocitySet(modelSize, N);
-  initVelSet(fmMethod, velSet); /// init the perturbation within the program later
+
+  //////// use my functions
+  std::vector<Velocity *> veldb = createVelDB(exvel, N, dx, dt);
+  std::vector<float *> velSet = generateVelSet(veldb);
+  ////////
 
   TRACE() << "go through ENKF to update velocity set";
   enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, 1);
@@ -242,16 +249,13 @@ int main(int argc, char *argv[]) {
   writeVelocity("meamvel0.rsf", vel, exvel.nx, exvel.nz, dx, dt);
   finalizeAMean(vel);
 
-  std::vector<Velocity *> vels(N);
   std::vector<Damp4t10d *> fms(N);
   std::vector<EssFwiFramework *> essfwis(N);
   for (size_t i = 0; i < essfwis.size(); i++) {
-    vels[i] = new Velocity(std::vector<float>(velSet[i], velSet[i] + modelSize), exvel.nx, exvel.nz);
     fms[i] = new Damp4t10d(fmMethod);
-    fms[i]->bindVelocity(*vels[i]);
+    fms[i]->bindVelocity(*veldb[i]);
     essfwis[i] = new EssFwiFramework(*fms[i], wlt, dobs);
   }
-//  EssFwiFramework essfwi(fmMethod, wlt, dobs);
 
   TRACE() << "iterate the remaining iteration";
   for (int iter = 1; iter <= params.niter; iter++) {
@@ -262,31 +266,29 @@ int main(int argc, char *argv[]) {
       essfwis[ivel]->epoch(iter, ivel);
 //      epoch(config, velSet[i], NULL, curr_gradient, update_direction, iter, i + 1, N, gradUpdator);
     }
+    TRACE() << "enkf analyze and update velocity";
+    if (iter % enkf_update_every_essfwi_iter == 0) {
+      enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, iter + 1);
 
-//    TRACE() << "enkf analyze and update velocity";
-//    if (iter % enkf_update_every_essfwi_iter == 0) {
-//      enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, iter + 1);
-////      enkf_analyze(config, velSet, lambdaSet, ratioSet, modelSize, iter + 1);
-//      //      reguPostProcess(lambdaSet, config.lambdaDescRatio);
-//
 //      TRACE() << "assign the average of all stored alpha to each sample";
 //      float *p = &PreservedAlpha::instance().getAlpha()[0];
 //      float alphaAvg = std::accumulate(p, p + N, 0.0f) / N;
 //      std::fill(p, p + N, alphaAvg);
+    }
+
+    float *vel = createAMean(velSet, modelSize);
+    float l1norm, l2norm;
+//    slownessL1L2Norm(config.accurate_vel, vel, config, l1norm, l2norm);
+//    INFO() << format("%4d/%d iter, slowness l1norm: %g, slowness l2norm: %g") % iter % params.niter % l1norm % l2norm;
+
+//    if (iter % 10 == 0) {
+      TRACE() << "write the mean of velocity set";
+      char buf[256];
+      sprintf(buf, "vel%d.rsf", iter);
+      writeVelocity(buf, vel, exvel.nx, exvel.nz, dx, dt);
 //    }
 
-//    float *vel = createAMean(velSet, modelSize);
-//    float l1norm, l2norm;
-//    slownessL1L2Norm(config.accurate_vel, vel, config, l1norm, l2norm);
-//    INFO() << format("%4d/%d iter, slowness l1norm: %g, slowness l2norm: %g") % iter % config.niters % l1norm % l2norm;
-//
-//    if (iter % 10 == 0) {
-//      TRACE() << "write the mean of velocity set";
-//      writeVelocitySet(velSet, config, "velset_" + to_str(iter) + ".bin");
-//      writeVelocity(vel, config, "currVel_" + to_str(iter) + ".bin");
-//    }
-//
-//    finalizeAMean(vel);
+    finalizeAMean(vel);
   }
 
   sf_close();
