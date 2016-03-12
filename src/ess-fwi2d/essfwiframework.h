@@ -32,8 +32,8 @@ private: /// propagate from other construction
   float dt;
 
 private:
-  static std::vector<float> g0;          /// gradient in previous step
-  static std::vector<float> updateDirection;
+  std::vector<float> g0;          /// gradient in previous step
+  std::vector<float> updateDirection;
 };
 
 #endif /* SRC_ESS_FWI2D_ESSFWIFRAMEWORK_H_ */

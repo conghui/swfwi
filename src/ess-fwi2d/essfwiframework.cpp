@@ -42,12 +42,9 @@ extern "C"
 #include "aux.h"
 #include "preserved-alpha.h"
 
-std::vector<float> EssFwiFramework::g0;
-std::vector<float> EssFwiFramework::updateDirection;
-
 static const int max_iter_select_alpha3 = 5;
-static const float vmax = 5500;
-static const float vmin = 1500;
+static const float vmax = 5600;
+static const float vmin = 1450;
 static const float maxdv = 200;
 typedef std::pair<float, float> ParaPoint;
 
@@ -799,10 +796,10 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_w
     fmMethod(method), wlt(_wlt), dobs(_dobs),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
     nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt())
-//    ,g0(nx*nz, 0), updateDirection(nx*nz, 0)
+    ,g0(nx*nz, 0), updateDirection(nx*nz, 0)
 {
-  g0.resize(nx*nz, 0);
-  updateDirection.resize(nx*nz, 0);
+//  g0.resize(nx*nz, 0);
+//  updateDirection.resize(nx*nz, 0);
 
 }
 
