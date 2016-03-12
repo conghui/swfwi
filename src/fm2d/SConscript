@@ -4,6 +4,7 @@ Import('*')
 bin_list = [
 			("mshot", "Mmshots.cpp"), 
 			("fm-damp", "main-fm-damp.cpp"),
+			("fm-enq", "main-fm-enquist.cpp"),
 			("fm-sponge", "main-fm-sponge.cpp"),
 			("fm-sponge-grad", "main-fm-sponge-grad.cpp"),
 

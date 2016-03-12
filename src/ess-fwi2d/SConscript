@@ -3,6 +3,7 @@ Import('*')
 
 bin_list = [
 			("essfwi", "main-essfwi2d.cpp"),
+			("essfwi-enq", "main-essfwi-enquist2d.cpp"),
 			("essfwi-new", "main-essfwi2d-new.cpp"),
 			("enfwi", "main-enfwi.cpp"),
 			("essfwi-sponge", "main-essfwi-sponge.cpp"),
