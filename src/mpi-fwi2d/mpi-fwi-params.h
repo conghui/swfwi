@@ -60,6 +60,7 @@ public:
   int jgx;
   int jgz;
   int csd;
+  int nb;
 
 public: // calculated
   int nk; // # of shots for each process

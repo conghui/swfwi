@@ -137,6 +137,9 @@ void MpiFwiParams::getInputParams() {
      sf_error("cannot find observed data file path");
    }
 
+   if (!sf_getint("nb", &nb)) {
+     sf_error("nb is not set");
+   }
 }
 
 void MpiFwiParams::putOutputParams() {
