@@ -56,7 +56,12 @@ int main(int argc, char *argv[]) {
   float vmax = 5500;
   float vmin = 1500;
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
-  EssFwiFramework essfwi(fmMethod, updatevelop, wlt, dobs);
+
+  int max_iter_update_alpha = 5;
+  float maxdv = 200;
+  UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, max_iter_update_alpha, maxdv);
+
+  EssFwiFramework essfwi(fmMethod, updateSteplenOp, updatevelop, wlt, dobs);
   for (int iter = 0; iter < params.niter; iter++) {
     essfwi.epoch(iter);
     essfwi.writeVel(params.vupdates);

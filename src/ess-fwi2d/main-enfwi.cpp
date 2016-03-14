@@ -25,6 +25,7 @@ extern "C" {
 #include "calgainmatrix.h"
 #include "preserved-alpha.h"
 #include "updatevelop.h"
+#include "updatesteplenop.h"
 
 static const int N = 2;
 static const int enkf_update_every_essfwi_iter = 1;
@@ -254,12 +255,16 @@ int main(int argc, char *argv[]) {
   float vmin = 1450;
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
 
+  int max_iter_update_alpha = 5;
+  float maxdv = 200;
+  UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, max_iter_update_alpha, maxdv);
+
   std::vector<Damp4t10d *> fms(N);
   std::vector<EssFwiFramework *> essfwis(N);
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
     fms[i]->bindVelocity(*veldb[i]);
-    essfwis[i] = new EssFwiFramework(*fms[i], updatevelop, wlt, dobs);
+    essfwis[i] = new EssFwiFramework(*fms[i], updateSteplenOp, updatevelop, wlt, dobs);
   }
 
   TRACE() << "iterate the remaining iteration";

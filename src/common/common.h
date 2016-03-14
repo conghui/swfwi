@@ -8,6 +8,14 @@
 #ifndef SRC_COMMON_COMMON_H_
 #define SRC_COMMON_COMMON_H_
 
+#include <vector>
+#include <functional>
+#include <algorithm>
+
+template <typename T>
+void vectorMinus(const std::vector<T> &dobs, const std::vector<T> &dcal, std::vector<T> &vsrc) {
+  std::transform(dobs.begin(), dobs.end(), dcal.begin(), vsrc.begin(), std::minus<T>());
+}
 
 void matrix_transpose(float *matrix, float *trans, int n1, int n2);
 void step_forward(const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);

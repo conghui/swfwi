@@ -41,6 +41,8 @@ public:
   void writeBndry(float* _bndr, const float* p, int it) const;
   void readBndry(const float* _bndr, float* p, int it) const;
 
+  void EssForwardModeling(const std::vector<float> &encsrc, std::vector<float> &dcal);
+
 public:
   const Velocity &getVelocity() const;
   Velocity &getVelocity();
