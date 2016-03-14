@@ -13,6 +13,7 @@ lib_modules = """
 			  encoder.cpp
 			  velocity.cpp
 			  shot-position.cpp
+			  parabola-vertex.cpp
               """.split()
 
 extra_include_dir = [

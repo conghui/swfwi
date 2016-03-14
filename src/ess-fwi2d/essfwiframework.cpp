@@ -41,6 +41,7 @@ extern "C"
 #include "sfutil.h"
 #include "aux.h"
 #include "preserved-alpha.h"
+#include "parabola-vertex.h"
 
 std::vector<float> EssFwiFramework::g0;          /// gradient in previous step
 std::vector<float> EssFwiFramework::updateDirection;
@@ -82,7 +83,6 @@ void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float
 
     beta = (a - b) / c;
 
-    DEBUG() << format("beta %e") % beta;
     if (beta < 0.0f) {
       beta = 0.0f;
     }
@@ -333,18 +333,14 @@ int calculate_obj_val(const Damp4t10d &fmMethod,
   Velocity updateVel(std::vector<float>(new_vel, new_vel + size), nx, nz);
   updateMethod.bindVelocity(updateVel);
 
-//  sfFloatWrite2d("upvel.rsf", &updateMethod.getVelocity().dat[0], nz, nx);
 
   //forward modeling
   int ng = fmMethod.getng();
   std::vector<float> dcal(nt * ng);
   forwardModeling(updateMethod, encsrc, dcal, nt);
 
-//  sfFloatWrite2d("11dcal.rsf", &dcal[0], ng, nt);
 
   updateMethod.removeDirectArrival(&dcal[0]);
-
-//  sfFloatWrite2d("22dcal.rsf", &dcal[0], ng, nt);
 
   std::vector<float> vdiff(nt * ng, 0);
   vectorMinus(encobs, dcal, vdiff);
@@ -375,7 +371,6 @@ void selectAlpha(const Damp4t10d &fmMethod,
   DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % alpha2 % obj_val2;
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
 
-//  exit(0);
 
   TRACE() << "maintain a set to store alpha2 that we ever tuned";
   std::set<ParaPoint, bool (*)(const ParaPoint &, const ParaPoint &) > tunedAlpha(parabolicLessComp);
@@ -394,7 +389,6 @@ void selectAlpha(const Damp4t10d &fmMethod,
     /// update alpha2
     alpha2 /= 2;
     calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha2, &obj_val2);
-//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha2, &obj_val2);
 
     /// store it
     tunedAlpha.insert(std::make_pair(alpha2, obj_val2));
@@ -423,7 +417,6 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
     _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
     calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha3, &_obj_val3);
-//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha3, &_obj_val3);
 
     toParabolicFit = false;
 
@@ -449,7 +442,6 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
     alpha3 = std::min(alpha3 * 2, maxAlpha3);
     calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha3, &obj_val3);
-//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, alpha3, &obj_val3);
 
     tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
 
@@ -468,7 +460,6 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
     _alpha2 = _alpha3 / 2;
     calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha2, &_obj_val2);
-//    calculate_obj_val(dim, config, shot, grad, vel, vmin, vmax, _alpha2, &_obj_val2);
 
     toParabolicFit = false;
 
@@ -488,29 +479,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
 }
 
-void calcParabolaVertex(float x1, float y1, float x2, float y2, float x3, float y3, float &xv, float &yv) {
-  double denom = (x1 - x2) * (x1 - x3) * (x2 - x3);
-  double A     = (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denom;
-  double B     = (x3 * x3 * (y1 - y2) + x2 * x2 * (y3 - y1) + x1 * x1 * (y2 - y3)) / denom;
-  double C     = (x2 * x3 * (x2 - x3) * y1 + x3 * x1 * (x3 - x1) * y2 + x1 * x2 * (x1 - x2) * y3) / denom;
 
-  xv = -B / (2 * A);
-  yv = C - B * B / (4 * A);
-}
-
-void calcParabolaVertexEnhanced(float x1, float y1, float x2, float y2, float x3, float y3, float max_alpha3, float &xv, float &yv) {
-  double k2 = (y3 - y2) / (x3 - x2);
-  double k1 = (y2 - y1) / (x2 - x1);
-
-  calcParabolaVertex(x1, y1, x2, y2, x3, y3, xv, yv);
-
-  if (std::abs(k2 - k1) < 0.001 * (std::max(std::abs(k2), std::abs(k1))) ||
-      (xv == -std::numeric_limits<double>::quiet_NaN())) {
-    WARNING() << "THE SET OF POINTS DON'T FIT PARABOLIC WELL, SET y TO -NAN ON PURPOSE JUST FOR INDICATION";
-    xv = std::min(2 * x3, max_alpha3);
-    yv = -std::numeric_limits<double>::quiet_NaN(); /// indicating what's happening
-  }
-}
 
 
 float calStepLen(const Damp4t10d &fmMethod,
@@ -539,7 +508,7 @@ float calStepLen(const Damp4t10d &fmMethod,
   float alpha4, obj_val4;
   if (toParabolic) {
     DEBUG() << "parabolic fit";
-    calcParabolaVertexEnhanced(alpha1, obj_val1, alpha2, obj_val2, alpha3, obj_val3, max_alpha3, alpha4, obj_val4);
+    parabolaVertex(alpha1, obj_val1, alpha2, obj_val2, alpha3, obj_val3, max_alpha3, alpha4, obj_val4);
     if (alpha4 > max_alpha3) {
       DEBUG() << format("alpha4 = %e, max_alpha3 = %e") % alpha4 % max_alpha3;
       DEBUG() << format("alpha4 is greater than max_alpha3, set it to alpha3");
@@ -661,8 +630,16 @@ void EssFwiFramework::epoch(int iter, int ivel) {
   float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
   float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
 
+
+
+
   DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
   float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
+
+
+
+
+
 
   Velocity &exvel = fmMethod.getVelocity();
   TRACE() << "Update velocity model";
