@@ -61,7 +61,8 @@ private:
   void removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const;
 
 private:
-  const static int FDLEN = 0;
+  const static int EXFDBNDRYLEN = 0;
+  const static int FDLEN = 5;
 
 private:
   const Velocity *vel;
