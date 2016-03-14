@@ -5,9 +5,6 @@
  *      Author: rice
  */
 
-#include "essfwiframework.h"
-
-
 
 extern "C"
 {
@@ -28,10 +25,8 @@ extern "C"
 
 #include <boost/timer/timer.hpp>
 #include "logger.h"
-#include "essfwi-params.h"
 #include "common.h"
 #include "ricker-wavelet.h"
-#include "cycle-swap.h"
 #include "sum.h"
 #include "sf-velocity-reader.h"
 #include "shotdata-reader.h"
@@ -39,9 +34,8 @@ extern "C"
 #include "encoder.h"
 #include "velocity.h"
 #include "sfutil.h"
-#include "aux.h"
-#include "preserved-alpha.h"
 #include "parabola-vertex.h"
+#include "essfwiframework.h"
 
 std::vector<float> EssFwiFramework::g0;          /// gradient in previous step
 std::vector<float> EssFwiFramework::updateDirection;
@@ -49,19 +43,11 @@ std::vector<float> EssFwiFramework::updateDirection;
 namespace {
 
 static const int max_iter_select_alpha3 = 5;
-static const float vmax = 5500;
-static const float vmin = 1500;
 static const float maxdv = 200;
 typedef std::pair<float, float> ParaPoint;
 
 bool parabolicLessComp(const ParaPoint &a, const ParaPoint &b) {
   return a.second - b.second < 1e-10;
-}
-
-
-
-void gradUpdator(float *, float *curr_grad, float *update_direction, int size) {
-  std::copy(curr_grad, curr_grad + size, update_direction);
 }
 
 void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float *update_direction,
@@ -99,30 +85,23 @@ void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float
 
 void forwardModeling(const Damp4t10d &fmMethod,
     const std::vector<float> &encSrc,
-    std::vector<float> &dobs, /* output (fast: ng, slow: nt) */
-    int nt)
+    std::vector<float> &dobs /* output (fast: ng, slow: nt) */)
 {
-    int nxpad = fmMethod.getVelocity().nx;
-    int nzpad = fmMethod.getVelocity().nz;
-    int ns = fmMethod.getns();
-    int ng = fmMethod.getng();
+  int nx = fmMethod.getnx();
+  int nz = fmMethod.getnz();
+  int ns = fmMethod.getns();
+  int ng = fmMethod.getng();
+  int nt = fmMethod.getnt();
 
-    boost::timer::cpu_timer timer;
+  std::vector<float> p0(nz * nx, 0);
+  std::vector<float> p1(nz * nx, 0);
 
-    std::vector<float> p0(nzpad * nxpad, 0);
-    std::vector<float> p1(nzpad * nxpad, 0);
-
-    for(int it=0; it<nt; it++) {
-
-      fmMethod.addEncodedSource(&p1[0], &encSrc[it * ns]);
-
-      fmMethod.stepForward(&p0[0], &p1[0]);
-
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
-
-      std::swap(p1, p0);
-
-    }
+  for(int it=0; it<nt; it++) {
+    fmMethod.addEncodedSource(&p1[0], &encSrc[it * ns]);
+    fmMethod.stepForward(&p0[0], &p1[0]);
+    std::swap(p1, p0);
+    fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
+  }
 
 }
 
@@ -130,7 +109,7 @@ void vectorMinus(const std::vector<float> &dobs, const std::vector<float> &dcal,
   std::transform(dobs.begin(), dobs.end(), dcal.begin(), vsrc.begin(), std::minus<float>());
 }
 
-void second_order_virtual_source_forth_accuracy(float *vsrc, int num, float dt) {
+void second_order_virtual_source_forth_accuracy(float *vsrc, int num) {
   float *tmp_vsrc = (float *)malloc(num * sizeof(float));
   memcpy(tmp_vsrc, vsrc, num * sizeof(float));
   int i = 0;
@@ -152,34 +131,29 @@ void second_order_virtual_source_forth_accuracy(float *vsrc, int num, float dt) 
   free(tmp_vsrc);
 }
 
-void transVsrc(std::vector<float> &vsrc, int nt, int ng, float dt) {
+void transVsrc(std::vector<float> &vsrc, int nt, int ng) {
   std::vector<float> trans(nt * ng);
   matrix_transpose(&vsrc[0], &trans[0], ng, nt);
   for (int ig = 0; ig < ng; ig++) {
-    second_order_virtual_source_forth_accuracy(&trans[ig * nt], nt, dt);
+    second_order_virtual_source_forth_accuracy(&trans[ig * nt], nt);
   }
-
-  //sfFloatWrite2d("vsrc.rsf", &trans[0], nt, ng);
 
   matrix_transpose(&trans[0], &vsrc[0], nt, ng);
 }
 
-static void cross_correlation(float *src_wave, float *vsrc_wave, float *image, int model_size, float scale) {
-  int i = 0;
-  for (i = 0; i < model_size; i ++) {
+void cross_correlation(float *src_wave, float *vsrc_wave, float *image, int model_size, float scale) {
+  for (int i = 0; i < model_size; i ++) {
     image[i] -= src_wave[i] * vsrc_wave[i] * scale;
   }
 
 }
 
-void hello2(const Damp4t10d &fmMethod,
+void calgradient(const Damp4t10d &fmMethod,
     const std::vector<float> &encSrc,
     const std::vector<float> &vsrc,
     std::vector<float> &g0,
     int nt, float dt)
 {
-  const int check_step = 50;
-
   int nxpad = fmMethod.getnx();
   int nzpad = fmMethod.getnz();
   int ns = fmMethod.getns();
@@ -211,39 +185,8 @@ void hello2(const Damp4t10d &fmMethod,
      * forward propagate receviers
      */
     fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
-//    {
-//      char buf[256];
-//      sprintf(buf, "vsrc%d.rsf", it);
-//      sfFloatWrite1d(buf, &vsrc[it * ng], ng);
-//    }
-//    {
-//      char buf[256];
-//      sprintf(buf, "gp1aftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
-//
-//      sprintf(buf, "gp0aftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
-//
-//      sprintf(buf, "velaftadd%d.rsf", it);
-//      sfFloatWrite2d(buf, &fmMethod.getVelocity().dat[0], nzpad, nxpad);
-//    }
-
     fmMethod.stepForward(&gp0[0], &gp1[0]);
-//    {
-//      char buf[256];
-//      sprintf(buf, "gp0aftfm%d.rsf", it);
-//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
-//    }
-
     std::swap(gp1, gp0);
-
-//    char buf[256];
-//    sprintf(buf, "sfield%d.rsf", it);
-//    sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
-//
-//    sprintf(buf, "vfield%d.rsf", it);
-//    sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
-
 
     if (dt * it > 0.4) {
       cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
@@ -253,9 +196,6 @@ void hello2(const Damp4t10d &fmMethod,
       break;
     }
 
-//    sprintf(buf, "img%d.rsf", it);
-//    sfFloatWrite2d(buf, &g0[0], nzpad, nxpad);
-//    if (it == 1999) exit(0);
  }
 }
 
@@ -283,88 +223,107 @@ void calMaxAlpha2_3(const Velocity &exvel,  const float *grad, float dt, float d
   ret_alpha3 =  2 * alpha2;
 }
 
-void update_vel(const float *vel, const float *grad, float size, float steplen, float vmin, float vmax, float *new_vel) {
-  if (vmax <= vmin) {
-    ERROR() << format("vmax(%f) < vmin(%f)") % vmax % vmin;
-    exit(0);
-  }
 
-  for (int i = 0; i < size; i++) {
-    new_vel[i] = vel[i] + steplen * grad[i];
-    if (new_vel[i] > vmax) {
-      new_vel[i] = vmax;
-    }
-    if (new_vel[i] < vmin) {
-      new_vel[i] = vmin;
-    }
-  }
+} /// end of namespace
+
+
+EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateVelOp &_updateVelOp,
+    const std::vector<float> &_wlt, const std::vector<float> &_dobs) :
+    fmMethod(method), updateVelOp(_updateVelOp), wlt(_wlt), dobs(_dobs),
+    ns(method.getns()), ng(method.getng()), nt(method.getnt()),
+    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()),
+    encsrc(NULL), encobs(NULL)
+{
+  g0.resize(nx*nz, 0);
+  updateDirection.resize(nx*nz, 0);
 }
 
-void initAlpha2_3(int ivel, float max_alpha3, float &initAlpha2, float &initAlpha3) {
-  const float minAlpha   = 1.0E-7;
-  const float resetAlpha = 1.0E-4;
+void EssFwiFramework::epoch(int iter) {
+  // create random codes
+  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
 
-  if (!PreservedAlpha::instance().getIsInit()[ivel]) {
-    PreservedAlpha::instance().getIsInit()[ivel] = true;
-    PreservedAlpha::instance().getAlpha()[ivel] = max_alpha3;
-  }
+  Encoder encoder(encodes);
+  std::vector<float> encsrc  = encoder.encodeSource(wlt);
+  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+  this->bindEncSrcObs(encsrc, encobs);
 
-  initAlpha3 = PreservedAlpha::instance().getAlpha()[ivel];
-  initAlpha3 = initAlpha3 < minAlpha ? resetAlpha : initAlpha3;
-  initAlpha2 = initAlpha3 * 0.5;
+  std::vector<float> dcal(nt * ng, 0);
+  forwardModeling(fmMethod, encsrc, dcal);
+
+  fmMethod.removeDirectArrival(&encobs[0]);
+  fmMethod.removeDirectArrival(&dcal[0]);
+
+  std::vector<float> vsrc(nt * ng, 0);
+  vectorMinus(encobs, dcal, vsrc);
+  float obj1 = cal_objective(&vsrc[0], vsrc.size());
+  DEBUG() << format("obj: %e") % obj1;
+
+  transVsrc(vsrc, nt, ng);
+
+  std::vector<float> g1(nx * nz, 0);
+  calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
+
+  fmMethod.maskGradient(&g1[0]);
+
+  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+
+  float steplen = calsteplen(updateDirection, obj1, iter);
+
+  TRACE() << "Update velocity model";
+  Velocity &exvel = fmMethod.getVelocity();
+  updateVelOp.update(exvel, exvel, updateDirection, steplen);
+
+  fmMethod.refillBoundary(&exvel.dat[0]);
 }
 
-int calculate_obj_val(const Damp4t10d &fmMethod,
-    const std::vector<float> &encsrc, const std::vector<float> &encobs,
-    const float *grad,
-    float vmin, float vmax, float steplen, float *obj_val_out) {
+void EssFwiFramework::writeVel(sf_file file) const {
+  fmMethod.sfWriteVel(file);
+}
 
-  int nx = fmMethod.getVelocity().nx;
-  int nz = fmMethod.getVelocity().nz;
-  int nt = fmMethod.getnt();
+void EssFwiFramework::bindEncSrcObs(const std::vector<float>& encsrc,
+    const std::vector<float>& encobs) {
+  this->encsrc = &encsrc;
+  this->encobs = &encobs;
+}
 
-  int size = nx *  nz;
+float EssFwiFramework::calobjval(const std::vector<float>& grad,
+    float steplen) const {
 
-  const float *vel = &fmMethod.getVelocity().dat[0];
-  float *new_vel = (float *)malloc(sizeof(float) * size);
-  update_vel(vel, grad, size, steplen, vmin, vmax, new_vel);
+  const Velocity &oldVel = fmMethod.getVelocity();
+  Velocity newVel(nx, nz);
+  updateVelOp.update(newVel, oldVel, grad, steplen);
 
   Damp4t10d updateMethod = fmMethod;
-  Velocity updateVel(std::vector<float>(new_vel, new_vel + size), nx, nz);
-  updateMethod.bindVelocity(updateVel);
-
+  updateMethod.bindVelocity(newVel);
 
   //forward modeling
   int ng = fmMethod.getng();
   std::vector<float> dcal(nt * ng);
-  forwardModeling(updateMethod, encsrc, dcal, nt);
+  forwardModeling(updateMethod, *encsrc, dcal);
 
 
   updateMethod.removeDirectArrival(&dcal[0]);
 
   std::vector<float> vdiff(nt * ng, 0);
-  vectorMinus(encobs, dcal, vdiff);
+  vectorMinus(*encobs, dcal, vdiff);
   float val = cal_objective(&vdiff[0], vdiff.size());
 
   DEBUG() << format("curr_alpha = %e, pure object value = %e") % steplen % val;
 
-  *obj_val_out = val;
-
-  return 0;
+  return val;
 }
 
-void selectAlpha(const Damp4t10d &fmMethod,
-    const std::vector<float> &encsrc, const std::vector<float> &encobs, const float *grad,
-    float obj_val1, float vmin, float vmax, float maxAlpha3,
-    float &_alpha2, float &_obj_val2, float &_alpha3, float &_obj_val3, bool &toParabolicFit) {
+bool EssFwiFramework::refineAlpha(const std::vector<float> &grad, float obj_val1, float maxAlpha3,
+    float& _alpha2, float& _obj_val2, float& _alpha3, float& _obj_val3) const {
+
   TRACE() << "SELECTING THE RIGHT OBJECTIVE VALUE 3";
 
   float alpha3 = _alpha3;
   float alpha2 = _alpha2;
   float obj_val2, obj_val3 = 0;
 
-  calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha2, &obj_val2);
-  calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha3, &obj_val3);
+  obj_val2 = calobjval(grad, alpha2);
+  obj_val3 = calobjval(grad, alpha3);
 
   DEBUG() << "BEFORE TUNNING";
   DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
@@ -388,7 +347,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
     /// update alpha2
     alpha2 /= 2;
-    calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha2, &obj_val2);
+    obj_val2 = calobjval(grad, alpha2);
 
     /// store it
     tunedAlpha.insert(std::make_pair(alpha2, obj_val2));
@@ -416,13 +375,14 @@ void selectAlpha(const Damp4t10d &fmMethod,
     _obj_val2 = it->second;
 
     _alpha3 = std::min(_alpha2 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod, encsrc, encobs, grad, vmin, vmax, alpha3, &_obj_val3);
+    _obj_val3 = calobjval(grad, alpha3);
 
-    toParabolicFit = false;
 
     DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
     DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
-    return;
+
+    bool toParabolicFit = false;
+    return toParabolicFit;
   }
 
   TRACE() << "now we can make sure that obj_val2 < obj_val1";
@@ -441,7 +401,7 @@ void selectAlpha(const Damp4t10d &fmMethod,
     obj_val2 = obj_val3;
 
     alpha3 = std::min(alpha3 * 2, maxAlpha3);
-    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha3, &obj_val3);
+    obj_val3 = calobjval(grad, alpha3);
 
     tunedAlpha.insert(std::make_pair(alpha3, obj_val3));
 
@@ -459,17 +419,17 @@ void selectAlpha(const Damp4t10d &fmMethod,
     _obj_val3 = it->second;
 
     _alpha2 = _alpha3 / 2;
-    calculate_obj_val(fmMethod,  encsrc, encobs, grad, vmin, vmax, alpha2, &_obj_val2);
+    _obj_val2 = calobjval(grad, alpha2);
 
-    toParabolicFit = false;
+    bool toParabolicFit = false;
 
     DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
     DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
-    return;
+    return toParabolicFit;
   }
 
   /// return objval2 and objval3
-  toParabolicFit = true;
+  bool toParabolicFit = true;
   _alpha2 = alpha2;
   _alpha3 = alpha3;
   _obj_val2 = obj_val2;
@@ -477,33 +437,28 @@ void selectAlpha(const Damp4t10d &fmMethod,
 
   DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % _alpha2 % _obj_val2;
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
+
+  return toParabolicFit;
 }
 
-
-
-
-float calStepLen(const Damp4t10d &fmMethod,
-    const std::vector<float> &encsrc, const std::vector<float> &encobs,
-    const std::vector<float> &updateDirection, int iter, int ivel,
-    float obj_val1, float min_vel, float max_vel) {
+float EssFwiFramework::calsteplen(const std::vector<float>& grad,
+    float obj_val1, int iter) {
 
   float dt = fmMethod.getdt();
   float dx = fmMethod.getdx();
 
-  TRACE() << "Calcuate step length";
   TRACE() << "calculate the initial value of alpha2 and alpha3";
   float max_alpha2, max_alpha3;
   calMaxAlpha2_3(fmMethod.getVelocity(), &updateDirection[0], dt, dx, maxdv, max_alpha2, max_alpha3);
   DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
 
   float alpha1 = 0, alpha2, alpha3;
-  initAlpha2_3(ivel, max_alpha3, alpha2, alpha3);
+  initAlpha23(max_alpha3, alpha2, alpha3);
   DEBUG() << format("after init alpha,  alpha2 = %e,      alpha3: = %e") % alpha2 % alpha3;
 
   float obj_val2, obj_val3;
-  bool toParabolic;
 
-  selectAlpha(fmMethod, encsrc, encobs, &updateDirection[0], obj_val1, min_vel, max_vel, max_alpha3, alpha2, obj_val2, alpha3, obj_val3, toParabolic);
+  bool toParabolic = refineAlpha(grad, obj_val1, max_alpha3, alpha2, obj_val2, alpha3, obj_val3);
 
   float alpha4, obj_val4;
   if (toParabolic) {
@@ -520,136 +475,25 @@ float calStepLen(const Damp4t10d &fmMethod,
     obj_val4 = obj_val3;
   }
 
-  INFO() << format("In calculate_steplen(): iter %d  alpha  = %e total obj_val1 = %e") % iter % alpha1 % obj_val1;
-  INFO() << format("In calculate_steplen(): iter %d  alpha2 = %e total obj_val2 = %e") % iter % alpha2 % obj_val2;
-  INFO() << format("In calculate_steplen(): iter %d  alpha3 = %e total obj_val3 = %e") % iter % alpha3 % obj_val3;
-  INFO() << format("In calculate_steplen(): iter %d  alpha4 = %e total obj_val4 = %e\n") % iter % alpha4 % obj_val4;
+  INFO() << format("iter %d  alpha  = %e total obj_val1 = %e") % iter % alpha1 % obj_val1;
+  INFO() << format("iter %d  alpha2 = %e total obj_val2 = %e") % iter % alpha2 % obj_val2;
+  INFO() << format("iter %d  alpha3 = %e total obj_val3 = %e") % iter % alpha3 % obj_val3;
+  INFO() << format("iter %d  alpha4 = %e total obj_val4 = %e\n") % iter % alpha4 % obj_val4;
 
-  PreservedAlpha::instance().getAlpha()[ivel] = alpha4;
+  preservedAlpha.alpha = alpha4;
   return alpha4;
 }
 
-}
+void EssFwiFramework::initAlpha23(float maxAlpha3, float &initAlpha2, float &initAlpha3) {
+  const float minAlpha   = 1.0E-7;
+  const float resetAlpha = 1.0E-4;
 
-EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_wlt,
-    const std::vector<float> &_dobs) :
-    fmMethod(method), wlt(_wlt), dobs(_dobs),
-    ns(method.getns()), ng(method.getng()), nt(method.getnt()),
-    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt())
-//    ,g0(nx*nz, 0), updateDirection(nx*nz, 0)
-{
-  g0.resize(nx*nz, 0);
-  updateDirection.resize(nx*nz, 0);
-}
-
-void EssFwiFramework::epoch(int iter, int ivel) {
-
-  // create random codes
-  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
-  std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
-
-  Encoder encoder(encodes);
-  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
-  std::vector<float> encsrc  = encoder.encodeSource(wlt);
-
-  {
-    char buf[BUFSIZ];
-    sprintf(buf, "encobs%d.rsf", iter);
-//    sfFloatWrite2d(buf, &encobs[0], nt, ng);
-
-    sprintf(buf, "encsrc%d.rsf", iter);
-//    sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
-
-    DEBUG() << format("sum wlt %.20f") % sum(wlt);
-//    sprintf(buf, "exvel%d.rsf", iter);
-    //sfFloatWrite2d(buf, &exvel.dat[0], exvel.nz, exvel.nx);
+  if (!preservedAlpha.init) {
+    preservedAlpha.init = true;
+    preservedAlpha.alpha = maxAlpha3;
   }
-//
-  std::vector<float> dcal(nt * ng, 0);
-  forwardModeling(fmMethod, encsrc, dcal, nt);
-//
-  {
-    char buf[BUFSIZ];
-    sprintf(buf, "calobs%d.rsf", iter);
-    //sfFloatWrite2d(buf, &dcal[0], ng, nt);
-  }
-//
-  fmMethod.removeDirectArrival(&encobs[0]);
-  fmMethod.removeDirectArrival(&dcal[0]);
-//
-  {
-    char buf[BUFSIZ];
-    sprintf(buf, "rmdcalobs%d.rsf", iter);
-    //sfFloatWrite2d(buf, &dcal[0], ng, nt);
-  }
-//
-  std::vector<float> vsrc(nt * ng, 0);
-  vectorMinus(encobs, dcal, vsrc);
-  float obj1 = cal_objective(&vsrc[0], vsrc.size());
-  DEBUG() << format("obj: %e") % obj1;
-//  exit(0);
-//
-  transVsrc(vsrc, nt, ng, dt);
-//
-//
-  std::vector<float> g1(nx * nz, 0);
-  hello2(fmMethod, encsrc, vsrc, g1, nt, dt);
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "grad%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//  }
-////    exit(0);
-//
-  fmMethod.maskGradient(&g1[0]);
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "mgrad%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//  }
-//
-//
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "pre%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-//  }
 
-//  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
-    gradUpdator(&g0[0], &g1[0], &updateDirection[0], g0.size()); /// for enfwi
-//
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "g0%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
-//
-//    sprintf(buf, "update%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &updateDirection[0], exvel.nz, exvel.nx);
-//  }
-//
-  float min_vel = (dx / dt / vmax) * (dx / dt / vmax);
-  float max_vel = (dx / dt / vmin) * (dx / dt / vmin);
-
-
-
-
-  DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
-  float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
-
-
-
-
-
-
-  Velocity &exvel = fmMethod.getVelocity();
-  TRACE() << "Update velocity model";
-  update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
-////    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
-//
-  fmMethod.refillBoundary(&exvel.dat[0]);
-////    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
-}
-
-void EssFwiFramework::writeVel(sf_file file) const {
-  fmMethod.sfWriteVel(file);
+  initAlpha3 = preservedAlpha.alpha;
+  initAlpha3 = initAlpha3 < minAlpha ? resetAlpha : initAlpha3;
+  initAlpha2 = initAlpha3 * 0.5;
 }

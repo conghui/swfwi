@@ -13,7 +13,8 @@ extern "C" {
 #include "essfwiframework.h"
 #include "shotdata-reader.h"
 #include "sum.h"
-#include "updatevelop.h"
+#include "essfwinotrans.h"
+#include "damp4t10dnotrans.h"
 
 int main(int argc, char *argv[]) {
 
@@ -40,7 +41,8 @@ int main(int argc, char *argv[]) {
 
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
-  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
+//  Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
+  Damp4t10dNotrans fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
 
   SfVelocityReader velReader(params.vinit);
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
@@ -53,12 +55,10 @@ int main(int argc, char *argv[]) {
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
 
-  float vmax = 5500;
-  float vmin = 1500;
-  UpdateVelOp updatevelop(vmin, vmax, dx, dt);
-  EssFwiFramework essfwi(fmMethod, updatevelop, wlt, dobs);
+//  EssFwiFramework essfwi(fmMethod, wlt, dobs);
+  EssFwiNotrans essfwi(fmMethod, wlt, dobs);
   for (int iter = 0; iter < params.niter; iter++) {
-    essfwi.epoch(iter);
+    essfwi.epoch(iter, 0);
     essfwi.writeVel(params.vupdates);
   } /// end of iteration
 

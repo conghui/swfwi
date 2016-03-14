@@ -10,6 +10,7 @@ lib_modules = """
 			  enquistabc2d.cpp
 			  zjh4t10dsponge.cpp
 			  zjh4t10dspongevelnotrans.cpp
+			  damp4t10dnotrans.cpp
               """.split()
 
 extra_include_dir = [

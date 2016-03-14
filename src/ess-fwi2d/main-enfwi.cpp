@@ -24,6 +24,7 @@ extern "C" {
 #include "Matrix.h"
 #include "calgainmatrix.h"
 #include "preserved-alpha.h"
+#include "updatevelop.h"
 
 static const int N = 2;
 static const int enkf_update_every_essfwi_iter = 1;
@@ -249,12 +250,16 @@ int main(int argc, char *argv[]) {
   writeVelocity("meamvel0.rsf", vel, exvel.nx, exvel.nz, dx, dt);
   finalizeAMean(vel);
 
+  float vmax = 5600;
+  float vmin = 1450;
+  UpdateVelOp updatevelop(vmin, vmax, dx, dt);
+
   std::vector<Damp4t10d *> fms(N);
   std::vector<EssFwiFramework *> essfwis(N);
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
     fms[i]->bindVelocity(*veldb[i]);
-    essfwis[i] = new EssFwiFramework(*fms[i], wlt, dobs);
+    essfwis[i] = new EssFwiFramework(*fms[i], updatevelop, wlt, dobs);
   }
 
   TRACE() << "iterate the remaining iteration";
@@ -263,7 +268,7 @@ int main(int argc, char *argv[]) {
     DEBUG() << "\n\n\n\n\n\n\n";
 
     for (int ivel = 0; ivel < N; ivel++) {
-      essfwis[ivel]->epoch(iter, ivel);
+      essfwis[ivel]->epoch(iter);
 //      epoch(config, velSet[i], NULL, curr_gradient, update_direction, iter, i + 1, N, gradUpdator);
     }
     TRACE() << "enkf analyze and update velocity";

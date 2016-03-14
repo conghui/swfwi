@@ -22,6 +22,7 @@ calgainmatrix.cpp
 dgesvd.cpp
 essfwiregu.cpp
 ReguFactor.cpp
+updatevelop.cpp
           """.split()
 
 include_dir = [

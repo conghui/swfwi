@@ -8,9 +8,12 @@
 #ifndef SRC_ESS_FWI2D_UPDATEVELOP_H_
 #define SRC_ESS_FWI2D_UPDATEVELOP_H_
 
+#include "velocity.h"
+
 class UpdateVelOp {
 public:
-  UpdateVelOp(float vmin, float vmax);
+  UpdateVelOp(float vmin, float vmax, float dx, float dt);
+  void update(Velocity &newVel, const Velocity &vel, const std::vector<float> &grad, float steplen) const;
 
 private:
   float vmin;
