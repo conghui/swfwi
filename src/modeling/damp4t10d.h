@@ -37,6 +37,10 @@ public:
   void subEncodedSource(float *p, const float *source) const;
   void refillVelStencilBndry();
 
+  std::vector<float> initBndryVector(int nt) const;
+  void writeBndry(float* _bndr, const float* p, int it) const;
+  void readBndry(const float* _bndr, float* p, int it) const;
+
 public:
   const Velocity &getVelocity() const;
   Velocity &getVelocity();
@@ -68,6 +72,7 @@ private:
   float fm;
   int nb;
   int nt;
+  mutable int bndrSize;
 
 private:
   std::vector<float> bndr;

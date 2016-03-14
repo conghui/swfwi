@@ -343,6 +343,93 @@ void hello(const Damp4t10d &fmMethod,
  }
 }
 
+void hello2(const Damp4t10d &fmMethod,
+    const std::vector<float> &encSrc,
+    const std::vector<float> &vsrc,
+    std::vector<float> &g0,
+    int nt, float dt)
+{
+  const int check_step = 50;
+
+  int nxpad = fmMethod.getnx();
+  int nzpad = fmMethod.getnz();
+  int ns = fmMethod.getns();
+  int ng = fmMethod.getng();
+  const ShotPosition &allGeoPos = fmMethod.getAllGeoPos();
+  const ShotPosition &allSrcPos = fmMethod.getAllSrcPos();
+
+  std::vector<float> bndr = fmMethod.initBndryVector(nt);
+  std::vector<float> sp0(nzpad * nxpad, 0);
+  std::vector<float> sp1(nzpad * nxpad, 0);
+  std::vector<float> gp0(nzpad * nxpad, 0);
+  std::vector<float> gp1(nzpad * nxpad, 0);
+
+
+  for(int it=0; it<nt; it++) {
+    fmMethod.addSource(&sp1[0], &encSrc[it * ns], allSrcPos);
+    fmMethod.stepForward(&sp0[0], &sp1[0]);
+    std::swap(sp1, sp0);
+    fmMethod.writeBndry(&bndr[0], &sp0[0], it);
+  }
+
+  for(int it = nt - 1; it >= 0 ; it--) {
+    fmMethod.readBndry(&bndr[0], &sp0[0], it);
+    std::swap(sp0, sp1);
+    fmMethod.stepBackward(&sp0[0], &sp1[0]);
+    fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
+
+    /**
+     * forward propagate receviers
+     */
+    fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
+//    {
+//      char buf[256];
+//      sprintf(buf, "vsrc%d.rsf", it);
+//      sfFloatWrite1d(buf, &vsrc[it * ng], ng);
+//    }
+//    {
+//      char buf[256];
+//      sprintf(buf, "gp1aftadd%d.rsf", it);
+//      sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
+//
+//      sprintf(buf, "gp0aftadd%d.rsf", it);
+//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
+//
+//      sprintf(buf, "velaftadd%d.rsf", it);
+//      sfFloatWrite2d(buf, &fmMethod.getVelocity().dat[0], nzpad, nxpad);
+//    }
+
+    fmMethod.stepForward(&gp0[0], &gp1[0]);
+//    {
+//      char buf[256];
+//      sprintf(buf, "gp0aftfm%d.rsf", it);
+//      sfFloatWrite2d(buf, &gp0[0], nzpad, nxpad);
+//    }
+
+    std::swap(gp1, gp0);
+
+//    char buf[256];
+//    sprintf(buf, "sfield%d.rsf", it);
+//    sfFloatWrite2d(buf, &sp1[0], nzpad, nxpad);
+//
+//    sprintf(buf, "vfield%d.rsf", it);
+//    sfFloatWrite2d(buf, &gp1[0], nzpad, nxpad);
+
+
+    if (dt * it > 0.4) {
+      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
+    } else if (dt * it > 0.3) {
+      cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), (dt * it - 0.3) / 0.1);
+    } else {
+      break;
+    }
+
+//    sprintf(buf, "img%d.rsf", it);
+//    sfFloatWrite2d(buf, &g0[0], nzpad, nxpad);
+//    if (it == 1999) exit(0);
+ }
+}
+
 void calMaxAlpha2_3(const Velocity &exvel,  const float *grad, float dt, float dx, float maxdv,
                     float &ret_alpha2, float &ret_alpha3) {
   const int nx = exvel.nx;
@@ -706,10 +793,11 @@ void EssFwiFramework::epoch(int iter, int ivel) {
 //
   transVsrc(vsrc, nt, ng, dt);
 //
-  forwardPropagate(fmMethod, encsrc);
+//  forwardPropagate(fmMethod, encsrc);
 //
   std::vector<float> g1(nx * nz, 0);
-  hello(fmMethod, encsrc, vsrc, g1, nt, dt);
+//  hello(fmMethod, encsrc, vsrc, g1, nt, dt);
+  hello2(fmMethod, encsrc, vsrc, g1, nt, dt);
 //  {
 //    char buf[BUFSIZ];
 //    sprintf(buf, "grad%d.rsf", iter);
