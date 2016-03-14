@@ -6,6 +6,7 @@ bin_list = [
 			("essfwi-enq", "main-essfwi-enquist2d.cpp"),
 			("essfwi-new", "main-essfwi2d-new.cpp"),
 			("enfwi", "main-enfwi.cpp"),
+			("enfwi-regu", "main-enfwi-regu.cpp"),
 			("essfwi-sponge", "main-essfwi-sponge.cpp"),
 			("essfwi-sponge-grad", "main-essfwi-sponge-grad.cpp"),
 
