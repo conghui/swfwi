@@ -20,6 +20,8 @@ essfwiframework.cpp
 Matrix.cpp
 calgainmatrix.cpp
 dgesvd.cpp
+essfwiregu.cpp
+ReguFactor.cpp
           """.split()
 
 include_dir = [

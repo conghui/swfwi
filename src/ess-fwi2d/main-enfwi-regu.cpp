@@ -17,16 +17,21 @@ extern "C" {
 #include "damp4t10d.h"
 #include "sf-velocity-reader.h"
 #include "ricker-wavelet.h"
-#include "essfwiframework.h"
+#include "essfwiregu.h"
 #include "shotdata-reader.h"
 #include "sfutil.h"
 #include "sum.h"
 #include "Matrix.h"
 #include "calgainmatrix.h"
 #include "preserved-alpha.h"
+#include "ReguFactor.h"
+#include "random-code.h"
+#include "encoder.h"
+#include "common.h"
 
 static const int N = 2;
 static const int enkf_update_every_essfwi_iter = 1;
+static const float initLambdaRatio = 0.5;
 
 //static void initVelSet(const fwi_config_t &config, std::vector<float *> &velSet, int N, int modelSize) {
 //  TRACE() << "add perturbation to initial velocity";
@@ -61,6 +66,26 @@ template <typename E>
 float velRecover(float vel, float dx, float dt) {
   float t = dx * dx / (dt * dt * vel);
   return std::sqrt(t);
+}
+
+template <typename T>
+float variance(const T *A_Begin, const T *A_End, const T *B_Begin) {
+  float v = 0;
+
+  for (; A_Begin != A_End; ++A_Begin, ++B_Begin) {
+    v += (*A_Begin - *B_Begin) * (*A_Begin - *B_Begin);
+  }
+
+  return v;
+}
+
+
+template <typename T>
+T variance(const std::vector<T> &A, const std::vector<T> &B) {
+  const T *A_begin = &A[0];
+  const T *A_end   = &A[A.size() - 1] + 1;
+  const T *B_begin = &B[0];
+  return variance(A_begin, A_end, B_begin);
 }
 
 template <typename E>
@@ -102,7 +127,12 @@ static void writeVelocity(const std::string &fn, const float *cur_vel, int nx, i
   sfFloatWrite2d(fn.c_str(), &tmp_vel[0], nz, nx);
 }
 
-void enkf_analyze(Damp4t10d &fm, const std::vector<float> &wlt, const std::vector<float> &dobs, std::vector<float *> &velSet, int modelSize, int iter) {
+void initRatioPerturb(const Matrix &ratioSet, Matrix &ratioPerturb) {
+  initGamma(ratioSet, ratioPerturb);
+}
+
+void enkf_analyze(Damp4t10d &fm, const std::vector<float> &wlt, const std::vector<float> &dobs, std::vector<float *> &velSet,
+    Matrix &lambdaSet, Matrix &ratioSet, int modelSize, int iter) {
   float dt = fm.getdt();
   float dx = fm.getdx();
 
@@ -145,6 +175,32 @@ void enkf_analyze(Damp4t10d &fm, const std::vector<float> &wlt, const std::vecto
             (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
 
     std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
+  }
+
+  TRACE() << "updating ratioset";
+  Matrix ratio_Perturb(N, 2);
+  initRatioPerturb(ratioSet, ratio_Perturb);
+
+  Matrix t6(N, 2);
+  alpha_A_B_plus_beta_C(1, ratio_Perturb, gainMatrix, 0, t6);
+
+  A_plus_B(ratioSet, t6, ratioSet);
+
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  float lambdaX = 0;
+  float lambdaZ = 0;
+  TRACE() << "updating lamdaset";
+  for (int i = 0; i < N; i++) {
+    ReguFactor fac(velSet[i], nx, nz, lambdaX, lambdaZ);
+    Matrix::value_type *pLambda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    Matrix::value_type *pRatio  = ratioSet.getData()  + i * ratioSet.getNumRow();
+    pLambda[0] = pRatio[0] * resdSet[i] / fac.getWx2();
+    pLambda[1] = pRatio[1] * resdSet[i] / fac.getWz2();
+    DEBUG() << "PRATIO[0] " << pRatio[0];
+    DEBUG() << "PRESD[i] " << resdSet[i];
+    DEBUG() << "PLAMBDA[0] " << pLambda[0];
+    DEBUG() << "";
   }
 
 } /// end of function
@@ -190,6 +246,107 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
 
   return velSet;
 }
+
+static void forwardModeling(const Damp4t10d &fmMethod,
+    const std::vector<float> &encSrc,
+    std::vector<float> &dobs /* output (fast: ng, slow: nt) */)
+{
+    int nx = fmMethod.getnx();
+    int nz = fmMethod.getnz();
+    int ns = fmMethod.getns();
+    int ng = fmMethod.getng();
+    int nt = fmMethod.getnt();
+
+    std::vector<float> p0(nz * nx, 0);
+    std::vector<float> p1(nz * nx, 0);
+
+    for(int it=0; it<nt; it++) {
+
+      fmMethod.addEncodedSource(&p1[0], &encSrc[it * ns]);
+
+      fmMethod.stepForward(&p0[0], &p1[0]);
+
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
+
+      std::swap(p1, p0);
+
+    }
+
+}
+
+void initLambdaSet(const Damp4t10d &fm, const std::vector<float> &wlt,
+    const std::vector<float> &dobs, std::vector<float *> &velSet, Matrix &lambdaSet,
+                   const Matrix &ratioSet, int enkf_samples) {
+  DEBUG() << "initial lambda ratio is: " << ratioSet.getData()[0];
+
+  int ng = fm.getng();
+  int nt = fm.getnt();
+  int ns = fm.getns();
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  int modelSize = nx * nz;
+  int diffColDiffCodes = 0;
+
+  int N = velSet.size();
+  std::vector<std::vector<int> > codes(N);
+  assert(N == enkf_samples);
+
+  int numDataSamples = ng * nt;
+  std::vector<float> obsData(numDataSamples);
+  std::vector<float> synData(numDataSamples);
+
+  for (int i = 0; i < enkf_samples; i++) {
+    DEBUG() << format("init Lambda on velocity %2d/%d") % (i + 1) % velSet.size();
+
+    TRACE() << "making encoded shot, both sources and receivers";
+    codes[i] = RandomCode::genPlus1Minus1(ns);
+    std::copy(codes[i].begin(), codes[i].end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
+
+    Encoder encoder(codes[0]);
+    std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+
+
+    TRACE() << "save encoded data";
+    std::vector<float> trans(encobs.size());
+    matrix_transpose(&encobs[0], &trans[0], ng, nt);
+    const float *p= &trans[0];
+    std::copy(p, p + numDataSamples, obsData.begin());
+
+    TRACE() << "expand velocity and shot";
+
+    TRACE() << "forward modeling";
+    std::vector<float> dcal(encobs.size(), 0);
+
+    ///// this decrease the performance ///
+    Damp4t10d newfm = fm;
+    Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
+    newfm.bindVelocity(curvel);
+    forwardModeling(newfm, encsrc, dcal);
+    matrix_transpose(&dcal[0], &trans[0], ng, nt);
+
+    std::copy(p, p + numDataSamples, synData.begin());
+
+    TRACE() << "calculate the data residule";
+    float resd = variance(obsData, synData);
+
+    TRACE() << "create regularization factor";
+    ReguFactor reguFac(velSet[i], nx, nz);
+    float Wx2 = reguFac.getWx2();
+    float Wz2 = reguFac.getWz2();
+
+    TRACE() << "update LambdaSet";
+    assert(lambdaSet.getNumCol() == enkf_samples);
+    Matrix::value_type *plamda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    const Matrix::value_type *pratio = ratioSet.getData() + i * ratioSet.getNumRow();
+    plamda[0] = pratio[0] * resd / Wx2; /// lambdaX
+    plamda[1] = pratio[1] * resd / Wz2; /// lamdaZ
+    DEBUG() << "pratio[0] " << pratio[0];
+    DEBUG() << "plambda[0] " << plamda[0];
+
+  }
+} /// end of function
+
 
 int main(int argc, char *argv[]) {
 
@@ -242,19 +399,27 @@ int main(int argc, char *argv[]) {
   std::vector<float *> velSet = generateVelSet(veldb);
   ////////
 
+  TRACE() << "Init ratio (mu) Set";
+  Matrix ratioSet(N, 2);  /// 0 for muX, 1 for muZ
+  std::fill(ratioSet.getData(), ratioSet.getData() + ratioSet.size(), initLambdaRatio);
+
+  TRACE() << "init lambda set";
+  Matrix lambdaSet(N, 2); /// 0 for lambdaX, 1 for lambdaZ
+  initLambdaSet(fmMethod, wlt, dobs, velSet, lambdaSet, ratioSet, N);
+
   TRACE() << "go through ENKF to update velocity set";
-  enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, 1);
+  enkf_analyze(fmMethod, wlt, dobs, velSet, lambdaSet, ratioSet, modelSize, 1);
 
   float *vel = createAMean(velSet, modelSize);
   writeVelocity("meamvel0.rsf", vel, exvel.nx, exvel.nz, dx, dt);
   finalizeAMean(vel);
 
   std::vector<Damp4t10d *> fms(N);
-  std::vector<EssFwiFramework *> essfwis(N);
+  std::vector<EssFwiRegu *> essfwis(N);
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
     fms[i]->bindVelocity(*veldb[i]);
-    essfwis[i] = new EssFwiFramework(*fms[i], wlt, dobs);
+    essfwis[i] = new EssFwiRegu(*fms[i], wlt, dobs);
   }
 
   TRACE() << "iterate the remaining iteration";
@@ -263,12 +428,15 @@ int main(int argc, char *argv[]) {
     DEBUG() << "\n\n\n\n\n\n\n";
 
     for (int ivel = 0; ivel < N; ivel++) {
-      essfwis[ivel]->epoch(iter, ivel);
+      const Matrix::value_type *lambda = lambdaSet.getData() + ivel * lambdaSet.getNumRow();
+      float lambdaX = lambda[0];
+      float lambdaZ = lambda[1];
+      essfwis[ivel]->epoch(iter, ivel, lambdaX, lambdaZ);
 //      epoch(config, velSet[i], NULL, curr_gradient, update_direction, iter, i + 1, N, gradUpdator);
     }
     TRACE() << "enkf analyze and update velocity";
     if (iter % enkf_update_every_essfwi_iter == 0) {
-      enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, iter + 1);
+      enkf_analyze(fmMethod, wlt, dobs, velSet, lambdaSet, ratioSet, modelSize, iter + 1);
 
 //      TRACE() << "assign the average of all stored alpha to each sample";
 //      float *p = &PreservedAlpha::instance().getAlpha()[0];

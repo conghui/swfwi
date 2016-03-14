@@ -1,11 +1,11 @@
 /*
- * essfwiframework.cpp
+ * essfwiregu.cpp
  *
- *  Created on: Mar 10, 2016
+ *  Created on: Mar 14, 2016
  *      Author: rice
  */
 
-#include "essfwiframework.h"
+#include "essfwiregu.h"
 
 
 
@@ -41,11 +41,15 @@ extern "C"
 #include "sfutil.h"
 #include "aux.h"
 #include "preserved-alpha.h"
+#include "ReguFactor.h"
 
-std::vector<float> EssFwiFramework::g0;          /// gradient in previous step
-std::vector<float> EssFwiFramework::updateDirection;
+std::vector<float> EssFwiRegu::g0;          /// gradient in previous step
+std::vector<float> EssFwiRegu::updateDirection;
 
 namespace {
+
+static float g_lambdaX;
+static float g_lambdaZ;
 
 static const int max_iter_select_alpha3 = 5;
 static const float vmax = 5500;
@@ -434,6 +438,9 @@ int calculate_obj_val(const Damp4t10d &fmMethod,
   vectorMinus(encobs, dcal, vdiff);
   float val = cal_objective(&vdiff[0], vdiff.size());
 
+  ReguFactor fac(new_vel, nx, nz, g_lambdaX, g_lambdaZ);
+  val += fac.getReguTerm();
+
   DEBUG() << format("curr_alpha = %e, pure object value = %e") % steplen % val;
 
   *obj_val_out = val;
@@ -646,7 +653,7 @@ float calStepLen(const Damp4t10d &fmMethod,
 
 }
 
-EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_wlt,
+EssFwiRegu::EssFwiRegu(Damp4t10d &method, const std::vector<float> &_wlt,
     const std::vector<float> &_dobs) :
     fmMethod(method), wlt(_wlt), dobs(_dobs),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
@@ -657,7 +664,12 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const std::vector<float> &_w
   updateDirection.resize(nx*nz, 0);
 }
 
-void EssFwiFramework::epoch(int iter, int ivel) {
+void EssFwiRegu::epoch(int iter, int ivel, float lambdaX, float lambdaZ) {
+
+  g_lambdaX = lambdaX;
+  g_lambdaZ = lambdaZ;
+
+  Velocity &exvel = fmMethod.getVelocity();
 
   // create random codes
   const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
@@ -704,25 +716,31 @@ void EssFwiFramework::epoch(int iter, int ivel) {
   DEBUG() << format("obj: %e") % obj1;
 //  exit(0);
 //
+  ReguFactor fac(&exvel.dat[0], nx, nz, lambdaX, lambdaZ);
+  obj1 += fac.getReguTerm();
+
   transVsrc(vsrc, nt, ng, dt);
 //
   forwardPropagate(fmMethod, encsrc);
 //
   std::vector<float> g1(nx * nz, 0);
   hello(fmMethod, encsrc, vsrc, g1, nt, dt);
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "grad%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//  }
+  {
+    char buf[BUFSIZ];
+    sprintf(buf, "grad%d.rsf", iter);
+//    sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+  }
 ////    exit(0);
 //
+  std::transform(g1.begin(), g1.end(), fac.getReguGradient(), g1.begin(), std::plus<float>());
+
   fmMethod.maskGradient(&g1[0]);
-//  {
-//    char buf[BUFSIZ];
-//    sprintf(buf, "mgrad%d.rsf", iter);
-//    //sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
-//  }
+  {
+    char buf[BUFSIZ];
+    sprintf(buf, "mgrad%d.rsf", iter);
+//    sfFloatWrite2d(buf, &g1[0], exvel.nz, exvel.nx);
+  }
+//  exit(0);
 //
 //
 //  {
@@ -749,7 +767,6 @@ void EssFwiFramework::epoch(int iter, int ivel) {
   DEBUG() << format("vmax: %f, vmin: %f, minv: %f, maxv: %f") % vmax % vmin % min_vel % max_vel;
   float steplen = calStepLen(fmMethod, encsrc, encobs, updateDirection, iter, ivel, obj1, min_vel, max_vel);
 
-  Velocity &exvel = fmMethod.getVelocity();
   TRACE() << "Update velocity model";
   update_vel(&exvel.dat[0], &updateDirection[0], exvel.dat.size(), steplen, min_vel, max_vel, &exvel.dat[0]);
 ////    sfFloatWrite2d("updatevel.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
@@ -758,6 +775,6 @@ void EssFwiFramework::epoch(int iter, int ivel) {
 ////    sfFloatWrite2d("updatevel-refilled.rsf", &exvel.dat[0], exvel.nz, exvel.nx);
 }
 
-void EssFwiFramework::writeVel(sf_file file) const {
+void EssFwiRegu::writeVel(sf_file file) const {
   fmMethod.sfWriteVel(file);
 }
