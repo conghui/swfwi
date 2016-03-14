@@ -14,6 +14,6 @@ std::vector<int> RandomCode::genPlus1Minus1(int nshots) {
     int v = (static_cast<float>(rand()) / RAND_MAX) > 0.5 ? 1 : -1;
     codes[i] = v;
   }
-  codes[0] = 1;
+//  codes[0] = 1;
   return codes;
 }
