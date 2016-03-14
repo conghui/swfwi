@@ -39,7 +39,7 @@ extern "C"
 
 namespace {
 
-void prevCurrCorrDirection(float *pre_gradient, const float *cur_gradient, float *update_direction,
+void updateGrad(float *pre_gradient, const float *cur_gradient, float *update_direction,
                            int model_size, int iter) {
   if (iter == 0) {
     std::copy(cur_gradient, cur_gradient + model_size, update_direction);
@@ -117,18 +117,18 @@ void calgradient(const Damp4t10d &fmMethod,
     std::vector<float> &g0,
     int nt, float dt)
 {
-  int nxpad = fmMethod.getnx();
-  int nzpad = fmMethod.getnz();
+  int nx = fmMethod.getnx();
+  int nz = fmMethod.getnz();
   int ns = fmMethod.getns();
   int ng = fmMethod.getng();
   const ShotPosition &allGeoPos = fmMethod.getAllGeoPos();
   const ShotPosition &allSrcPos = fmMethod.getAllSrcPos();
 
   std::vector<float> bndr = fmMethod.initBndryVector(nt);
-  std::vector<float> sp0(nzpad * nxpad, 0);
-  std::vector<float> sp1(nzpad * nxpad, 0);
-  std::vector<float> gp0(nzpad * nxpad, 0);
-  std::vector<float> gp1(nzpad * nxpad, 0);
+  std::vector<float> sp0(nz * nx, 0);
+  std::vector<float> sp1(nz * nx, 0);
+  std::vector<float> gp0(nz * nx, 0);
+  std::vector<float> gp1(nz * nx, 0);
 
 
   for(int it=0; it<nt; it++) {
@@ -158,7 +158,6 @@ void calgradient(const Damp4t10d &fmMethod,
     } else {
       break;
     }
-
  }
 }
 
@@ -201,12 +200,11 @@ void EssFwiFramework::epoch(int iter) {
 
   fmMethod.maskGradient(&g1[0]);
 
-  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+  updateGrad(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
   updateStenlelOp.bindEncSrcObs(encsrc, encobs);
   float steplen = updateStenlelOp.calsteplen(updateDirection, obj1, iter);
 
-  TRACE() << "Update velocity model";
   Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);
 
