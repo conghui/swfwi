@@ -2,9 +2,8 @@ import os
 Import('*')
 
 bin_list = [
-			("essfwi", "main-essfwi2d.cpp"),
+			("essfwi", "main-essfwi.cpp"),
 			("essfwi-enq", "main-essfwi-enquist2d.cpp"),
-			("essfwi-new", "main-essfwi2d-new.cpp"),
 			("enfwi", "main-enfwi.cpp"),
 			("enfwi-regu", "main-enfwi-regu.cpp"),
 			("essfwi-sponge", "main-essfwi-sponge.cpp"),
