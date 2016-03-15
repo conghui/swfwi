@@ -383,7 +383,7 @@ int main(int argc, char *argv[]) {
   }
 
   TRACE() << "iterate the remaining iteration";
-  for (int iter = 1; iter <= params.niter; iter++) {
+  for (int iter = 0; iter < params.niter; iter++) {
     TRACE() << "FWI for each velocity";
     DEBUG() << "\n\n\n\n\n\n\n";
 
