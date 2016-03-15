@@ -107,39 +107,22 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
 
   std::vector<std::vector<int> > codes(N);
   Matrix HOnA(N, numDataSamples);
-  Matrix HOnAMean(N, numDataSamples);
   Matrix D(N, numDataSamples);
 
   DEBUG() << "total samples in receivers: " << numDataSamples;
   TRACE() << "use different codes for different column";
 
-  int diffColDiffCodes = 0;
-  int use_H_on_Amean = 0;
-  INFO() << (diffColDiffCodes ? "different codes" : "same codes") << " for different velocity";
-  INFO() << (use_H_on_Amean ? "" : "Not") << " apply forward modeling on AMean";
-
   for (int i = 0; i < N; i++) {
     int ns = fm.getns();
     DEBUG() << format("calculate HA on velocity %2d/%d") % (i + 1) % velSet.size();
 
-    TRACE() << "making encoded shot, both sources and receivers";
+    /// "making encoded shot, both sources and receivers";
     codes[i] = RandomCode::genPlus1Minus1(ns);
-    std::copy(codes[i].begin(), codes[i].end(), std::ostream_iterator<int>(std::cout, ", ")); std::cout << "\n";
-
     Encoder encoder(codes[0]);
     std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
     std::vector<float> encsrc  = encoder.encodeSource(wlt);
 
-    {
-      char buf[256];
-      sprintf(buf, "encsrc%d.rsf", i);
-//      sfFloatWrite1d(buf, &encsrc[0], encsrc.size());
-
-      sprintf(buf, "encobs%d.rsf", i);
-//      sfFloatWrite2d(buf, &encobs[0], ng, nt);
-    }
-
-    TRACE() << "save encoded data";
+    /// "save encoded data";
     std::vector<float> trans(encobs.size());
     matrix_transpose(&encobs[0], &trans[0], ng, nt);
     const float *pdata = &trans[0];
@@ -147,7 +130,7 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
 
     DEBUG() << format("sum D %.20f") % getSum(D);
 
-    TRACE() << "H operate on A, and store data in HOnA";
+    /// "H operate on A, and store data in HOnA";
     std::vector<float> dcal(encobs.size(), 0);
 
     ///// this decrease the performance ///
@@ -163,7 +146,6 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
 
   DEBUG() << "sum of D: " << getSum(D);
   DEBUG() << "sum of HOnA: " << getSum(HOnA);
-  DEBUG() << "sum of HOnAMean: " << getSum(HOnAMean);
 
   Matrix HA_Perturb(N, numDataSamples);
   initGamma(HOnA, HA_Perturb);

@@ -114,16 +114,22 @@ Params::Params() {
   /**
    * output parameters
    */
-  sf_putint(vupdates, "n1", nz);
-  sf_putint(vupdates, "n2", nx);
+  sf_putint(vupdates,   "n1", nz);
+  sf_putint(vupdates,   "n2", nx);
+  sf_putint(vupdates,   "n3", nsample);
+  sf_putint(vupdates,   "n4", niter);
   sf_putfloat(vupdates, "d1", dz);
   sf_putfloat(vupdates, "d2", dx);
+  sf_putint(vupdates,   "d3", 1);
+  sf_putint(vupdates,   "d4", 1);
+  sf_putint(vupdates,   "o1", 0);
+  sf_putint(vupdates,   "o2", 0);
+  sf_putint(vupdates,   "o3", 0);
+  sf_putint(vupdates,   "o4", 0);
   sf_putstring(vupdates, "label1", "Depth");
   sf_putstring(vupdates, "label2", "Distance");
-  sf_putstring(vupdates, "label3", "Iteration");
-  sf_putint(vupdates, "n3", niter);
-  sf_putint(vupdates, "d3", 1);
-  sf_putint(vupdates, "o3", 1);
+  sf_putstring(vupdates, "label3", "Sample");
+  sf_putstring(vupdates, "label4", "Iteration");
   sf_putint(objs, "n1", niter);
   sf_putint(objs, "n2", 1);
   sf_putfloat(objs, "d1", 1);
@@ -149,15 +155,6 @@ void Params::check() {
 }
 
 } /// end of name space
-
-
-//static void writeVelocity(const std::string &fn, const float *cur_vel, int nx, int nz, float dx, float dt) {
-//  int tmp_size = nx * nz;
-//  std::vector<float> tmp_vel(tmp_size);
-//  std::transform(cur_vel, cur_vel + tmp_size, tmp_vel.begin(), boost::bind(velRecover<float>, _1, dx, dt));
-//
-//  sfFloatWrite2d(fn.c_str(), &tmp_vel[0], nz, nx);
-//}
 
 
 std::vector<Velocity *> createVelDB(const Velocity &vel, const char *perin, int N, float dx, float dt) {
@@ -226,33 +223,21 @@ int main(int argc, char *argv[]) {
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
   Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
-
+  std::vector<float> wlt = rickerWavelet(nt, fm, dt, params.amp);
   SfVelocityReader velReader(params.vinit);
-  Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
-  Velocity exvel = fmMethod.expandDomain(v0);
+  Velocity exvel = fmMethod.expandDomain(SfVelocityReader::read(params.vinit, nx, nz));
   fmMethod.bindVelocity(exvel);
-
-  std::vector<float> wlt(nt);
-  rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
-
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
-
-  int modelSize = fmMethod.getnx() * fmMethod.getnz();
-  TRACE() << "init velocity set";
-  DEBUG() << "model size " << modelSize;
-
-  //////// use my functions
-  std::vector<Velocity *> veldb = createVelDB(exvel, params.perin, N, dx, dt);
-  std::vector<float *> velSet = generateVelSet(veldb);
-  ////////
-
 
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
   UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
 
+  std::vector<Velocity *> veldb = createVelDB(exvel, params.perin, N, dx, dt);
+  std::vector<float *> velSet = generateVelSet(veldb);
   std::vector<Damp4t10d *> fms(N);
   std::vector<EssFwiFramework *> essfwis(N);
+
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
     fms[i]->bindVelocity(*veldb[i]);
@@ -260,8 +245,6 @@ int main(int argc, char *argv[]) {
   }
 
   EnkfAnalyze enkfAnly(fmMethod, wlt, dobs, sigfac);
-
-  TRACE() << "go through ENKF to update velocity set";
   enkfAnly.analyze(velSet);
 
   TRACE() << "iterate the remaining iteration";
@@ -271,6 +254,7 @@ int main(int argc, char *argv[]) {
 
     for (int ivel = 0; ivel < N; ivel++) {
       essfwis[ivel]->epoch(iter);
+      essfwis[ivel]->writeVel(params.vupdates);
     }
 
     TRACE() << "enkf analyze and update velocity";
@@ -298,7 +282,7 @@ int main(int argc, char *argv[]) {
 //    finalizeAMean(vel);
   }
 
-  sf_close();
+//  sf_close();
 
   return 0;
 }

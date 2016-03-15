@@ -72,8 +72,8 @@ int main(int argc, char* argv[])
     for(int it=0; it<nt; it++) {
       fmMethod.addSource(&p1[0], &wlt[it], curSrcPos);
       fmMethod.stepForward(&p0[0], &p1[0]);
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
       std::swap(p1, p0);
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
     }
 
     matrix_transpose(&dobs[0], &trans[0], ng, nt);

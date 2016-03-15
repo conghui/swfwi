@@ -25,7 +25,11 @@ Flow('vel','marmvel.hh',
   put label1=Depth  unit1=m label2=Lateral unit2=m
   ''')
 
-Flow('smvel','vel','smooth rect1=25 rect2=60')
+Flow('smvel', 'vel', '''
+  math output="1/input" |
+  smooth rect1=25 rect2=60 |
+  math output="1/input"
+  ''')
 plot('vel', 'Marmousi model')
 plot('smvel', 'Smoothed model')
 Result('marm', 'vel smvel', 'OverUnderAniso')
@@ -40,16 +44,26 @@ mkdir(checkpointdir)
 
 task = ARGUMENTS.get('task')
 if task == 'fm':
-  system('''./fm-damp vinit=vel.rsf shots=shots.rsf
+  system('''../../../bin/fm-damp vinit=vel.rsf shots=shots.rsf
   fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=30
   sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
   '''.replace('\n', ' '))
 elif task == 'essfwi':
-  system('''./essfwi vin=smvel.rsf  shots=shots.rsf
-  grads=grads.rsf objs=objs.rsf illums=illums.rsf
-  niter=300 nb=30 vout=vsnaps.rsf
+  system('''../../../bin/essfwi vin=smvel.rsf shots=shots.rsf
+  vout=vsnaps.rsf objs=objs.rsf vmin=1500 vmax=5500 maxdv=200 nita=5
+  niter=3 nb=30 seed=10
+  '''.replace('\n', ''))
+elif task == 'enfwi':
+  system('''../../../bin/enfwi vin=smvel.rsf shots=shots.rsf
+  vout=vsnaps.rsf objs=objs.rsf vmin=1500 vmax=5500 maxdv=200 nita=5
+  niter=2 nb=30 seed=10
+  sigfac=0.2 niterenkf=1 nsample=2 perin=./velPerturb_20.bin
   '''.replace('\n', ''))
 
+#plot('vel3', 'vel 3')
+#plot('vsnaps', 'vel')
+#plot('illums', 'illum')
+#plot('grads', 'grad')
 
 #Flow('shots','vel',
   #'''
