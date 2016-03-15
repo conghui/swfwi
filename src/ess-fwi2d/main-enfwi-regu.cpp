@@ -33,28 +33,6 @@ static const int N = 2;
 static const int enkf_update_every_essfwi_iter = 1;
 static const float initLambdaRatio = 0.5;
 
-//static void initVelSet(const fwi_config_t &config, std::vector<float *> &velSet, int N, int modelSize) {
-//  TRACE() << "add perturbation to initial velocity";
-//  const std::string fn = "velPerturb_" + to_str(N) + ".bin";
-//  std::ifstream ifs(fn.c_str());
-//  if (!ifs) {
-//    ERROR() << "cannot open file: " << fn;
-//    exit(EXIT_FAILURE);
-//  }
-//
-//  std::vector<float> tmp(modelSize);
-//  std::vector<float> velOrig(config.init_vel, config.init_vel + modelSize);
-//  std::transform(velOrig.begin(), velOrig.end(), velOrig.begin(),
-//                 boost::bind(velRecover<float>, _1, config.fwi_dim.dx, config.dt));
-//
-//  for (std::vector<float *>::iterator it = velSet.begin(); it != velSet.end(); ++it) {
-//    float *ret = *it;
-//    ifs.read(reinterpret_cast<char *>(&tmp[0]), modelSize * sizeof(tmp[0]));
-//    std::transform(tmp.begin(), tmp.end(), velOrig.begin(), ret, std::plus<float>());
-//    std::transform(ret, ret + modelSize, ret, boost::bind(velTrans<float>, _1, config.fwi_dim.dx, config.dt));
-//  }
-//  ifs.close();
-//}
 template <typename T>
 std::string to_str(T val) {
   std::stringstream ss;
@@ -381,7 +359,6 @@ int main(int argc, char *argv[]) {
   Velocity v0 = SfVelocityReader::read(params.vinit, nx, nz);
   Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
-
 
 
   std::vector<float> wlt(nt);
