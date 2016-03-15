@@ -43,11 +43,6 @@
 static const float enkf_sigma_factor = 0.2;
 
 template <typename T>
-bool abs_less(T a, T b) {
-  return std::abs(a) < std::abs(b);
-}
-
-template <typename T>
 float variance(const T *A_Begin, const T *A_End, const T *B_Begin) {
   float v = 0;
 
@@ -117,9 +112,10 @@ static void forwardModeling(const Damp4t10d &fmMethod,
 
       fmMethod.stepForward(&p0[0], &p1[0]);
 
+      std::swap(p1, p0);
+
       fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
 
-      std::swap(p1, p0);
 
     }
 
@@ -193,7 +189,7 @@ Matrix calGainMatrix(const Damp4t10d &fm, const std::vector<float> &wlt, const s
     const Matrix::value_type *synDataBegin = HOnA.getData() + i * numDataSamples;
     resdSet[i] = variance(obsDataBegin, obsDataEnd, synDataBegin);
 
-    DEBUG() << format("resdSet[%d] %.20f") % i % resdSet[i];
+//    DEBUG() << format("resdSet[%d] %.20f") % i % resdSet[i];
   }
 
   DEBUG() << "sum of D: " << getSum(D);

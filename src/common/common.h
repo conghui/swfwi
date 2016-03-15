@@ -11,10 +11,27 @@
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include <cmath>
 
 template <typename T>
 void vectorMinus(const std::vector<T> &dobs, const std::vector<T> &dcal, std::vector<T> &vsrc) {
   std::transform(dobs.begin(), dobs.end(), dcal.begin(), vsrc.begin(), std::minus<T>());
+}
+
+template <typename E>
+float velRecover(float vel, float dx, float dt) {
+  float t = dx * dx / (dt * dt * vel);
+  return std::sqrt(t);
+}
+
+template <typename E>
+float velTrans(float vel, float dx, float dt) {
+  return dx * dx / (dt * dt * vel * vel);
+}
+
+template <typename T>
+bool abs_less(T a, T b) {
+  return std::abs(a) < std::abs(b);
 }
 
 void matrix_transpose(float *matrix, float *trans, int n1, int n2);

@@ -23,6 +23,7 @@ essfwiregu.cpp
 ReguFactor.cpp
 updatevelop.cpp
 updatesteplenop.cpp
+enkfanalyze.cpp
           """.split()
 
 include_dir = [

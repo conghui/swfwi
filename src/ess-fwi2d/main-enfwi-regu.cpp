@@ -40,11 +40,6 @@ std::string to_str(T val) {
   return ss.str();
 }
 
-template <typename E>
-float velRecover(float vel, float dx, float dt) {
-  float t = dx * dx / (dt * dt * vel);
-  return std::sqrt(t);
-}
 
 template <typename T>
 float variance(const T *A_Begin, const T *A_End, const T *B_Begin) {
@@ -65,12 +60,6 @@ T variance(const std::vector<T> &A, const std::vector<T> &B) {
   const T *B_begin = &B[0];
   return variance(A_begin, A_end, B_begin);
 }
-
-template <typename E>
-float velTrans(float vel, float dx, float dt) {
-  return dx * dx / (dt * dt * vel * vel);
-}
-
 
 static float *createAMean(const std::vector<float *> &velSet, int modelSize) {
   float *ret = (float *)malloc(modelSize * sizeof * ret);
