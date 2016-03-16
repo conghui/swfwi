@@ -2,6 +2,7 @@ extern "C" {
 #include <rsf.h>
 }
 
+#include <mpi.h>
 #include <cstdlib>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
@@ -71,6 +72,11 @@ public: // parameters from input files
   int jsz;
   int jgx;
   int jgz;
+
+public:
+  int rank;
+  int k;
+  int np;
 };
 
 Params::Params() {
@@ -135,6 +141,10 @@ Params::Params() {
   sf_putfloat(objs, "d1", 1);
   sf_putfloat(objs, "o1", 1);
 
+  MPI_Comm_size(MPI_COMM_WORLD, &np);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  k = std::ceil(static_cast<float>(nsample) / np);
+
   check();
 }
 
@@ -196,6 +206,7 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
 }
 
 int main(int argc, char *argv[]) {
+  MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
   Logger::instance().init("enfwi");
 
@@ -217,6 +228,7 @@ int main(int argc, char *argv[]) {
   int nita = params.nita;
   int N = params.nsample;
   int niterenkf = params.niterenkf;
+  int rank = params.rank;
 
   srand(params.seed);
 
@@ -224,11 +236,20 @@ int main(int argc, char *argv[]) {
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
   Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
   std::vector<float> wlt = rickerWavelet(nt, fm, dt, params.amp);
+
+  /// read and broadcast velocity
   SfVelocityReader velReader(params.vinit);
-  Velocity exvel = fmMethod.expandDomain(SfVelocityReader::read(params.vinit, nx, nz));
+  Velocity v0(nx, nz);
+  velReader.readAndBcast(&v0.dat[0], nx * nz, 0);
+  Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
+
+  /// read and broadcast dobs
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
-  ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
+  if (rank == 0) {
+    ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
+  }
+  MPI_Bcast(&dobs[0], dobs.size(), MPI_FLOAT, 0, MPI_COMM_WORLD);
 
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
   UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
