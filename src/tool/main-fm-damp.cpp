@@ -36,8 +36,6 @@ public:
 private:
   Params(const Params &);
   void operator=(const Params &);
-  void getInputParams();
-  void putOutputParams();
   void check();
 
 public:
@@ -143,6 +141,30 @@ Params::Params() {
   /* x-begining index of receivers, starting from 0 */
   if (!sf_getint("gzbeg",&gzbeg))   sf_error("no gzbeg");
   /* z-begining index of receivers, starting from 0 */
+
+  sf_putint(shots,"n1",nt);
+  sf_putint(shots,"n2",ng);
+  sf_putint(shots,"n3",ns);
+  sf_putfloat(shots,"d1",dt);
+  sf_putfloat(shots,"d2",jgx*dx);
+  sf_putfloat(shots,"o1",0);
+  sf_putfloat(shots,"o2",0);
+  sf_putstring(shots,"label1","Time");
+  sf_putstring(shots,"label2","Lateral");
+  sf_putstring(shots,"label3","Shot");
+  sf_putstring(shots,"unit1","sec");
+  sf_putstring(shots,"unit2","m");
+  sf_putfloat(shots,"amp",amp);
+  sf_putfloat(shots,"fm",fm);
+  sf_putint(shots,"ng",ng);
+  sf_putint(shots,"szbeg",szbeg);
+  sf_putint(shots,"sxbeg",sxbeg);
+  sf_putint(shots,"gzbeg",gzbeg);
+  sf_putint(shots,"gxbeg",gxbeg);
+  sf_putint(shots,"jsx",jsx);
+  sf_putint(shots,"jsz",jsz);
+  sf_putint(shots,"jgx",jgx);
+  sf_putint(shots,"jgz",jgz);
 
   check();
 }
