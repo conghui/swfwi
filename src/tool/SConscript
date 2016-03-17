@@ -2,19 +2,15 @@ import os
 Import('*')
 
 bin_list = [
-			("mshot", "Mmshots.cpp"), 
 			("fm-damp", "main-fm-damp.cpp"),
-			("fm-enq", "main-fm-enquist.cpp"),
-			("fm-sponge", "main-fm-sponge.cpp"),
-			("fm-sponge-grad", "main-fm-sponge-grad.cpp"),
+			("essfwi-damp", "main-essfwi-damp.cpp"),
+			("enfwi-damp", "main-enfwi-damp.cpp"),
 
            ]
 
-lib = 'fm'
+lib = 'tool'
 
 modules = """
-fm-params.cpp
-
           """.split()
 
 include_dir = [
@@ -23,10 +19,11 @@ include_dir = [
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
+  '#' + dirs['ess-fwi'],
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['modeling', 'common', 'mdlib', 'util', 'rsf']
+depend_libs = ['essfwi', 'modeling', 'common', 'mdlib', 'util', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)

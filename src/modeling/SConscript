@@ -4,13 +4,7 @@ Import('*')
 lib = "modeling"
 # these modules will compiled in to library
 lib_modules = """
-			  i-modeling.cpp
-			  spongeabc4d.cpp
 			  damp4t10d.cpp
-			  enquistabc2d.cpp
-			  zjh4t10dsponge.cpp
-			  zjh4t10dspongevelnotrans.cpp
-			  damp4t10dnotrans.cpp
               """.split()
 
 extra_include_dir = [

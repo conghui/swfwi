@@ -50,10 +50,8 @@ mkl_root = os.environ['INSTALL_ROOT'] + '/softs/install/intel/mkl/'
 dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
-   ('mpi-fwi', 'src/mpi-fwi2d'),
    ('ess-fwi', 'src/ess-fwi2d'),
-   ('serial-fwi', 'src/serial-fwi2d'),
-   ('fm2d', 'src/fm2d'),
+   ('tool', 'src/tool'),
    ('common', 'src/common'),
    ('modeling', 'src/modeling'),
    ('util', 'src/util'),

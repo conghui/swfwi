@@ -22,8 +22,6 @@ extern "C" {
 #include "sfutil.h"
 #include "sum.h"
 #include "Matrix.h"
-#include "calgainmatrix.h"
-#include "preserved-alpha.h"
 #include "updatevelop.h"
 #include "updatesteplenop.h"
 #include "enkfanalyze.h"

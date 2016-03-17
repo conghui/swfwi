@@ -2,25 +2,14 @@ import os
 Import('*')
 
 bin_list = [
-			("essfwi", "main-essfwi.cpp"),
-			("essfwi-enq", "main-essfwi-enquist2d.cpp"),
-			("enfwi", "main-enfwi.cpp"),
-			("enfwi-regu", "main-enfwi-regu.cpp"),
-			("essfwi-sponge", "main-essfwi-sponge.cpp"),
-			("essfwi-sponge-grad", "main-essfwi-sponge-grad.cpp"),
-
            ]
 
 lib = 'essfwi'
 
 modules = """
-essfwi-params.cpp
 essfwiframework.cpp
 Matrix.cpp
-calgainmatrix.cpp
 dgesvd.cpp
-essfwiregu.cpp
-ReguFactor.cpp
 updatevelop.cpp
 updatesteplenop.cpp
 enkfanalyze.cpp
