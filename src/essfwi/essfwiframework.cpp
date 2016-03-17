@@ -212,5 +212,5 @@ void EssFwiFramework::epoch(int iter) {
 }
 
 void EssFwiFramework::writeVel(sf_file file) const {
-  fmMethod.sfWriteVel(file);
+  fmMethod.sfWriteVel(fmMethod.getVelocity().dat, file);
 }

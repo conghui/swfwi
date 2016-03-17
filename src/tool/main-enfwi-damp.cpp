@@ -412,7 +412,8 @@ int main(int argc, char *argv[]) {
       /// output velocity
       std::vector<float *> velSet = generateVelSet(totalveldb);
       std::vector<float> vv = enkfAnly.createAMean(velSet);
-      sf_floatwrite(&vv[0], vv.size(), params.vupdates);
+
+      fmMethod.sfWriteVel(vv, params.vupdates);
     }
     scatterVelocity(veldb, totalveldb, params);
 //    MPI_Barrier(MPI_COMM_WORLD);
