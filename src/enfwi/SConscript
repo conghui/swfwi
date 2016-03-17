@@ -2,15 +2,14 @@ import os
 Import('*')
 
 bin_list = [
-			("fm-damp", "main-fm-damp.cpp"),
-			("essfwi-damp", "main-essfwi-damp.cpp"),
-			("enfwi-damp", "main-enfwi-damp.cpp"),
-
            ]
 
-lib = 'tool'
+lib = 'enfwi'
 
 modules = """
+Matrix.cpp
+dgesvd.cpp
+enkfanalyze.cpp
           """.split()
 
 include_dir = [
@@ -19,12 +18,10 @@ include_dir = [
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
-  '#' + dirs['essfwi'],
-  '#' + dirs['enfwi'],
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'util', 'rsf']
+depend_libs = ['modeling', 'mdlib', 'common', 'rsf', 'util']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
@@ -39,6 +36,7 @@ ar = myenv.StaticLibrary(target = lib, source = objs)
 
 # install
 myenv.Install("#" + dirs['lib'], ar)
+
 # compile each binary
 for bin in bin_list:
   bin_obj = myenv.StaticObject(bin[1])

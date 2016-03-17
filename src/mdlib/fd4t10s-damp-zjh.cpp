@@ -8,7 +8,6 @@
 #include <vector>
 #include <cstdio>
 #include "fd4t10s-damp-zjh.h"
-#include "sfutil.h"
 #include "logger.h"
 
 /**

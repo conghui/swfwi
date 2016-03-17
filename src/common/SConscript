@@ -14,6 +14,7 @@ lib_modules = """
 			  velocity.cpp
 			  shot-position.cpp
 			  parabola-vertex.cpp
+			  sfutil.cpp
               """.split()
 
 extra_include_dir = [

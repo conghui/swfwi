@@ -11,7 +11,6 @@ extern "C" {
 #endif
 
 #include "logger.h"
-#include "fm-params.h"
 #include "sum.h"
 #include "ricker-wavelet.h"
 #include "velocity.h"

@@ -6,7 +6,6 @@ lib = "mdlib"
 lib_modules = """
 			  fd4t10s-damp-zjh.cpp
 			  fd4t10s-zjh.cpp
-			  sfutil.cpp
               """.split()
 
 extra_include_dir = [
