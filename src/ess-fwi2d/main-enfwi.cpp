@@ -77,6 +77,7 @@ public:
   int rank;
   int k;
   int np;
+  int ntask; /// exactly the # of task each process owns
 };
 
 Params::Params() {
@@ -122,20 +123,16 @@ Params::Params() {
    */
   sf_putint(vupdates,   "n1", nz);
   sf_putint(vupdates,   "n2", nx);
-  sf_putint(vupdates,   "n3", nsample);
-  sf_putint(vupdates,   "n4", niter);
+  sf_putint(vupdates,   "n3", niter);
   sf_putfloat(vupdates, "d1", dz);
   sf_putfloat(vupdates, "d2", dx);
   sf_putint(vupdates,   "d3", 1);
-  sf_putint(vupdates,   "d4", 1);
   sf_putint(vupdates,   "o1", 0);
   sf_putint(vupdates,   "o2", 0);
   sf_putint(vupdates,   "o3", 0);
-  sf_putint(vupdates,   "o4", 0);
   sf_putstring(vupdates, "label1", "Depth");
   sf_putstring(vupdates, "label2", "Distance");
-  sf_putstring(vupdates, "label3", "Sample");
-  sf_putstring(vupdates, "label4", "Iteration");
+  sf_putstring(vupdates, "label3", "Iteration");
   sf_putint(objs, "n1", niter);
   sf_putint(objs, "n2", 1);
   sf_putfloat(objs, "d1", 1);
@@ -144,6 +141,7 @@ Params::Params() {
   MPI_Comm_size(MPI_COMM_WORLD, &np);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   k = std::ceil(static_cast<float>(nsample) / np);
+  ntask = std::min(k, nsample - rank*k);
 
   check();
 }
@@ -163,8 +161,6 @@ void Params::check() {
     exit(1);
   }
 }
-
-} /// end of name space
 
 
 std::vector<Velocity *> createVelDB(const Velocity &vel, const char *perin, int N, float dx, float dt) {
@@ -205,6 +201,92 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
   return velSet;
 }
 
+void scatterVelocity(std::vector<Velocity *> &veldb, const std::vector<Velocity *> &totalveldb, const Params &params) {
+  int N = params.nsample;
+  int rank = params.rank;
+  int k = params.k;
+  int ntask = params.ntask;
+  int modelsize = veldb[0]->dat.size();
+
+  if (rank == 0) { /// sender
+
+    /// say N=7, np=3, k=ceil(N/np)=3, then each process owns the following velocity
+    /// rank 0: 0, 1, 2   (tag: 0, 1, 2)
+    /// rank 1: 3, 4, 5   (tag: 0, 1, 2)
+    /// rank 2: 6         (tag: 0)
+    /// each process except the last rank should own k samples. the last rank should own
+    /// (N-(rank)*k) samples. (rank == np-1 for the last rank)
+    /// the root process will send velocity tagged from 0 to k
+    ///
+    /// first prepare the velocity for the root process itself
+    for (int i = 0; i < k; i++) {
+      std::copy(totalveldb[i]->dat.begin(), totalveldb[i]->dat.end(), veldb[i]->dat.begin());
+      DEBUG() << format("rank %d, vel%d %.20f") % rank % i % sum(veldb[i]->dat);
+    }
+
+    /// send velocity for other process, so sample is counting from k
+    for (int isample = k; isample < N; isample++) {
+      int rcvrank = isample / k;
+      int tag = isample % k;
+      MPI_Send(&totalveldb[isample]->dat[0], modelsize, MPI_FLOAT, rcvrank, tag, MPI_COMM_WORLD);
+    }
+
+  } else {
+    /// (N-rank*k) for last rank process
+    /// k for other process
+    int sendrank = 0;
+    for (int tag = 0; tag < ntask; tag++) {
+      MPI_Status status;
+      MPI_Recv(&veldb[tag]->dat[0], modelsize, MPI_FLOAT, sendrank, tag, MPI_COMM_WORLD, &status);
+
+      DEBUG() << format("rank %d recv from rank %d, tag %d,  sum %.20f") % rank % sendrank % tag % sum(veldb[tag]->dat);
+    }
+  } //// end of dispatching velocity
+}
+
+void gatherVelocity(std::vector<Velocity *> &totalveldb, const std::vector<Velocity *> &veldb, const Params &params) {
+  int N = params.nsample;
+  int rank = params.rank;
+  int k = params.k;
+  int ntask = params.ntask;
+  int modelsize = veldb[0]->dat.size();
+
+  /// collect all the data from other process to rank 0
+   if (rank != 0) {
+     for (int tag = 0; tag < ntask; tag++) {
+       DEBUG() << "1 rank " << rank << " tag: " << tag;
+       MPI_Send(&veldb[tag]->dat[0], modelsize, MPI_FLOAT, 0, tag, MPI_COMM_WORLD);
+       DEBUG() << format("2 send rank %d, tag %d, sum %.20f") % rank % tag % sum(veldb[tag]->dat);
+     }
+   } else { /// rank == 0
+     /// collect from rank 0 itself first
+     for (int i = 0; i < k; i++) {
+       totalveldb[i]->dat = veldb[i]->dat;
+     }
+
+     // receive from other process
+     // send velocity for other process, so sample is counting from k
+     for (int isample = k; isample < N; isample++) {
+       int sendrank = isample / k;
+       int tag = isample % k;
+       DEBUG() << format("isample %d") % isample;
+       DEBUG() << totalveldb[isample]->dat[0];
+
+       MPI_Status status;
+       MPI_Recv(&totalveldb[isample]->dat[0], modelsize, MPI_FLOAT, sendrank, tag, MPI_COMM_WORLD, &status);
+       DEBUG() << format("3 recv from rank %d, tag %d, sum %.20f") % sendrank % tag % sum(totalveldb[isample]->dat);
+     }
+
+     for (size_t i = 0; i < totalveldb.size(); i++) {
+       DEBUG() << format("after recv correct vel%d %.20f") % i % sum(totalveldb[i]->dat);
+     }
+
+   }
+}
+} /// end of name space
+
+
+
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
@@ -229,6 +311,8 @@ int main(int argc, char *argv[]) {
   int N = params.nsample;
   int niterenkf = params.niterenkf;
   int rank = params.rank;
+  int k = params.k;
+  int ntask = params.ntask;
 
   srand(params.seed);
 
@@ -244,6 +328,7 @@ int main(int argc, char *argv[]) {
   Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
 
+
   /// read and broadcast dobs
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
   if (rank == 0) {
@@ -254,10 +339,30 @@ int main(int argc, char *argv[]) {
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
   UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
 
-  std::vector<Velocity *> veldb = createVelDB(exvel, params.perin, N, dx, dt);
-  std::vector<float *> velSet = generateVelSet(veldb);
-  std::vector<Damp4t10d *> fms(N);
-  std::vector<EssFwiFramework *> essfwis(N);
+  std::vector<Velocity *> totalveldb;  /// only for rank 0
+  std::vector<Velocity *> veldb(ntask); /// each process owns # of velocity
+
+  if (rank == 0) { /// sender
+    totalveldb = createVelDB(exvel, params.perin, N, dx, dt);
+    for (size_t i = 0; i < totalveldb.size(); i++) {
+      DEBUG() << format("correct vel%d %.20f") % i % sum(totalveldb[i]->dat);
+    }
+    DEBUG();
+  }
+  for (size_t iv = 0; iv < veldb.size(); iv++) {
+    veldb[iv] = new Velocity(exvel.nx, exvel.nz);
+  }
+
+  /// it is a bad implementation. one process send each velocity to all other processes
+  /// if the number of samples become large, it would be the bottleneck.
+  /// TODO: refactor the Velocity class. keep the real data of all velocity in ONE array and
+  /// each Velocity has a pointer that points to the correct location.
+  scatterVelocity(veldb, totalveldb, params);
+  DEBUG() << "dispatching velocity finished!";
+//  MPI_Barrier(MPI_COMM_WORLD);
+
+  std::vector<Damp4t10d *> fms(ntask);
+  std::vector<EssFwiFramework *> essfwis(ntask);
 
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
@@ -266,27 +371,59 @@ int main(int argc, char *argv[]) {
   }
 
   EnkfAnalyze enkfAnly(fmMethod, wlt, dobs, sigfac);
-  enkfAnly.analyze(velSet);
+
+
+  /// collect all the data from other process to rank 0
+  gatherVelocity(totalveldb, veldb, params);
+
+  /// in current implementation,only the root process perform the enkf analyze
+  /// we will further parallel this function
+  if (rank == 0) {
+    std::vector<float *> velSet = generateVelSet(totalveldb);
+    enkfAnly.analyze(velSet);
+  }
+
+  /// after enkf, we should scatter velocities
+  scatterVelocity(veldb, totalveldb, params);
+
+//  MPI_Barrier(MPI_COMM_WORLD);
+
 
   TRACE() << "iterate the remaining iteration";
   for (int iter = 0; iter < params.niter; iter++) {
     TRACE() << "FWI for each velocity";
     DEBUG() << "\n\n\n\n\n\n\n";
 
-    for (int ivel = 0; ivel < N; ivel++) {
+    for (size_t ivel = 0; ivel < essfwis.size(); ivel++) {
+      int absvel = rank * k + ivel;
+      INFO() << format("iter %d, rank %d on %dth velocity, sum %f") % iter % rank % absvel % sum(veldb[ivel]->dat);
       essfwis[ivel]->epoch(iter);
-      essfwis[ivel]->writeVel(params.vupdates);
     }
 
     TRACE() << "enkf analyze and update velocity";
+    gatherVelocity(totalveldb, veldb, params);
+//    MPI_Barrier(MPI_COMM_WORLD);
     if (iter % niterenkf == 0) {
-      enkfAnly.analyze(velSet);
+      if (rank == 0) {
+        std::vector<float *> velSet = generateVelSet(totalveldb);
+        enkfAnly.analyze(velSet);
+      }
+    }
+
+    if (rank == 0) {
+      /// output velocity
+      std::vector<float *> velSet = generateVelSet(totalveldb);
+      std::vector<float> vv = enkfAnly.createAMean(velSet);
+      sf_floatwrite(&vv[0], vv.size(), params.vupdates);
+    }
+    scatterVelocity(veldb, totalveldb, params);
+//    MPI_Barrier(MPI_COMM_WORLD);
+
 
 //      TRACE() << "assign the average of all stored alpha to each sample";
 //      float *p = &PreservedAlpha::instance().getAlpha()[0];
 //      float alphaAvg = std::accumulate(p, p + N, 0.0f) / N;
 //      std::fill(p, p + N, alphaAvg);
-    }
 
 //    float *vel = createAMean(velSet, modelSize);
 //    float l1norm, l2norm;
@@ -303,7 +440,19 @@ int main(int argc, char *argv[]) {
 //    finalizeAMean(vel);
   }
 
-//  sf_close();
+  /// release memory
+  if (rank == 0) {
+    for (size_t i = 0; i < totalveldb.size(); i++) {
+      delete totalveldb[i];
+    }
+  }
+  for (int i = 0; i < ntask; i++) {
+    delete veldb[i];
+    delete fms[i];
+    delete essfwis[i];
+  }
 
+
+  MPI_Finalize();
   return 0;
 }

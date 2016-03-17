@@ -393,10 +393,12 @@ const ShotPosition& Damp4t10d::getAllGeoPos() const {
 }
 
 int Damp4t10d::getnx() const {
+  assert(vel != NULL);
   return vel->nx;
 }
 
 int Damp4t10d::getnz() const {
+  assert(vel != NULL);
   return vel->nz;
 }
 

@@ -18,6 +18,7 @@ public:
   EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt, const std::vector<float> &dobs, float sigmafactor);
 
   void analyze(std::vector<float *> &velSet) const;
+  std::vector<float> createAMean(const std::vector<float *> &velSet) const;
 
 protected:
   Matrix calGainMatrix(const std::vector<float *> &velSet) const;

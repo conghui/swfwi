@@ -18,20 +18,20 @@
 #include "dgesvd.h"
 
 namespace {
-std::vector<float> createAMean(const std::vector<float *> &velSet, int modelSize) {
-  std::vector<float> ret(modelSize);
-
-  for (int i = 0; i < modelSize; i++) {
-    float sum = 0.0;
-    for (size_t j = 0; j < velSet.size(); j++) {
-      sum += velSet[j][i];
-    }
-
-    ret[i] = sum / velSet.size();
-  }
-
-  return ret;
-}
+//std::vector<float> createAMean(const std::vector<float *> &velSet, int modelSize) {
+//  std::vector<float> ret(modelSize);
+//
+//  for (int i = 0; i < modelSize; i++) {
+//    float sum = 0.0;
+//    for (size_t j = 0; j < velSet.size(); j++) {
+//      sum += velSet[j][i];
+//    }
+//
+//    ret[i] = sum / velSet.size();
+//  }
+//
+//  return ret;
+//}
 
 void initAPerturb(Matrix &matAPerturb, const std::vector<float *> &velSet,
     const std::vector<float> &AMean, int modelSize) {
@@ -60,7 +60,7 @@ void EnkfAnalyze::analyze(std::vector<float*>& velSet) const {
 
   std::vector<float *> &A = velSet; /// velSet <==> matA
   int N = velSet.size();
-  std::vector<float> AMean = createAMean(A, modelSize);
+  std::vector<float> AMean = createAMean(A);
   DEBUG() << "sum of AMean: " << sum(AMean);
 
   Matrix A_Perturb(N, modelSize);
@@ -262,6 +262,22 @@ void EnkfAnalyze::initGamma(const Matrix& perturbation, Matrix& gamma) const {
       gamma.getData()[idx] = p[idx] - avg;
     }
   }
+}
+
+std::vector<float> EnkfAnalyze::createAMean(const std::vector<float*>& velSet) const {
+  int modelSize = fm.getnx() * fm.getnz();
+  std::vector<float> ret(modelSize);
+
+  for (int i = 0; i < modelSize; i++) {
+    float sum = 0.0;
+    for (size_t j = 0; j < velSet.size(); j++) {
+      sum += velSet[j][i];
+    }
+
+    ret[i] = sum / velSet.size();
+  }
+
+  return ret;
 }
 
 void EnkfAnalyze::initPerturbation(Matrix& perturbation, double mean, double sigma) const {
