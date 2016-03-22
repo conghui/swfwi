@@ -1,7 +1,7 @@
 import os
 Import('*')
 
-bin_list = [
+bin_list = [('enfwi-old', 'main-enfwi.cpp'),
            ]
 
 lib = 'enfwi'
@@ -10,6 +10,9 @@ modules = """
 Matrix.cpp
 dgesvd.cpp
 enkfanalyze.cpp
+calgainmatrix.cpp
+essfwiframework.cpp
+essfwi-params.cpp
           """.split()
 
 include_dir = [
