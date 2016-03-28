@@ -39,6 +39,7 @@
 #include "sfutil.h"
 #include "common.h"
 #include "dgesvd.h"
+#include "sum.h"
 
 static const float enkf_sigma_factor = 0.2;
 
@@ -113,9 +114,9 @@ static void forwardModeling(const Damp4t10d &fmMethod,
 
       fmMethod.stepForward(&p0[0], &p1[0]);
 
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
-
       std::swap(p1, p0);
+
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
 
     }
 
@@ -177,11 +178,13 @@ Matrix calGainMatrix(const Damp4t10d &fm, const std::vector<float> &wlt, const s
     Damp4t10d newfm = fm;
     Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
     newfm.bindVelocity(curvel);
+    DEBUG() << format("   curvel %.20f") % sum(curvel.dat);
+
     forwardModeling(newfm, encsrc, dcal);
     matrix_transpose(&dcal[0], &trans[0], ng, nt);
     std::copy(pdata, pdata + numDataSamples, HOnA.getData() + i * numDataSamples);
 
-    DEBUG() << format("sum HonA %.20f") % getSum(HOnA);
+    DEBUG() << format("   sum HonA %.20f") % getSum(HOnA);
 
     TRACE() << "save the resd";
     const Matrix::value_type *obsDataBegin = D.getData() + i * numDataSamples;

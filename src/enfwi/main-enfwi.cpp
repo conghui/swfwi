@@ -242,8 +242,16 @@ int main(int argc, char *argv[]) {
   std::vector<float *> velSet = generateVelSet(veldb);
   ////////
 
+  for (size_t i = 0; i < veldb.size(); i++) {
+	 DEBUG() << format("vel %d, sum %.20f") % i % sum(veldb[i]->dat);
+  }
+
   TRACE() << "go through ENKF to update velocity set";
   enkf_analyze(fmMethod, wlt, dobs, velSet, modelSize, 1);
+
+  for (size_t i = 0; i < velSet.size(); i++) {
+    DEBUG() << format("velset %d, sum %.20f") % i % sum(velSet[i], modelSize);
+  }
 
   float *vel = createAMean(velSet, modelSize);
   writeVelocity("meamvel0.rsf", vel, exvel.nx, exvel.nz, dx, dt);
@@ -258,13 +266,15 @@ int main(int argc, char *argv[]) {
   }
 
   TRACE() << "iterate the remaining iteration";
-  for (int iter = 1; iter <= params.niter; iter++) {
+  for (int iter = 0; iter < params.niter; iter++) {
     TRACE() << "FWI for each velocity";
     DEBUG() << "\n\n\n\n\n\n\n";
 
     for (int ivel = 0; ivel < N; ivel++) {
       essfwis[ivel]->epoch(iter, ivel);
 //      epoch(config, velSet[i], NULL, curr_gradient, update_direction, iter, i + 1, N, gradUpdator);
+      DEBUG() << format("iter %d, vel %d, sumvel %.20f") % iter % ivel % sum(veldb[ivel]->dat);
+//      exit(0);
     }
     TRACE() << "enkf analyze and update velocity";
     if (iter % enkf_update_every_essfwi_iter == 0) {

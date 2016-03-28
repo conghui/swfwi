@@ -113,9 +113,10 @@ void forwardModeling(const Damp4t10d &fmMethod,
 
       fmMethod.stepForward(&p0[0], &p1[0]);
 
-      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
 
       std::swap(p1, p0);
+
+      fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
 
     }
 
@@ -603,6 +604,7 @@ float calStepLen(const Damp4t10d &fmMethod,
   TRACE() << "Calcuate step length";
   TRACE() << "calculate the initial value of alpha2 and alpha3";
   float max_alpha2, max_alpha3;
+  DEBUG() << format("sumvel %.f, sumdir %.f dt %f, dx %f, maxdv %f") % sum(fmMethod.getVelocity().dat) % sum(updateDirection) % dt % dx % maxdv;
   calMaxAlpha2_3(fmMethod.getVelocity(), &updateDirection[0], dt, dx, maxdv, max_alpha2, max_alpha3);
   DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
 
@@ -856,6 +858,9 @@ void EssFwiFrameworkOld::epoch(int iter, int ivel) {
 //
   std::vector<float> g1(nx * nz, 0);
   hello(fmMethod, encsrc, vsrc, g1, nt, dt);
+
+  DEBUG() << format("grad %.20f") % sum(g1);
+
 //  {
 //    char buf[BUFSIZ];
 //    sprintf(buf, "grad%d.rsf", iter);
@@ -877,8 +882,8 @@ void EssFwiFrameworkOld::epoch(int iter, int ivel) {
 //    //sfFloatWrite2d(buf, &g0[0], exvel.nz, exvel.nx);
 //  }
 
-//  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
-    gradUpdator(&g0[0], &g1[0], &updateDirection[0], g0.size()); /// for enfwi
+  prevCurrCorrDirection(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+//    gradUpdator(&g0[0], &g1[0], &updateDirection[0], g0.size()); /// for enfwi
 //
 //  {
 //    char buf[BUFSIZ];

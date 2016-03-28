@@ -5,3 +5,6 @@ build/
 .sconsign.dblite
 lib/
 *.log
+job/
+.cproject
+.project

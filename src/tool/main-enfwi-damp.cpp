@@ -335,7 +335,6 @@ int main(int argc, char *argv[]) {
   MPI_Bcast(&dobs[0], dobs.size(), MPI_FLOAT, 0, MPI_COMM_WORLD);
 
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
-  UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
 
   std::vector<Velocity *> totalveldb;  /// only for rank 0
   std::vector<Velocity *> veldb(ntask); /// each process owns # of velocity
@@ -360,12 +359,15 @@ int main(int argc, char *argv[]) {
 //  MPI_Barrier(MPI_COMM_WORLD);
 
   std::vector<Damp4t10d *> fms(ntask);
+  std::vector<UpdateSteplenOp *> usl(ntask);
   std::vector<EssFwiFramework *> essfwis(ntask);
 
   for (size_t i = 0; i < essfwis.size(); i++) {
     fms[i] = new Damp4t10d(fmMethod);
     fms[i]->bindVelocity(*veldb[i]);
-    essfwis[i] = new EssFwiFramework(*fms[i], updateSteplenOp, updatevelop, wlt, dobs);
+
+    usl[i] = new UpdateSteplenOp(*fms[i], updatevelop, nita, maxdv);
+    essfwis[i] = new EssFwiFramework(*fms[i], *usl[i], updatevelop, wlt, dobs);
   }
 
   EnkfAnalyze enkfAnly(fmMethod, wlt, dobs, sigfac);
@@ -396,6 +398,7 @@ int main(int argc, char *argv[]) {
       int absvel = rank * k + ivel;
       INFO() << format("iter %d, rank %d on %dth velocity, sum %f") % iter % rank % absvel % sum(veldb[ivel]->dat);
       essfwis[ivel]->epoch(iter);
+//      exit(0);
     }
 
     TRACE() << "enkf analyze and update velocity";
@@ -448,6 +451,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < ntask; i++) {
     delete veldb[i];
     delete fms[i];
+    delete usl[i];
     delete essfwis[i];
   }
 

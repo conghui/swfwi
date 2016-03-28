@@ -137,11 +137,14 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
     Damp4t10d newfm = fm;
     Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
     newfm.bindVelocity(curvel);
+
+    DEBUG() << format("   curvel %.20f") % sum(curvel.dat);
     newfm.EssForwardModeling(encsrc, dcal);
     matrix_transpose(&dcal[0], &trans[0], ng, nt);
     std::copy(pdata, pdata + numDataSamples, HOnA.getData() + i * numDataSamples);
 
-    DEBUG() << format("sum HonA %.20f") % getSum(HOnA);
+    DEBUG() << format("   sum HonA %.20f") % getSum(HOnA);
+
   }
 
   DEBUG() << "sum of D: " << getSum(D);
