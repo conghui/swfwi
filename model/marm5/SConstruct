@@ -38,29 +38,30 @@ datapath = './rsfdata/'
 checkpointdir='./checkpoingdir/'
 os.environ['DATAPATH'] = datapath
 os.environ['CHECKPOINTDIR'] = checkpointdir
-#os.environ['OMP_NUM_THREADS'] = '2'
+os.environ['OMP_NUM_THREADS'] = '8'
 mkdir(datapath)
 mkdir(checkpointdir)
 
 task = ARGUMENTS.get('task')
 if task == 'fm':
-  system('''../../../bin/fm-damp vinit=vel.rsf shots=shots.rsf
-  fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=30
+  system('''../../bin/fm-damp vinit=vel.rsf shots=shots.rsf
+  fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=60
   sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
   '''.replace('\n', ' '))
 elif task == 'essfwi':
-  system('''../../../bin/essfwi vin=smvel.rsf shots=shots.rsf
+  system('''../../bin/essfwi-damp vin=smvel.rsf shots=shots.rsf
   vout=vsnaps.rsf objs=objs.rsf vmin=1500 vmax=5500 maxdv=200 nita=5
-  niter=3 nb=30 seed=10
+  niter=300 nb=60 seed=10
   '''.replace('\n', ''))
 elif task == 'enfwi':
-  system('''../../../bin/enfwi vin=smvel.rsf shots=shots.rsf
-  vout=vsnaps.rsf objs=objs.rsf vmin=1500 vmax=5500 maxdv=200 nita=5
-  niter=2 nb=30 seed=10
-  sigfac=0.2 niterenkf=1 nsample=2 perin=./velPerturb_20.bin
+  system('''mpirun -np 1 ../../bin/enfwi-damp vin=smvel.rsf shots=shots.rsf
+  vout=vsnaps.rsf objs=objs.rsf vmin=1450 vmax=5600 maxdv=200 nita=5
+  niter=300 nb=30 seed=10
+  sigfac=0.2 niterenkf=10 nsample=20
+  perin=/home/rice/data/marm/velPerturb_20.bin
   '''.replace('\n', ''))
 
-#plot('vel3', 'vel 3')
+# plot('vel300', 'vel 300 D=0')
 #plot('vsnaps', 'vel')
 #plot('illums', 'illum')
 #plot('grads', 'grad')

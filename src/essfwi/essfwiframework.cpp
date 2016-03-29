@@ -375,7 +375,7 @@ void EssFwiFramework::epoch(int iter) {
   transVsrc(vsrc, nt, ng);
 
   std::vector<float> g1(nx * nz, 0);
-  calgradient2_store(fmMethod, encsrc, vsrc, g1, nt, dt);
+  calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
 
   DEBUG() << format("grad %.20f") % sum(g1);
 
