@@ -129,9 +129,11 @@ void Params::check() {
 
 } /// end of name space
 
+_INITIALIZE_EASYLOGGINGPP
+
 int main(int argc, char *argv[]) {
   sf_init(argc, argv);                /* initialize Madagascar */
-  Logger::instance().init("essfwi");  /* init logger */
+//  Logger::instance().init("essfwi");  /* init logger */
 
   Params params;
   int nz = params.nz;

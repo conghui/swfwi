@@ -284,11 +284,12 @@ void gatherVelocity(std::vector<Velocity *> &totalveldb, const std::vector<Veloc
 } /// end of name space
 
 
+_INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
-  Logger::instance().init("enfwi");
+//  Logger::instance().init("enfwi");
 
   Params params;
 

@@ -31,6 +31,7 @@
 #include <boost/random/variate_generator.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <iterator>
 
 #include "random-code.h"
 #include "logger.h"

@@ -191,12 +191,14 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
   return velSet;
 }
 
+_INITIALIZE_EASYLOGGINGPP
+
 int main(int argc, char *argv[]) {
 
   /* initialize Madagascar */
   sf_init(argc, argv);
 
-  Logger::instance().init("enfwi");
+//  Logger::instance().init("enfwi");
 
   EssFwiParams &params = EssFwiParams::instance();
 

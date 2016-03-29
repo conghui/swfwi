@@ -20,6 +20,7 @@ extern "C" {
 
 #include "damp4t10d.h"
 #include "sfutil.h"
+#include <logger.h>
 
 namespace {
 
@@ -188,12 +189,14 @@ void Params::check() {
 
 } /// end of name space
 
+_INITIALIZE_EASYLOGGINGPP
+
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */
   sf_init(argc,argv);
 
   Params params;
-  Logger::instance().init("fm");
+//  Logger::instance().init("fm");
   boost::timer::auto_cpu_timer t;
 
   int nz = params.nz;
@@ -222,6 +225,7 @@ int main(int argc, char* argv[]) {
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
+  LINFO << "HELLO";
 
   for(int is=0; is<ns; is++) {
     boost::timer::cpu_timer timer;
