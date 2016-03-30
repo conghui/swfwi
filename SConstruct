@@ -55,7 +55,6 @@ dirlist = [
    ('tool', 'src/tool'),
    ('common', 'src/common'),
    ('modeling', 'src/modeling'),
-   ('util', 'src/util'),
    ('mdlib', 'src/mdlib'),
 ]
 dirs = dict(dirlist)

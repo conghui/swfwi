@@ -15,7 +15,6 @@ modules = """
 
 include_dir = [
   os.environ['RSFROOT'] + '/include',
-  '#' + dirs['util'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
@@ -24,7 +23,7 @@ include_dir = [
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'util', 'rsf']
+depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)

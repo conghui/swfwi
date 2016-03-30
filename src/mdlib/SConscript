@@ -9,7 +9,6 @@ lib_modules = """
               """.split()
 
 extra_include_dir = [
-  "#" + dirs['util'],
   os.environ['RSFROOT'] + '/include',
 ]
 

@@ -1,7 +1,7 @@
 import os
 Import('*')
 
-bin_list = [('enfwi-old', 'main-enfwi.cpp'),
+bin_list = [
            ]
 
 lib = 'enfwi'
@@ -10,21 +10,17 @@ modules = """
 Matrix.cpp
 dgesvd.cpp
 enkfanalyze.cpp
-calgainmatrix.cpp
-essfwiframework.cpp
-essfwi-params.cpp
           """.split()
 
 include_dir = [
   os.environ['RSFROOT'] + '/include',
-  '#' + dirs['util'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
 ]
 
 depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['modeling', 'mdlib', 'common', 'rsf', 'util']
+depend_libs = ['modeling', 'mdlib', 'common', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)

@@ -1,3 +1,0 @@
-[submodule "src/util"]
-	path = src/util
-	url = https://github.com/conghui/util.git

@@ -8,7 +8,6 @@
 
 #include <vector>
 #include <cstdio>
-#include "logger.h"
 
 #include "fd4t10s-zjh.h"
 

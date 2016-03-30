@@ -19,7 +19,6 @@ lib_modules = """
 
 extra_include_dir = [
   os.environ['RSFROOT'] + '/include',
-  "#" + dirs['util']
 ]
 
 ############################### for library ###########################

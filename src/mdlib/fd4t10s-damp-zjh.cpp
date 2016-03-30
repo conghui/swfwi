@@ -8,7 +8,6 @@
 #include <vector>
 #include <cstdio>
 #include "fd4t10s-damp-zjh.h"
-#include "logger.h"
 
 /**
  * please note that the velocity is transformed
