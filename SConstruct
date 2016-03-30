@@ -35,7 +35,6 @@ else:
 # set up boost direcotry
 boost_root = os.environ['INSTALL_ROOT'] + '/boost/'
 boost_inc = boost_root + 'include'
-boost_lib = boost_root + 'lib'
 
 mkl_root = os.environ['INSTALL_ROOT'] + '/intel/mkl/'
 mkl_inc = mkl_root + 'include'
@@ -71,12 +70,9 @@ else:
 
 # add boost include_dir and lib dir
 cur_cflags += ["-isystem", boost_inc, "-isystem", fftw_inc]
-libpath     = ["#" + dirs['lib'], boost_lib]
-#libs        = ["boost_system",    "boost_filesystem",     "boost_thread",
-               #"boost_date_time", "boost_chrono",         "boost_log_setup",
-               #"boost_log",       "boost_program_options","boost_timer"]
+libpath     = ["#" + dirs['lib'], ]
+libs        = []
 
-libs        = ["boost_timer"]
 # add additional includes and libs for gnu compiler
 if compiler_set == 'gnu':
   cur_cflags += ["-isystem", mkl_inc]

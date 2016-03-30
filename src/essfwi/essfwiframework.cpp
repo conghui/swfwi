@@ -23,7 +23,6 @@ extern "C"
 #include <vector>
 #include <set>
 
-#include <boost/timer/timer.hpp>
 #include "logger.h"
 #include "common.h"
 #include "ricker-wavelet.h"
