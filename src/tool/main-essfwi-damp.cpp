@@ -133,9 +133,14 @@ _INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
   sf_init(argc, argv);                /* initialize Madagascar */
-//  Logger::instance().init("essfwi");  /* init logger */
-
   Params params;
+
+  /// configure logger
+  easyloggingpp::Configurations defaultConf;
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "%date %level %log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "essfwi-damp.log");
+  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
+
   int nz = params.nz;
   int nx = params.nx;
   int nb = params.nb;

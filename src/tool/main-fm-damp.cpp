@@ -3,8 +3,6 @@ extern "C" {
 #include <rsf.h>
 }
 
-#include <time.h>
-
 #include <omp.h>
 
 #include "logger.h"
@@ -186,6 +184,12 @@ int main(int argc, char* argv[]) {
   sf_init(argc,argv);
   Params params;
   Timer totalTimer;
+
+  /// configure logger
+  easyloggingpp::Configurations defaultConf;
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "%date %level %log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
+  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   int nz = params.nz;
   int nx = params.nx;

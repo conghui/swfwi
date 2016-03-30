@@ -289,7 +289,12 @@ _INITIALIZE_EASYLOGGINGPP
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
-//  Logger::instance().init("enfwi");
+
+  /// configure logger
+  easyloggingpp::Configurations defaultConf;
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "%date %level %log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "enfwi-damp.log");
+  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   Params params;
 
