@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
 
   /// configure logger
   easyloggingpp::Configurations defaultConf;
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "%date %level %log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
