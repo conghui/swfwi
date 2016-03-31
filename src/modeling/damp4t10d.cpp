@@ -227,28 +227,6 @@ void Damp4t10d::maskGradient(float* grad) const {
 void Damp4t10d::refillBoundary(float* gradient) const {
   int nzpad = vel->nz;
   int nxpad = vel->nx;
-//  int bx = nb + EXFDBNDRYLEN;
-//  int bz = nb + EXFDBNDRYLEN;
-//
-//  const float *srcx0 = gradient + bx * nz;
-//  const float *srcxn = gradient + (nx - bx - 1) * nz;
-//
-//  TRACE() << "fill x[0, bx] and x[nx - bx, nx]";
-//  for (int ix = 0; ix < bx; ix++) {
-//    float *dstx0 = gradient + ix * nz;
-//    float *dstxn = gradient + (ix + nx - bx) * nz;
-//    std::copy(srcx0, srcx0 + nz, dstx0);
-//    std::copy(srcxn, srcxn + nz, dstxn);
-//  }
-//
-//  TRACE() << "fill z[nz - bz, nz]";
-//  for (int ix = 0; ix < nx; ix++) {
-//    for (int iz = nz - bx; iz < nz; iz++) {
-//      int srcIdx = ix * nz + (nz - bz - 1);
-//      int dstIdx = ix * nz + iz;
-//      gradient[dstIdx] = gradient[srcIdx];
-//    }
-//  }
 
   for (int ix = 0; ix < nxpad; ix++) {
     for (int iz = 0; iz < bz0; iz++) {
@@ -435,13 +413,27 @@ std::vector<float> Damp4t10d::initBndryVector(int nt) const {
   }
   int nxpad = vel->nx;
   int nzpad = vel->nz;
-  int nx = nxpad - 2*nb;
-  int nz = nzpad - nb;
+//  int nx = nxpad - 2*nb;
+//  int nz = nzpad - nb;
 
-  bndrSize = FDLEN * (
-             nx +   /* bottom */
-             2 * nz /* left + right */
-             );
+//  int nx = nxpad - bx0 - bxn;
+//  int nz = nzpad - bz0 - bzn;
+//
+//  bndrLen = FDLEN + 1;
+//  bndrSize = bndrLen * (
+//             nx +   /* bottom */
+//             2 * nz /* left + right */
+//             );
+
+  bndrLen = 6;
+  int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+  int nz = nzpad - bz0 - bzn;
+
+  bndrSize = bndrLen * (
+      nx +   /* bottom */
+      2 * nz /* left + right */
+  );
+
   return std::vector<float>(nt*bndrSize, 0);
 }
 
@@ -463,20 +455,34 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
      */
     int nxpad = vel->nx;
     int nzpad = vel->nz;
-    int nx = nxpad - 2 * nb;
-    int nz = nzpad - nb;
+//    int nx = nxpad - 2 * nb;
+//    int nz = nzpad - nb;
+//    int nx = nxpad - bx0 - bxn;
+//    int nz = nzpad - bz0 - bzn;
+
+    int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+    int nz = nzpad - bz0 - bzn;
+
     float *bndr = &_bndr[it * bndrSize];
 
     for (int ix = 0; ix < nx; ix++) {
-      for(int iz = 0; iz < FDLEN; iz++) {
-        bndr[iz + FDLEN*ix] = p[(ix+nb)*nzpad + (iz+nz)]; // bottom
+      for(int iz = 0; iz < bndrLen; iz++) {
+//        bndr[iz + bndrLen*ix] = p[(ix+nb)*nzpad + (iz+nz)]; // bottom
+//        bndr[iz + bndrLen*ix] = p[(ix+bx0)*nzpad + (bz0 + nz + iz)]; // bottom
+        bndr[iz + bndrLen*ix] = p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)]; // bottom
       }
     }
 
     for (int iz = 0; iz < nz; iz++) {
-      for(int ix=0; ix < FDLEN; ix++) {
-        bndr[FDLEN*nx+iz+nz*ix]         = p[(ix-2+nb)*nzpad + (iz)];   // left
-        bndr[FDLEN*nx+iz+nz*(ix+FDLEN)] = p[(ix+nx+nb)*nzpad + (iz)];  // right
+      for(int ix=0; ix < bndrLen; ix++) {
+//        bndr[bndrLen*nx+iz+nz*ix]         = p[(ix-2+nb)*nzpad + (iz)];   // left
+//        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(ix+nx+nb)*nzpad + (iz)];  // right
+
+//        bndr[bndrLen*nx+iz+nz*ix]         = p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)];   // left
+//        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(bx0 + nx + ix)*nzpad + (bz0 + iz)];  // right
+
+        bndr[bndrLen*nx+iz+nz*ix]         = p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)];   // left
+        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)];  // right
       }
     }
 }
@@ -484,20 +490,33 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
 void Damp4t10d::readBndry(const float* _bndr, float* p, int it) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
-  int nx = nxpad - 2 * nb;
-  int nz = nzpad - nb;
+//  int nx = nxpad - 2 * nb;
+//  int nz = nzpad - nb;
+//  int nx = nxpad - bx0 - bxn;
+//  int nz = nzpad - bz0 - bzn;
+
+  int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+  int nz = nzpad - bz0 - bzn;
   const float *bndr = &_bndr[it * bndrSize];
 
   for (int ix = 0; ix < nx; ix++) {
-    for(int iz = 0; iz < FDLEN; iz++) {
-      p[(ix+nb)*nzpad + (iz+nz)] = bndr[iz + FDLEN*ix]; // bottom
+    for(int iz = 0; iz < bndrLen; iz++) {
+//      p[(ix+nb)*nzpad + (iz+nz)] = bndr[iz + bndrLen*ix]; // bottom
+//      p[(ix+bx0)*nzpad + (bz0 + nz + iz)] = bndr[iz + bndrLen*ix]; // bottom
+
+      p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)] = bndr[iz + bndrLen*ix]; // bottom
     }
   }
 
   for (int iz = 0; iz < nz; iz++) {
-    for(int ix=0; ix < FDLEN; ix++) {
-      p[(ix-2+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*ix];   // left
-      p[(ix+nx+nb)*nzpad + (iz)] = bndr[FDLEN*nx+iz+nz*(ix+FDLEN)];  // right
+    for(int ix=0; ix < bndrLen; ix++) {
+//      p[(ix-2+nb)*nzpad + (iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
+//      p[(ix+nx+nb)*nzpad + (iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
+//      p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
+//      p[(bx0 + nx + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
+
+      p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
+      p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
     }
   }
 }

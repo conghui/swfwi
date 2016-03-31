@@ -78,6 +78,7 @@ private:
   int nb;
   int nt;
   mutable int bndrSize;
+  mutable int bndrLen;
 
 private:
   std::vector<float> bndr;
