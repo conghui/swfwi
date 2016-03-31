@@ -449,16 +449,12 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
      *    **-             -**
      *    **-             -**
      *    **+-------------+**
-     *      ***************
-     *      ***************
+     *    *******************
+     *    *******************
      *
      */
     int nxpad = vel->nx;
     int nzpad = vel->nz;
-//    int nx = nxpad - 2 * nb;
-//    int nz = nzpad - nb;
-//    int nx = nxpad - bx0 - bxn;
-//    int nz = nzpad - bz0 - bzn;
 
     int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
     int nz = nzpad - bz0 - bzn;
@@ -467,20 +463,12 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
 
     for (int ix = 0; ix < nx; ix++) {
       for(int iz = 0; iz < bndrLen; iz++) {
-//        bndr[iz + bndrLen*ix] = p[(ix+nb)*nzpad + (iz+nz)]; // bottom
-//        bndr[iz + bndrLen*ix] = p[(ix+bx0)*nzpad + (bz0 + nz + iz)]; // bottom
         bndr[iz + bndrLen*ix] = p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)]; // bottom
       }
     }
 
     for (int iz = 0; iz < nz; iz++) {
       for(int ix=0; ix < bndrLen; ix++) {
-//        bndr[bndrLen*nx+iz+nz*ix]         = p[(ix-2+nb)*nzpad + (iz)];   // left
-//        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(ix+nx+nb)*nzpad + (iz)];  // right
-
-//        bndr[bndrLen*nx+iz+nz*ix]         = p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)];   // left
-//        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(bx0 + nx + ix)*nzpad + (bz0 + iz)];  // right
-
         bndr[bndrLen*nx+iz+nz*ix]         = p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)];   // left
         bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)];  // right
       }
@@ -490,10 +478,6 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
 void Damp4t10d::readBndry(const float* _bndr, float* p, int it) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
-//  int nx = nxpad - 2 * nb;
-//  int nz = nzpad - nb;
-//  int nx = nxpad - bx0 - bxn;
-//  int nz = nzpad - bz0 - bzn;
 
   int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
   int nz = nzpad - bz0 - bzn;
@@ -501,20 +485,12 @@ void Damp4t10d::readBndry(const float* _bndr, float* p, int it) const {
 
   for (int ix = 0; ix < nx; ix++) {
     for(int iz = 0; iz < bndrLen; iz++) {
-//      p[(ix+nb)*nzpad + (iz+nz)] = bndr[iz + bndrLen*ix]; // bottom
-//      p[(ix+bx0)*nzpad + (bz0 + nz + iz)] = bndr[iz + bndrLen*ix]; // bottom
-
       p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)] = bndr[iz + bndrLen*ix]; // bottom
     }
   }
 
   for (int iz = 0; iz < nz; iz++) {
     for(int ix=0; ix < bndrLen; ix++) {
-//      p[(ix-2+nb)*nzpad + (iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
-//      p[(ix+nx+nb)*nzpad + (iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
-//      p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
-//      p[(bx0 + nx + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
-
       p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
       p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
     }
