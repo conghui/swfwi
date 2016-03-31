@@ -30,6 +30,7 @@ public:
   void addEncodedSource(float *p, const float *encsrc) const;
   void recordSeis(float *seis_it, const float *p) const;
   void maskGradient(float *grad) const;
+  void scaleGradient(float *grad) const;
   void refillBoundary(float *vel) const;
   void sfWriteVel(const std::vector<float> &exvel, sf_file file) const;
 
@@ -74,10 +75,9 @@ private:
   float fm;
   int bx0, bxn;
   int bz0, bzn;
-  int nb;
   int nt;
   mutable int bndrSize;
-  mutable int bndrLen;
+  mutable int bndrWidth;
 
 private:
   std::vector<float> bndr;

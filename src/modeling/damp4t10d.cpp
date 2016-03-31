@@ -286,6 +286,18 @@ void Damp4t10d::EssForwardModeling(const std::vector<float>& encSrc,
   }
 }
 
+void Damp4t10d::scaleGradient(float* grad) const {
+  int nxpad = vel->nx;
+  int nzpad = vel->nz;
+  int nz = nzpad - bz0 - bzn;
+
+  for (int ix = bx0; ix < nxpad - bxn; ix++) {
+    for (int iz = 1; iz < nz; iz++) {
+      grad[ix*nzpad + iz+bz0] *= std::sqrt(static_cast<float>(iz));
+    }
+  }
+}
+
 void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
   int half_len = t_width / dt;
   int sx = allSrcPos.getx(0) + bx0;
@@ -335,7 +347,7 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
 Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos, const ShotPosition& _allGeoPos,
     float _dt, float _dx, float _fm, int _nb, int _nt) :
       vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
-      dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
+      dt(_dt), dx(_dx), fm(_fm),  nt(_nt)
 {
   bz0 = EXFDBNDRYLEN;
   bx0 = bxn = bzn = _nb + EXFDBNDRYLEN;
@@ -425,11 +437,11 @@ std::vector<float> Damp4t10d::initBndryVector(int nt) const {
 //             2 * nz /* left + right */
 //             );
 
-  bndrLen = 6;
-  int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+  bndrWidth = 6;
+  int nx = nxpad - (bx0 - bndrWidth + bxn - bndrWidth);
   int nz = nzpad - bz0 - bzn;
 
-  bndrSize = bndrLen * (
+  bndrSize = bndrWidth * (
       nx +   /* bottom */
       2 * nz /* left + right */
   );
@@ -456,21 +468,21 @@ void Damp4t10d::writeBndry(float* _bndr, const float* p, int it) const {
     int nxpad = vel->nx;
     int nzpad = vel->nz;
 
-    int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+    int nx = nxpad - (bx0 - bndrWidth + bxn - bndrWidth);
     int nz = nzpad - bz0 - bzn;
 
     float *bndr = &_bndr[it * bndrSize];
 
     for (int ix = 0; ix < nx; ix++) {
-      for(int iz = 0; iz < bndrLen; iz++) {
-        bndr[iz + bndrLen*ix] = p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)]; // bottom
+      for(int iz = 0; iz < bndrWidth; iz++) {
+        bndr[iz + bndrWidth*ix] = p[(ix+bx0-bndrWidth)*nzpad + (nzpad - bzn + iz)]; // bottom
       }
     }
 
     for (int iz = 0; iz < nz; iz++) {
-      for(int ix=0; ix < bndrLen; ix++) {
-        bndr[bndrLen*nx+iz+nz*ix]         = p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)];   // left
-        bndr[bndrLen*nx+iz+nz*(ix+bndrLen)] = p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)];  // right
+      for(int ix=0; ix < bndrWidth; ix++) {
+        bndr[bndrWidth*nx+iz+nz*ix]         = p[(bx0-bndrWidth + ix)*nzpad + (bz0 + iz)];   // left
+        bndr[bndrWidth*nx+iz+nz*(ix+bndrWidth)] = p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)];  // right
       }
     }
 }
@@ -479,20 +491,20 @@ void Damp4t10d::readBndry(const float* _bndr, float* p, int it) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
 
-  int nx = nxpad - (bx0 - bndrLen + bxn - bndrLen);
+  int nx = nxpad - (bx0 - bndrWidth + bxn - bndrWidth);
   int nz = nzpad - bz0 - bzn;
   const float *bndr = &_bndr[it * bndrSize];
 
   for (int ix = 0; ix < nx; ix++) {
-    for(int iz = 0; iz < bndrLen; iz++) {
-      p[(ix+bx0-bndrLen)*nzpad + (nzpad - bzn + iz)] = bndr[iz + bndrLen*ix]; // bottom
+    for(int iz = 0; iz < bndrWidth; iz++) {
+      p[(ix+bx0-bndrWidth)*nzpad + (nzpad - bzn + iz)] = bndr[iz + bndrWidth*ix]; // bottom
     }
   }
 
   for (int iz = 0; iz < nz; iz++) {
-    for(int ix=0; ix < bndrLen; ix++) {
-      p[(bx0-bndrLen + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*ix];   // left
-      p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)] = bndr[bndrLen*nx+iz+nz*(ix+bndrLen)];  // right
+    for(int ix=0; ix < bndrWidth; ix++) {
+      p[(bx0-bndrWidth + ix)*nzpad + (bz0 + iz)] = bndr[bndrWidth*nx+iz+nz*ix];   // left
+      p[(nxpad - bxn + ix)*nzpad + (bz0 + iz)] = bndr[bndrWidth*nx+iz+nz*(ix+bndrWidth)];  // right
     }
   }
 }

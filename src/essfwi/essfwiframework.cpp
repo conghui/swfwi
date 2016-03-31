@@ -378,6 +378,7 @@ void EssFwiFramework::epoch(int iter) {
 
   DEBUG() << format("grad %.20f") % sum(g1);
 
+  fmMethod.scaleGradient(&g1[0]);
   fmMethod.maskGradient(&g1[0]);
 
   updateGrad(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
