@@ -6,9 +6,7 @@
  */
 
 #include <boost/bind.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/variate_generator.hpp>
+
 #include "enkfanalyze.h"
 #include "logger.h"
 #include "sum.h"
@@ -49,7 +47,7 @@ void initAPerturb(Matrix &matAPerturb, const std::vector<float *> &velSet,
 
 EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
     const std::vector<float> &dobs, float sigmafactor) :
-  fm(fm), wlt(wlt), dobs(dobs), sigmaFactor(sigmafactor)
+  fm(fm), wlt(wlt), dobs(dobs), sigmaFactor(sigmafactor), sigmaIter0(0), initSigma(false)
 {
   modelSize = fm.getnx() * fm.getnz();
 }
@@ -155,12 +153,8 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
   DEBUG() << "sum of HA_Perturb: " << getSum(HA_Perturb);
 
   TRACE() << "initialize the perturbation";
-  double mean = 0.0f;
-  double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
-  double sigma = initPerturbSigma(maxHAP, sigmaFactor);
-  DEBUG() << "sigma: " << sigma;
   Matrix perturbation(N, numDataSamples);
-  initPerturbation(perturbation, mean, sigma);
+  initPerturbation(perturbation, HA_Perturb);
 
   DEBUG() << "sum of perturbation: " << getSum(perturbation);
 
@@ -283,13 +277,18 @@ std::vector<float> EnkfAnalyze::createAMean(const std::vector<float*>& velSet) c
   return ret;
 }
 
-void EnkfAnalyze::initPerturbation(Matrix& perturbation, double mean, double sigma) const {
-  //    int seed = time(NULL);
-  int seed = 1;
-  boost::variate_generator<boost::mt19937, boost::normal_distribution<> >
-  generator(boost::mt19937(seed),
-      boost::normal_distribution<>(mean, sigma));
+void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Perturb) const {
+  if (!initSigma) {
+    initSigma = true;
+    int seed = 1;
+    double mean = 0;
+    double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
+    double sigma = initPerturbSigma(maxHAP, sigmaFactor);
+    DEBUG() << "sigmaIter0: " << sigma;
+    sigmaIter0 = sigma;
+    generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
+  }
 
-  std::generate(perturbation.getData(), perturbation.getData() + perturbation.size(), generator);
+  std::generate(perturbation.getData(), perturbation.getData() + perturbation.size(), *generator);
 
 }
