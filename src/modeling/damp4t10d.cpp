@@ -215,11 +215,9 @@ void Damp4t10d::manipSource(float* p, const float* source,
 void Damp4t10d::maskGradient(float* grad) const {
   int nxpad = vel->nx;
   int nzpad = vel->nz;
-  int bx = nb + EXFDBNDRYLEN;
-  int bz = nb + EXFDBNDRYLEN;
   for (int ix = 0; ix < nxpad; ix++) {
     for (int iz = 0; iz < nzpad; iz++) {
-      if (ix < bx || ix >= nxpad - bx || iz >= nzpad - bz) {
+      if (ix < bx0 || iz < bz0 || ix >= nxpad - bxn || iz >= nzpad - bzn) {
         grad[ix  * nzpad + iz] = 0.f;
       }
     }
@@ -227,28 +225,49 @@ void Damp4t10d::maskGradient(float* grad) const {
 }
 
 void Damp4t10d::refillBoundary(float* gradient) const {
-  int nz = vel->nz;
-  int nx = vel->nx;
-  int bx = nb + EXFDBNDRYLEN;
-  int bz = nb + EXFDBNDRYLEN;
+  int nzpad = vel->nz;
+  int nxpad = vel->nx;
+//  int bx = nb + EXFDBNDRYLEN;
+//  int bz = nb + EXFDBNDRYLEN;
+//
+//  const float *srcx0 = gradient + bx * nz;
+//  const float *srcxn = gradient + (nx - bx - 1) * nz;
+//
+//  TRACE() << "fill x[0, bx] and x[nx - bx, nx]";
+//  for (int ix = 0; ix < bx; ix++) {
+//    float *dstx0 = gradient + ix * nz;
+//    float *dstxn = gradient + (ix + nx - bx) * nz;
+//    std::copy(srcx0, srcx0 + nz, dstx0);
+//    std::copy(srcxn, srcxn + nz, dstxn);
+//  }
+//
+//  TRACE() << "fill z[nz - bz, nz]";
+//  for (int ix = 0; ix < nx; ix++) {
+//    for (int iz = nz - bx; iz < nz; iz++) {
+//      int srcIdx = ix * nz + (nz - bz - 1);
+//      int dstIdx = ix * nz + iz;
+//      gradient[dstIdx] = gradient[srcIdx];
+//    }
+//  }
 
-  const float *srcx0 = gradient + bx * nz;
-  const float *srcxn = gradient + (nx - bx - 1) * nz;
-
-  TRACE() << "fill x[0, bx] and x[nx - bx, nx]";
-  for (int ix = 0; ix < bx; ix++) {
-    float *dstx0 = gradient + ix * nz;
-    float *dstxn = gradient + (ix + nx - bx) * nz;
-    std::copy(srcx0, srcx0 + nz, dstx0);
-    std::copy(srcxn, srcxn + nz, dstxn);
+  for (int ix = 0; ix < nxpad; ix++) {
+    for (int iz = 0; iz < bz0; iz++) {
+      gradient[ix * nzpad + iz] = gradient[ix * nzpad + bz0];           // top
+    }
+    for (int iz = nzpad - bzn; iz < nzpad; iz++) {
+      gradient[ix * nzpad + iz] = gradient[ix * nzpad + nzpad - bzn - 1];  // bottom
+    }
   }
 
-  TRACE() << "fill z[nz - bz, nz]";
-  for (int ix = 0; ix < nx; ix++) {
-    for (int iz = nz - bx; iz < nz; iz++) {
-      int srcIdx = ix * nz + (nz - bz - 1);
-      int dstIdx = ix * nz + iz;
-      gradient[dstIdx] = gradient[srcIdx];
+  for (int ix = 0; ix < bx0; ix++) {                              // left
+    for (int iz = 0; iz < nzpad; iz++) {
+      gradient[ix * nzpad + iz] = gradient[bx0 * nzpad + iz];
+    }
+  }
+
+  for (int ix = nxpad - bxn; ix < nxpad; ix++) {                        // right
+    for (int iz = 0; iz < nzpad; iz++) {
+      gradient[ix * nzpad + iz] = gradient[(nxpad - bxn - 1) * nzpad + iz];
     }
   }
 }

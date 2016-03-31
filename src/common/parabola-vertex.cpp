@@ -27,8 +27,10 @@ void parabolaVertex(float x1, float y1, float x2, float y2, float x3, float y3, 
 
   if (std::abs(k2 - k1) < 0.001 * (std::max(std::abs(k2), std::abs(k1))) ||
       (xv == -std::numeric_limits<double>::quiet_NaN())) {
-    WARNING() << "THE SET OF POINTS DON'T FIT PARABOLIC WELL, SET y TO -NAN ON PURPOSE JUST FOR INDICATION";
-    xv = std::min(2 * x3, max_alpha3);
-    yv = -std::numeric_limits<double>::quiet_NaN(); /// indicating what's happening
+    WARNING() << "THE SET OF POINTS DON'T FIT PARABOLIC WELL, SET y TO y3 ON PURPOSE JUST FOR INDICATION";
+//    xv = std::min(2 * x3, max_alpha3);
+//    yv = -std::numeric_limits<double>::quiet_NaN(); /// indicating what's happening
+    xv = x3;
+    yv = y3;
   }
 }

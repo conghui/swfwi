@@ -26,7 +26,8 @@ public:
   sf_file vinit;        /* initial velocity model, unit=m/s */
   sf_file shots;        /* recorded shots from exact velocity model */
   sf_file vupdates;     /* updated velocity in iterations */
-  sf_file objs;         /* values of objective function in iterations */
+  sf_file absobjs;         /* absolute values of objective function in iterations */
+  sf_file norobjs;         /* normalize values of objective function in iterations */
   int niter;            /* # of iterations */
   int nb;               /* size of the boundary */
   float vmin;
@@ -60,7 +61,9 @@ Params::Params() {
   vinit = sf_input ("vin");       /* initial velocity model, unit=m/s */
   shots = sf_input("shots");      /* recorded shots from exact velocity model */
   vupdates = sf_output("vout");   /* updated velocity in iterations */
-  objs = sf_output("objs");       /* values of objective function in iterations */
+  absobjs = sf_output("absobjs"); /* absolute values of objective function in iterations */
+  norobjs = sf_output("norobjs"); /* normalized values of objective function in iterations */
+
   if (!sf_getint("niter", &niter)) { sf_error("no niter"); }      /* number of iterations */
   if (!sf_getint("nb",&nb))        { sf_error("no nb"); }         /* thickness of sponge ABC  */
   if (!sf_getfloat("vmin", &vmin)) { sf_error("no vmin"); }       /* minimal velocity in real model*/
@@ -103,10 +106,14 @@ Params::Params() {
   sf_putint(vupdates, "n3", niter);
   sf_putint(vupdates, "d3", 1);
   sf_putint(vupdates, "o3", 1);
-  sf_putint(objs, "n1", niter);
-  sf_putint(objs, "n2", 1);
-  sf_putfloat(objs, "d1", 1);
-  sf_putfloat(objs, "o1", 1);
+  sf_putint(absobjs, "n1", niter);
+  sf_putfloat(absobjs, "d1", 1);
+  sf_putfloat(absobjs, "o1", 1);
+  sf_putstring(absobjs, "label1", "Absolute");
+  sf_putint(norobjs, "n1", niter);
+  sf_putfloat(norobjs, "d1", 1);
+  sf_putfloat(norobjs, "o1", 1);
+  sf_putstring(norobjs, "label1", "Normalize");
 
   check();
 }
@@ -136,9 +143,11 @@ int main(int argc, char *argv[]) {
   Params params;
 
   /// configure logger
+  const char *logfile = "essfwi-damp.log";
+  std::remove(logfile);
   easyloggingpp::Configurations defaultConf;
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "%date %level %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "essfwi-damp.log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   int nz = params.nz;
@@ -176,10 +185,21 @@ int main(int argc, char *argv[]) {
   UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
 
   EssFwiFramework essfwi(fmMethod, updateSteplenOp, updatevelop, wlt, dobs);
+
+  std::vector<float> absobj(params.niter);
+  std::vector<float> norobj(params.niter);
+  float absobj0 = 0;
   for (int iter = 0; iter < params.niter; iter++) {
     essfwi.epoch(iter);
     essfwi.writeVel(params.vupdates);
+    float obj = essfwi.getobjval();
+    absobj0 = iter == 0 ? obj : absobj0;
+    absobj[iter] = obj;
+    norobj[iter] = obj / absobj0;
   } /// end of iteration
+
+  sf_floatwrite(&absobj[0], absobj.size(), params.absobjs);
+  sf_floatwrite(&norobj[0], norobj.size(), params.norobjs);
 
   sf_close();
 

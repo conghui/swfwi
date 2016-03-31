@@ -213,8 +213,8 @@ bool UpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1
   return toParabolicFit;
 }
 
-float UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
-    float obj_val1, int iter) {
+void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
+    float obj_val1, int iter, float &steplen, float &objval) {
 
   float dt = fmMethod.getdt();
   float dx = fmMethod.getdx();
@@ -255,7 +255,8 @@ float UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
   INFO() << format("iter %d  alpha4 = %e total obj_val4 = %e\n") % iter % alpha4 % obj_val4;
 
   preservedAlpha.alpha = alpha4;
-  return alpha4;
+  steplen = alpha4;
+  objval = obj_val4;
 }
 
 void UpdateSteplenOp::bindEncSrcObs(const std::vector<float>& encsrc,

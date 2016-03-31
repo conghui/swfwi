@@ -347,7 +347,7 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
     const std::vector<float> &_wlt, const std::vector<float> &_dobs) :
     fmMethod(method), updateStenlelOp(updateSteplenOp), updateVelOp(_updateVelOp), wlt(_wlt), dobs(_dobs),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
-    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt())
+    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()), objval(0)
 {
   g0.resize(nx*nz, 0);
   updateDirection.resize(nx*nz, 0);
@@ -383,7 +383,8 @@ void EssFwiFramework::epoch(int iter) {
   updateGrad(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
 
   updateStenlelOp.bindEncSrcObs(encsrc, encobs);
-  float steplen = updateStenlelOp.calsteplen(updateDirection, obj1, iter);
+  float steplen;
+  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, objval);
 
   Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);
@@ -393,4 +394,8 @@ void EssFwiFramework::epoch(int iter) {
 
 void EssFwiFramework::writeVel(sf_file file) const {
   fmMethod.sfWriteVel(fmMethod.getVelocity().dat, file);
+}
+
+float EssFwiFramework::getobjval() const {
+  return objval;
 }

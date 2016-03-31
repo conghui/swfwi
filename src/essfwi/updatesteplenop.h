@@ -17,7 +17,7 @@ public:
   UpdateSteplenOp(const Damp4t10d &fmMethod, const UpdateVelOp &updateVelOp, int max_iter_select_alpha3, float maxdv);
 
   void bindEncSrcObs(const std::vector<float> &encsrc, const std::vector<float> &encobs);
-  float calsteplen(const std::vector<float> &grad, float obj_val1, int iter);
+  void calsteplen(const std::vector<float> &grad, float obj_val1, int iter, float &steplen, float &objval);
 
 private:
   float calobjval(const std::vector<float> &grad, float steplen) const;
