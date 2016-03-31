@@ -219,10 +219,9 @@ void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
   float dt = fmMethod.getdt();
   float dx = fmMethod.getdx();
 
-  TRACE() << "calculate the initial value of alpha2 and alpha3";
+  /// "calculate the initial value of alpha2 and alpha3";
   float max_alpha2, max_alpha3;
 
-  DEBUG() << format("sumvel %.f, sumdir %.f dt %f, dx %f, maxdv %f") % sum(fmMethod.getVelocity().dat) % sum(grad) % dt % dx % maxdv;
   calMaxAlpha2_3(fmMethod.getVelocity(), &grad[0], dt, dx, maxdv, max_alpha2, max_alpha3);
   DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
 
