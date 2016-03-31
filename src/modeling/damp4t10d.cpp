@@ -136,6 +136,7 @@ static void recoverVel(std::vector<float> &vel, float dx, float dt) {
 
 Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
   // expand for boundary, free surface
+  int nb = bx0 - EXFDBNDRYLEN;
   Velocity exvelForBndry(_vel.nx + 2 * nb, _vel.nz + nb);
   expandBndry(exvelForBndry, _vel, nb);
 
@@ -149,7 +150,7 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
-  fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + EXFDBNDRYLEN, dx, dt);
+  fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz, bx0, dx, dt);
 //  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
 //  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
 //  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
@@ -168,8 +169,8 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p,
 //  DEBUG() << format("ng %d") % ng;
 //  float sum = 0;
   for (int ig = 0; ig < ng; ig++) {
-    int gx = geoPos.getx(ig) + nb + EXFDBNDRYLEN;
-    int gz = geoPos.getz(ig) + EXFDBNDRYLEN;
+    int gx = geoPos.getx(ig) + bx0;
+    int gz = geoPos.getz(ig) + bz0;
     int idx = gx * nzpad + gz;
     seis_it[ig] = p[idx];
 //    DEBUG() << format("ig %d, idx %d, v %.20f") % ig % idx % seis_it[ig];
@@ -204,8 +205,8 @@ void Damp4t10d::manipSource(float* p, const float* source,
   int nzpad = vel->nz;
 
   for (int is = 0; is < pos.ns; is++) {
-    int sx = pos.getx(is) + nb + EXFDBNDRYLEN;
-    int sz = pos.getz(is) + EXFDBNDRYLEN;
+    int sx = pos.getx(is) + bx0;
+    int sz = pos.getz(is) + bz0;
     p[sx * nzpad + sz] = op(p[sx * nzpad + sz], source[is]);
 //    DEBUG() << format("sx %d, sz %d, source[%d] %f") % sx % sz % is % source[is];
   }
@@ -256,11 +257,11 @@ void Damp4t10d::sfWriteVel(const std::vector<float> &exvel, sf_file file) const 
   assert(exvel.size() == vel->dat.size());
   int nzpad = vel->nz;
   int nxpad = vel->nx;
-  int nz = nzpad - 2 * EXFDBNDRYLEN - nb;
+  int nz = nzpad - bz0 - bzn;
 
   std::vector<float> vv = exvel;
   recoverVel(vv, dx, dt);
-  for (int ix = EXFDBNDRYLEN + nb; ix < nxpad - EXFDBNDRYLEN - nb; ix++) {
+  for (int ix = bx0; ix < nxpad - bxn; ix++) {
     sf_floatwrite(&vv[ix * nzpad + EXFDBNDRYLEN], nz, file);
   }
 }
@@ -290,9 +291,9 @@ void Damp4t10d::EssForwardModeling(const std::vector<float>& encSrc,
 
 void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const {
   int half_len = t_width / dt;
-  int sx = allSrcPos.getx(0) + EXFDBNDRYLEN + nb;
-  int sz = allSrcPos.getz(0) + EXFDBNDRYLEN;
-  int gz = allGeoPos.getz(0) + EXFDBNDRYLEN; // better to assume all receivers are located at the same depth
+  int sx = allSrcPos.getx(0) + bx0;
+  int sz = allSrcPos.getz(0) + bz0;
+  int gz = allGeoPos.getz(0) + bz0; // better to assume all receivers are located at the same depth
 
   float vel_average = 0.0;
   int gmin = (sz < gz) ? sz : gz;
@@ -318,8 +319,8 @@ void Damp4t10d::removeDirectArrival(const ShotPosition &allSrcPos, const ShotPos
   matrix_transpose(&data[0], &trans[0], ng, nt);
 
   for (int itr = 0; itr < ng; itr ++) {
-    int gx = allGeoPos.getx(itr) + EXFDBNDRYLEN + nb;
-    int gz = allGeoPos.getz(itr) + EXFDBNDRYLEN;
+    int gx = allGeoPos.getx(itr) + bx0;
+    int gz = allGeoPos.getz(itr) + bz0;
 
     float dist = (gx-sx)*(gx-sx) + (gz-sz)*(gz-sz);
     int t = (int)sqrt(dist * vel_average);
@@ -339,8 +340,9 @@ Damp4t10d::Damp4t10d(const ShotPosition& _allSrcPos, const ShotPosition& _allGeo
       vel(NULL), allSrcPos(&_allSrcPos), allGeoPos(&_allGeoPos),
       dt(_dt), dx(_dx), fm(_fm), nb(_nb), nt(_nt)
 {
-  int totalNb = nb + EXFDBNDRYLEN;
-  bndr.resize(totalNb);
+  bz0 = EXFDBNDRYLEN;
+  bx0 = bxn = bzn = _nb + EXFDBNDRYLEN;
+  bndr.resize(bx0);
   initbndr(bndr, bndr.size());
 }
 

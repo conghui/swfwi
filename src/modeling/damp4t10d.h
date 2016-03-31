@@ -73,6 +73,8 @@ private:
   float dt;
   float dx;
   float fm;
+  int bx0, bxn;
+  int bz0, bzn;
   int nb;
   int nt;
   mutable int bndrSize;
