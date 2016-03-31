@@ -34,6 +34,8 @@ bool abs_less(T a, T b) {
   return std::abs(a) < std::abs(b);
 }
 
+
+
 void matrix_transpose(float *matrix, float *trans, int n1, int n2);
 void step_forward(const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
 void step_backward(float *illum, float *lap, const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);

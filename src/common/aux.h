@@ -50,6 +50,17 @@ float variance(const std::vector<T> &A, const std::vector<T> &B) {
 }
 
 template <typename T>
+float variance(const T *A_Begin, const T *A_End, const T *B_Begin) {
+  float v = 0;
+
+  for (; A_Begin != A_End; ++A_Begin, ++B_Begin) {
+    v += (*A_Begin - *B_Begin) * (*A_Begin - *B_Begin);
+  }
+
+  return v;
+}
+
+template <typename T>
 void writeBin(const std::string &fn, T *data, int bytes) {
   std::ofstream ofs(fn.c_str());
   assert(ofs.good());

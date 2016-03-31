@@ -19,15 +19,17 @@ class EnkfAnalyze {
 public:
   EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt, const std::vector<float> &dobs, float sigmafactor);
 
-  void analyze(std::vector<float *> &velSet) const;
+  void analyze(std::vector<float *> &velSet, Matrix &lambdaSet, Matrix &ratioSet) const;
+  void initLambdaSet(const std::vector<float *> &velSet, Matrix &lambdaSet, const Matrix &ratioSet) const;
   std::vector<float> createAMean(const std::vector<float *> &velSet) const;
 
 protected:
-  Matrix calGainMatrix(const std::vector<float *> &velSet) const;
+  Matrix calGainMatrix(const std::vector<float *> &velSet, std::vector<float> &resdSet) const;
   double initPerturbSigma(double maxHAP, float factor) const;
   void initGamma(const Matrix &perturbation, Matrix &gamma) const;
 //  void initPerturbation(Matrix &perturbation, double mean, double sigma) const;
   void initPerturbation(Matrix& perturbation, const Matrix &HA_Perturb) const;
+  void initRatioPerturb(const Matrix &ratioSet, Matrix &ratioPerturb) const;
 
 protected:
   const Damp4t10d &fm;

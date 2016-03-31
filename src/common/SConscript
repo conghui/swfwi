@@ -15,6 +15,7 @@ lib_modules = """
 			  shot-position.cpp
 			  parabola-vertex.cpp
 			  sfutil.cpp
+			  ReguFactor.cpp
               """.split()
 
 extra_include_dir = [

@@ -14,6 +14,8 @@
 #include "random-code.h"
 #include "encoder.h"
 #include "dgesvd.h"
+#include "ReguFactor.h"
+#include "aux.h"
 
 namespace {
 //std::vector<float> createAMean(const std::vector<float *> &velSet, int modelSize) {
@@ -52,7 +54,7 @@ EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
   modelSize = fm.getnx() * fm.getnz();
 }
 
-void EnkfAnalyze::analyze(std::vector<float*>& velSet) const {
+void EnkfAnalyze::analyze(std::vector<float*>& velSet, Matrix &lambdaSet, Matrix &ratioSet) const {
   float dt = fm.getdt();
   float dx = fm.getdx();
 
@@ -65,7 +67,8 @@ void EnkfAnalyze::analyze(std::vector<float*>& velSet) const {
   initAPerturb(A_Perturb, A, AMean, modelSize);
   DEBUG() << "sum of A_Perturb: " << getSum(A_Perturb);
 
-  Matrix gainMatrix = calGainMatrix(velSet);
+  std::vector<float> resdSet(N);
+  Matrix gainMatrix = calGainMatrix(velSet, resdSet);
 
   Matrix t5(N, modelSize);
   alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
@@ -95,9 +98,35 @@ void EnkfAnalyze::analyze(std::vector<float*>& velSet) const {
     std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
   }
 
+  TRACE() << "updating ratioset";
+  Matrix ratio_Perturb(N, 2);
+  initRatioPerturb(ratioSet, ratio_Perturb);
+
+  Matrix t6(N, 2);
+  alpha_A_B_plus_beta_C(1, ratio_Perturb, gainMatrix, 0, t6);
+
+  A_plus_B(ratioSet, t6, ratioSet);
+
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  float lambdaX = 0;
+  float lambdaZ = 0;
+  TRACE() << "updating lamdaset";
+  for (int i = 0; i < N; i++) {
+    ReguFactor fac(velSet[i], nx, nz, lambdaX, lambdaZ);
+    Matrix::value_type *pLambda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    Matrix::value_type *pRatio  = ratioSet.getData()  + i * ratioSet.getNumRow();
+    pLambda[0] = pRatio[0] * resdSet[i] / fac.getWx2();
+    pLambda[1] = pRatio[1] * resdSet[i] / fac.getWz2();
+    DEBUG() << "PRATIO[0] " << pRatio[0];
+    DEBUG() << "PRESD[i] " << resdSet[i];
+    DEBUG() << "PLAMBDA[0] " << pLambda[0];
+    DEBUG() << "";
+  }
 }
 
-Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
+
+Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector<float> &resdSet) const {
   int N = velSet.size();
   int nt = fm.getnt();
   int ng = fm.getng();
@@ -143,6 +172,11 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
 
     DEBUG() << format("   sum HonA %.20f") % getSum(HOnA);
 
+    TRACE() << "save the resd";
+    const Matrix::value_type *obsDataBegin = D.getData() + i * numDataSamples;
+    const Matrix::value_type *obsDataEnd   = obsDataBegin + numDataSamples;
+    const Matrix::value_type *synDataBegin = HOnA.getData() + i * numDataSamples;
+    resdSet[i] = variance(obsDataBegin, obsDataEnd, synDataBegin);
   }
 
   DEBUG() << "sum of D: " << getSum(D);
@@ -291,4 +325,72 @@ void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Pertur
 
   std::generate(perturbation.getData(), perturbation.getData() + perturbation.size(), *generator);
 
+}
+
+void EnkfAnalyze::initLambdaSet(const std::vector<float*>& velSet, Matrix& lambdaSet, const Matrix& ratioSet) const {
+  DEBUG() << "initial lambda ratio is: " << ratioSet.getData()[0];
+
+  int ng = fm.getng();
+  int nt = fm.getnt();
+  int ns = fm.getns();
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  int modelSize = nx * nz;
+  int diffColDiffCodes = 0;
+
+  int N = velSet.size();
+  std::vector<std::vector<int> > codes(N);
+
+  int numDataSamples = ng * nt;
+  std::vector<float> obsData(numDataSamples);
+  std::vector<float> synData(numDataSamples);
+
+  for (int i = 0; i < N; i++) {
+    DEBUG() << format("init Lambda on velocity %2d/%d") % (i + 1) % velSet.size();
+
+    ///  "making encoded shot, both sources and receivers";
+    codes[i] = RandomCode::genPlus1Minus1(ns);
+    Encoder encoder(codes[0]);
+    std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+
+    TRACE() << "save encoded data";
+    std::vector<float> trans(encobs.size());
+    matrix_transpose(&encobs[0], &trans[0], ng, nt);
+    const float *p= &trans[0];
+    std::copy(p, p + numDataSamples, obsData.begin());
+
+    std::vector<float> dcal(encobs.size(), 0);
+
+    ///// this decrease the performance ///
+    Damp4t10d newfm = fm;
+    Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
+    newfm.bindVelocity(curvel);
+    newfm.EssForwardModeling(encsrc, dcal);
+    matrix_transpose(&dcal[0], &trans[0], ng, nt);
+    std::copy(p, p + numDataSamples, synData.begin());
+
+    TRACE() << "calculate the data residule";
+    float resd = variance(obsData, synData);
+
+    TRACE() << "create regularization factor";
+    ReguFactor reguFac(velSet[i], nx, nz);
+    float Wx2 = reguFac.getWx2();
+    float Wz2 = reguFac.getWz2();
+
+    TRACE() << "update LambdaSet";
+    assert(lambdaSet.getNumCol() == N);
+    Matrix::value_type *plamda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    const Matrix::value_type *pratio = ratioSet.getData() + i * ratioSet.getNumRow();
+    plamda[0] = pratio[0] * resd / Wx2; /// lambdaX
+    plamda[1] = pratio[1] * resd / Wz2; /// lamdaZ
+    DEBUG() << "pratio[0] " << pratio[0];
+    DEBUG() << "plambda[0] " << plamda[0];
+
+  }
+}
+
+void EnkfAnalyze::initRatioPerturb(const Matrix& ratioSet,
+    Matrix& ratioPerturb) const {
+  initGamma(ratioSet, ratioPerturb);
 }

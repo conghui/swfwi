@@ -382,11 +382,19 @@ int main(int argc, char *argv[]) {
   /// collect all the data from other process to rank 0
   gatherVelocity(totalveldb, veldb, params);
 
+  /// for regulalization
+  float initLambdaRatio = 0.5;
+  Matrix ratioSet(N, 2);  /// 0 for muX, 1 for muZ
+  Matrix lambdaSet(N, 2); /// 0 for lambdaX, 1 for lambdaZ
+
   /// in current implementation,only the root process perform the enkf analyze
   /// we will further parallel this function
   if (rank == 0) {
     std::vector<float *> velSet = generateVelSet(totalveldb);
-    enkfAnly.analyze(velSet);
+
+    std::fill(ratioSet.getData(), ratioSet.getData() + ratioSet.size(), initLambdaRatio);
+    enkfAnly.initLambdaSet(velSet, lambdaSet, ratioSet);
+    enkfAnly.analyze(velSet, lambdaSet, ratioSet);
   }
 
   /// after enkf, we should scatter velocities
@@ -413,7 +421,7 @@ int main(int argc, char *argv[]) {
     if (iter % niterenkf == 0) {
       if (rank == 0) {
         std::vector<float *> velSet = generateVelSet(totalveldb);
-        enkfAnly.analyze(velSet);
+        enkfAnly.analyze(velSet, lambdaSet, ratioSet);
       }
     }
 

@@ -35,6 +35,7 @@ extern "C"
 #include "sfutil.h"
 #include "parabola-vertex.h"
 #include "essfwiframework.h"
+#include "ReguFactor.h"
 
 #include "aux.h"
 
@@ -176,7 +177,7 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
   updateDirection.resize(nx*nz, 0);
 }
 
-void EssFwiFramework::epoch(int iter) {
+void EssFwiFramework::epoch(int iter, float lambdaX, float lambdaZ) {
   // create random codes
   const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
 
@@ -194,6 +195,12 @@ void EssFwiFramework::epoch(int iter) {
   float obj1 = cal_objective(&vsrc[0], vsrc.size());
   DEBUG() << format("obj: %e") % obj1;
 
+  Velocity &exvel = fmMethod.getVelocity();
+  if (!(lambdaX == 0 && lambdaZ == 0)) {
+    ReguFactor fac(&exvel.dat[0], nx, nz, lambdaX, lambdaZ);
+    obj1 += fac.getReguTerm();
+  }
+
   transVsrc(vsrc, nt, ng);
 
   std::vector<float> g1(nx * nz, 0);
@@ -208,9 +215,8 @@ void EssFwiFramework::epoch(int iter) {
 
   updateStenlelOp.bindEncSrcObs(encsrc, encobs);
   float steplen;
-  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, objval);
+  updateStenlelOp.calsteplen(updateDirection, obj1, iter, lambdaX, lambdaZ, steplen, objval);
 
-  Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);
 
   fmMethod.refillBoundary(&exvel.dat[0]);
