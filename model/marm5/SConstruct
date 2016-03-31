@@ -8,10 +8,16 @@ def mkdir(path):#{{{
   if not os.path.exists(path):
     os.makedirs(path)
 #}}}
-def plot(file, title):#{{{
+def plotvel(file, title):#{{{
   Plot(file, '''
     grey title="%s" color=j allpos=y pclip=100 bias=1500 gainpanel=1
     scalebar=y barreverse=y barunit=m/s barlabel=Velocity''' % title)
+#}}}
+def plotobj(file, title):#{{{
+  cmd = '''< %s.rsf sfput n2=1 label1=Iteration unit1= unit2= label2= |
+  sfgraph title="%s" dash=0 plotfat=5  grid=y yreverse=n >
+  %s.vpl''' % (file, title, file)
+  system(cmd.replace('\n', ''))
 #}}}
 
 # marmvel.hh contains Marmousi model which can be downloaded from the server using Fetch.
@@ -30,12 +36,12 @@ Flow('smvel', 'vel', '''
   smooth rect1=25 rect2=60 |
   math output="1/input"
   ''')
-plot('vel', 'Marmousi model')
-plot('smvel', 'Smoothed model')
+plotvel('vel', 'Marmousi model')
+plotvel('smvel', 'Smoothed model')
 Result('marm', 'vel smvel', 'OverUnderAniso')
 
-datapath = './rsfdata/'
-checkpointdir='./checkpoingdir/'
+datapath = os.getcwd() + '/rsfdata/'
+checkpointdir = os.getcwd() + '/checkpoingdir/'
 os.environ['DATAPATH'] = datapath
 os.environ['CHECKPOINTDIR'] = checkpointdir
 os.environ['OMP_NUM_THREADS'] = '8'
@@ -50,18 +56,21 @@ if task == 'fm':
   '''.replace('\n', ' '))
 elif task == 'essfwi':
   system('''../../bin/essfwi-damp vin=smvel.rsf shots=shots.rsf
-  vout=vsnaps.rsf objs=objs.rsf vmin=1500 vmax=5500 maxdv=200 nita=5
-  niter=300 nb=60 seed=10
+  vout=essvsnaps.rsf absobjs=absobjs.rsf norobjs=norobjs.rsf
+  niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
   '''.replace('\n', ''))
+  plotobj('absobjs', 'Absolute objective value')
+  plotobj('norobjs', 'Normalized objective value')
+
 elif task == 'enfwi':
   system('''mpirun -np 1 ../../bin/enfwi-damp vin=smvel.rsf shots=shots.rsf
-  vout=vsnaps.rsf objs=objs.rsf vmin=1450 vmax=5600 maxdv=200 nita=5
-  niter=300 nb=30 seed=10
-  sigfac=0.2 niterenkf=10 nsample=20
+  vout=envsnaps.rsf objs=objs.rsf vmin=1450 vmax=5600 maxdv=200 nita=5
+  niter=2 nb=30 seed=10
+  sigfac=0.2 niterenkf=1 nsample=2
   perin=/home/rice/data/marm/velPerturb_20.bin
   '''.replace('\n', ''))
 
-# plot('vel300', 'vel 300 D=0')
+plotvel('vel300', 'new rwbndry enfwi vel 300 D=0')
 #plot('vsnaps', 'vel')
 #plot('illums', 'illum')
 #plot('grads', 'grad')
