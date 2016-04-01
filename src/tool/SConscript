@@ -5,7 +5,7 @@ bin_list = [
 			("fm-damp", "main-fm-damp.cpp"),
 			("essfwi-damp", "main-essfwi-damp.cpp"),
 			("enfwi-damp", "main-enfwi-damp.cpp"),
-
+			("norm", "main-norm.cpp"),
            ]
 
 lib = 'tool'

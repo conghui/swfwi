@@ -1,164 +1,94 @@
 # vim: fdm=marker fdl=0
 
 from rsf.proj import *
-import os
-from os import system
-
-def mkdir(path):#{{{
-  if not os.path.exists(path):
-    os.makedirs(path)
-#}}}
-def plotvel(file, title):#{{{
+def plotvel(file, title):# {{{
   Plot(file, '''
     grey title="%s" color=j allpos=y pclip=100 bias=1500 gainpanel=1
     scalebar=y barreverse=y barunit=m/s barlabel=Velocity''' % title)
-#}}}
-def plotobj(file, title):#{{{
-  cmd = '''< %s.rsf sfput n2=1 label1=Iteration unit1= unit2= label2= |
-  sfgraph title="%s" dash=0 plotfat=5  grid=y yreverse=n >
-  %s.vpl''' % (file, title, file)
-  system(cmd.replace('\n', ''))
-#}}}
+# }}}
+def plotcurve(file, title):# {{{
+  Plot(file,
+    '''sfput n2=1 label1=Iteration unit1= unit2= label2= |
+    sfgraph title="%s" dash=0 plotfat=5  grid=y yreverse=n''' % title)
+# }}}
+def windowAndDraw(vsnaps, base, arr):# {{{
+  vels = ''
+  for i in arr:
+    vels += '%s%s ' % (base, i)
+    Plot('%s%d' % (base, i), vsnaps, '''window f3=%d n3=1 |
+    grey title="Essfwi, iter %d" color=j allpos=y pclip=100 bias=1500 gainpanel=1
+    scalebar=y barreverse=y barunit=m/s barlabel=Velocity''' % (i-1, i))
 
-# marmvel.hh contains Marmousi model which can be downloaded from the server using Fetch.
+  Plot('essvelset', vels, 'TwoRows')
+# }}}
+# fetch marmvel#{{{
 #Fetch('marmvel.hh','marm')
 Fetch('marmvel.hh', 'marm', server = 'local', top = os.environ['HOME'] + '/data/')
-
+#}}}
+# down sampling velocity#{{{
 Flow('vel','marmvel.hh',
   '''
   dd form=native |
   window j1=5 j2=5 |
   put label1=Depth  unit1=m label2=Lateral unit2=m
   ''')
-
-Flow('smvel', 'vel', '''
-  math output="1/input" |
+#}}}
+# smooth initial model#{{{
+Flow('smvel', 'vel', '''math output="1/input" |
   smooth rect1=25 rect2=60 |
   math output="1/input"
   ''')
+#}}}
+# plot real/smoothed velocities#{{{
 plotvel('vel', 'Marmousi model')
 plotvel('smvel', 'Smoothed model')
 Result('marm', 'vel smvel', 'OverUnderAniso')
-
-datapath = os.getcwd() + '/rsfdata/'
-checkpointdir = os.getcwd() + '/checkpoingdir/'
-os.environ['DATAPATH'] = datapath
-os.environ['CHECKPOINTDIR'] = checkpointdir
-os.environ['OMP_NUM_THREADS'] = '8'
-mkdir(datapath)
-mkdir(checkpointdir)
+#}}}
+# setup binaries#{{{
+bindir    = '../../bin/'
+fmbin     = bindir + 'fm-damp'
+essfwibin = bindir + 'essfwi-damp'
+enfwibin  = bindir + 'enfwi-damp'
+normbin   = bindir + 'norm'
+#}}}
 
 task = ARGUMENTS.get('task')
 if task == 'fm':
-  system('''../../bin/fm-damp vinit=vel.rsf shots=shots.rsf
-  fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=60
-  sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
-  '''.replace('\n', ' '))
+  Flow('shots', 'vel', '''%s
+    vinit=${SOURCES[0]} shots=${TARGETS[0]}
+    fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=30
+    sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
+    ''' % fmbin, stdout=-1, stdin=0)
+  Plot('shots','grey color=g title=shot label2= unit2=', view=0)
 elif task == 'essfwi':
-  system('''../../bin/essfwi-damp vin=smvel.rsf shots=shots.rsf
-  vout=essvsnaps.rsf absobjs=absobjs.rsf norobjs=norobjs.rsf
-  niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
-  '''.replace('\n', ''))
-  plotobj('absobjs', 'Absolute objective value')
-  plotobj('norobjs', 'Normalized objective value')
-
+  Flow('vsnaps absobjs norobjs', 'smvel shots', '''%s
+    vin=${SOURCES[0]} shots=${SOURCES[1]}
+    vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
+    niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
+    ''' % essfwibin, stdout=-1, stdin=0)
 elif task == 'enfwi':
-  system('''mpirun -np 1 ../../bin/enfwi-damp vin=smvel.rsf shots=shots.rsf
-  vout=envsnaps.rsf objs=objs.rsf vmin=1450 vmax=5600 maxdv=200 nita=5
-  niter=2 nb=30 seed=10
-  sigfac=0.2 niterenkf=1 nsample=2
-  perin=/home/rice/data/marm/velPerturb_20.bin
-  '''.replace('\n', ''))
+  Flow('vsnaps absobjs norobjs', 'smvel shots',
+    '''mpirun -np 1 %s
+    vin=${SOURCES[0]} shots=${SOURCES[1]}
+    vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
+    niter=300 nb=30 seed=10 vmin=1450 vmax=5600 maxdv=200 nita=5
+    sigfac=0.2 niterenkf=10 nsample=20
+    perbin=/home/rice/data/marm/velpert533x193x100.bin
+    ''' % enfwibin, stdout=-1, stdin=0)
+elif task == 'addnoise':
+  Flow('shotsnoise', 'shots', 'noise seed=1 type=n var=0.01')
+  Plot('shotsnoise','grey color=g title=shot label2= unit2=', view=0)
 
-plotvel('vel300', 'new rwbndry enfwi vel 300 D=0')
-#plot('vsnaps', 'vel')
-#plot('illums', 'illum')
-#plot('grads', 'grad')
-
-#Flow('shots','vel',
-  #'''
-  #../../../bin/fm-damp vinit=${SOURCES[0]} shots=${TARGETS[0]}
-  #fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=30
-  #sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
-  #''', stdin=0, stdout=-1)
-#Plot('shots','grey color=g title=shot label2= unit2=',view=1)
-
-
-#Plot('shot4','shots','window n3=1 f3=4| grey color=g title=shot4 label2=Lateral unit2=m')
-#Plot('shot11','shots','window n3=1 f3=11| grey color=g title=shot11 label2=Lateral unit2=m')
-#Plot('shot17','shots','window n3=1 f3=17| grey color=g title=shot17 label2=Lateral unit2=m')
-#Result('shotsnap','shot4 shot11 shot17','SideBySideAniso',vppen='txscale=2.')
-
-## smoothed velocity model
-#Flow('smvel','vel','smooth repeat=10 rect1=10 rect2=20')
-#Plot('smvel',
-     #'''
-     #grey title="Smoothed Marmousi model" wantitle=y allpos=y color=j
-     #pclip=100 scalebar=y bartype=v barlabel="V" barunit="m/s"
-  #screenratio=0.45 color=j labelsz=10 titlesz=12
-     #''' )
-
-#Result('marm','vel smvel','TwoRows')
-
-## use the over-smoothed model as initial model for FWI
-##Flow('vsnaps grads objs illums','smvel shots',
-  ##'''
-  ##sffwi2d shots=${SOURCES[1]} grads=${TARGETS[1]} objs=${TARGETS[2]}
-  ##illums=${TARGETS[3]} niter=300 precon=y
-  ##''')
-##Result('vsnaps',
-  ##'''
-  ##grey title="Updated velocity" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s"
-  ##''')
-##Plot('vsnap1','vsnaps',
-  ##'''
-  ##window n3=1|grey title="Updated velocity, iter=1" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-##Plot('vsnap20','vsnaps',
-  ##'''
-  ##window n3=1 f3=19|grey title="Updated velocity, iter=20" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-##Plot('vsnap50','vsnaps',
-  ##'''
-  ##window n3=1 f3=49|grey title="Updated velocity, iter=50" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-
-##Plot('vsnap100','vsnaps',
-  ##'''
-  ##window n3=1 f3=99|grey title="Updated velocity, iter=100" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-##Plot('vsnap180','vsnaps',
-  ##'''
-  ##window n3=1 f3=179|grey title="Updated velocity, iter=180" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-##Plot('vsnap300','vsnaps',
-  ##'''
-  ##window n3=1 f3=299|grey title="Updated velocity, iter=300" allpos=y color=j pclip=100
-  ##scalebar=y bartype=v barlabel="V" barunit="m/s" labelsz=10 titlesz=12
-  ##''')
-
-##Result('vsnap','vsnap1 vsnap20 vsnap50 vsnap100 vsnap180 vsnap300','TwoRows')
-
-###########################################################################
-###Plot('vsnapa','vsnap1 vsnap100','OverUnderAniso',vppen='txscale=2')
-###Plot('vsnapb','vsnap20 vsnap180','OverUnderAniso',vppen='txscale=2')
-###Plot('vsnapc','vsnap50 vsnap300','OverUnderAniso',vppen='txscale=2')
-###Result('vsnap','vsnapa vsnapb vsnapc','SideBySideAniso',vppen='txscale=1.')
-
-##Result('grads','grey title="Updated gradient" scalebar=y color=j ')
-##Result('illums','grey title="illumination" scalebar=y color=j')
-
-##Result('objs',
-  ##'''
-  ##sfput n2=1 label1=Iteration unit1= unit2= label2= |
-  ##graph title="Misfit function" dash=0 plotfat=5  grid=y yreverse=n
-  ##''')
-
-
+if task == 'enfwi' or task == 'essfwi':
+  windowAndDraw('vsnaps', 'vel', [50, 100, 200, 300])
+  # plot objs norms#{{{
+  plotcurve('absobjs', 'Absolute objective value')
+  plotcurve('norobjs', 'Normalized objective value')
+  Flow('l1norm l2norm', 'vel vsnaps',   '''%s
+    realvel=${SOURCES[0]} velset=${SOURCES[1]}
+    l1norm=${TARGETS[0]} l2norm=${TARGETS[1]}
+    ''' % normbin, stdout=-1, stdin=0)
+  plotcurve('l1norm', 'l1norm')
+  plotcurve('l2norm', 'l2norm')
+#}}}
 End()
