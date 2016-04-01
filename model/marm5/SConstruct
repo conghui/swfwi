@@ -50,13 +50,14 @@ fmbin     = bindir + 'fm-damp'
 essfwibin = bindir + 'essfwi-damp'
 enfwibin  = bindir + 'enfwi-damp'
 normbin   = bindir + 'norm'
+noisebin  = bindir + 'noise'
 #}}}
 
 task = ARGUMENTS.get('task')
 if task == 'fm':
   Flow('shots', 'vel', '''%s
     vinit=${SOURCES[0]} shots=${TARGETS[0]}
-    fm=10 amp=1 dt=0.0015 ns=40 ng=461 nt=2000 nb=30
+    fm=10 amp=1 dt=0.0015 ns=47 ng=461 nt=2000 nb=30
     sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
     ''' % fmbin, stdout=-1, stdin=0)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
@@ -73,10 +74,10 @@ elif task == 'enfwi':
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 nb=30 seed=10 vmin=1450 vmax=5600 maxdv=200 nita=5
     sigfac=0.2 niterenkf=10 nsample=20
-    perbin=/home/rice/data/marm/velpert533x193x100.bin
+    perin=/home/rice/data/marm/velpert533x193x100.bin
     ''' % enfwibin, stdout=-1, stdin=0)
-elif task == 'addnoise':
-  Flow('shotsnoise', 'shots', 'noise seed=1 type=n var=0.01')
+elif task == 'noise':
+  Flow('shotsnoise', 'shots', '%s fac=0.05' % noisebin)
   Plot('shotsnoise','grey color=g title=shot label2= unit2=', view=0)
 
 if task == 'enfwi' or task == 'essfwi':
