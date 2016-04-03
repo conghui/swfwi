@@ -5,6 +5,7 @@ extern "C" {
 
 #include <cmath>
 #include "logger.h"
+#include "environment.h"
 
 namespace {
 class Params {
@@ -66,13 +67,8 @@ _INITIALIZE_EASYLOGGINGPP
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */
   sf_init(argc,argv);
+  Environment::setDatapath();
   Params params;
-
-  /// configure logger
-//  easyloggingpp::Configurations defaultConf;
-//  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
-//  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
-//  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   int nz = params.nz;
   int nx = params.nx;

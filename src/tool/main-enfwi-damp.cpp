@@ -26,6 +26,7 @@ extern "C" {
 #include "updatesteplenop.h"
 #include "enkfanalyze.h"
 #include "common.h"
+#include "environment.h"
 
 namespace {
 class Params {
@@ -289,6 +290,7 @@ _INITIALIZE_EASYLOGGINGPP
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
+  Environment::setDatapath();
 
   /// configure logger
   easyloggingpp::Configurations defaultConf;

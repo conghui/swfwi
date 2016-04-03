@@ -8,6 +8,7 @@ extern "C" {
 #include <cstdio>
 #include "common.h"
 #include "sum.h"
+#include "environment.h"
 
 namespace {
 float rand01f() {
@@ -56,6 +57,8 @@ Params::~Params() {
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */
   sf_init(argc,argv);
+  Environment::setDatapath();
+
   Params params;
 
   int nt = params.nt;

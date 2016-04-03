@@ -14,6 +14,7 @@ extern "C" {
 #include "essfwiframework.h"
 #include "shotdata-reader.h"
 #include "updatevelop.h"
+#include "environment.h"
 
 namespace {
 class Params {
@@ -140,6 +141,7 @@ _INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
   sf_init(argc, argv);                /* initialize Madagascar */
+  Environment::setDatapath();
   Params params;
 
   /// configure logger

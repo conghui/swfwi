@@ -15,6 +15,7 @@ extern "C" {
 #include "damp4t10d.h"
 #include "sfutil.h"
 #include "timer.h"
+#include "environment.h"
 
 namespace {
 class Params {
@@ -182,6 +183,8 @@ _INITIALIZE_EASYLOGGINGPP
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */
   sf_init(argc,argv);
+  Environment::setDatapath();
+
   Params params;
   Timer totalTimer;
 
