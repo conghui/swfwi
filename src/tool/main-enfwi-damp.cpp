@@ -27,6 +27,8 @@ extern "C" {
 #include "enkfanalyze.h"
 #include "common.h"
 #include "environment.h"
+#include "random-code.h"
+#include "encoder.h"
 
 namespace {
 class Params {
@@ -39,7 +41,8 @@ public:
   sf_file vinit;        /* initial velocity model, unit=m/s */
   sf_file shots;        /* recorded shots from exact velocity model */
   sf_file vupdates;     /* updated velocity in iterations */
-  sf_file objs;         /* values of objective function in iterations */
+  sf_file absobjs;         /* absolute values of objective function in iterations */
+  sf_file norobjs;         /* normalize values of objective function in iterations */
   int niter;            /* # of iterations */
   int nb;               /* size of the boundary */
   float vmin;
@@ -83,7 +86,9 @@ Params::Params() {
   vinit = sf_input ("vin");       /* initial velocity model, unit=m/s */
   shots = sf_input("shots");      /* recorded shots from exact velocity model */
   vupdates = sf_output("vout");   /* updated velocity in iterations */
-  objs = sf_output("objs");       /* values of objective function in iterations */
+  absobjs = sf_output("absobjs"); /* absolute values of objective function in iterations */
+  norobjs = sf_output("norobjs"); /* normalized values of objective function in iterations */
+
   if (!sf_getint("niter", &niter)) { sf_error("no niter"); }      /* number of iterations */
   if (!sf_getint("nb",&nb))        { sf_error("no nb"); }         /* thickness of sponge ABC  */
   if (!sf_getfloat("vmin", &vmin)) { sf_error("no vmin"); }       /* minimal velocity in real model*/
@@ -132,10 +137,14 @@ Params::Params() {
   sf_putstring(vupdates, "label1", "Depth");
   sf_putstring(vupdates, "label2", "Distance");
   sf_putstring(vupdates, "label3", "Iteration");
-  sf_putint(objs, "n1", niter);
-  sf_putint(objs, "n2", 1);
-  sf_putfloat(objs, "d1", 1);
-  sf_putfloat(objs, "o1", 1);
+  sf_putint(absobjs, "n1", niter + 1);
+  sf_putfloat(absobjs, "d1", 1);
+  sf_putfloat(absobjs, "o1", 1);
+  sf_putstring(absobjs, "label1", "Absolute");
+  sf_putint(norobjs, "n1", niter + 1);
+  sf_putfloat(norobjs, "d1", 1);
+  sf_putfloat(norobjs, "o1", 1);
+  sf_putstring(norobjs, "label1", "Normalize");
 
   MPI_Comm_size(MPI_COMM_WORLD, &np);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -198,6 +207,27 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
   }
 
   return velSet;
+}
+
+float calobj(const Damp4t10d &fmMethod, const std::vector<float> wlt,
+    std::vector<float> &dobs, int ns, int ng, int nt) {
+  // create random codes
+  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
+
+  Encoder encoder(encodes);
+  std::vector<float> encsrc  = encoder.encodeSource(wlt);
+  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+
+  std::vector<float> dcal(nt * ng, 0);
+  fmMethod.EssForwardModeling(encsrc, dcal);
+  fmMethod.removeDirectArrival(&encobs[0]);
+  fmMethod.removeDirectArrival(&dcal[0]);
+
+  std::vector<float> vsrc(nt * ng, 0);
+  vectorMinus(encobs, dcal, vsrc);
+  float obj = cal_objective(&vsrc[0], vsrc.size());
+
+  return obj;
 }
 
 void scatterVelocity(std::vector<Velocity *> &veldb, const std::vector<Velocity *> &totalveldb, const Params &params) {
@@ -334,6 +364,8 @@ int main(int argc, char *argv[]) {
   Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
 
+  std::vector<float> absobj;
+  std::vector<float> norobj;
 
   /// read and broadcast dobs
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
@@ -389,6 +421,14 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     std::vector<float *> velSet = generateVelSet(totalveldb);
     enkfAnly.analyze(velSet);
+
+    /// calculate objective function
+    std::vector<float> vv = enkfAnly.createAMean(velSet);
+    Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
+    fmMethod.bindVelocity(newvel);
+    float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
+    absobj.push_back(obj);
+    norobj.push_back(obj / absobj[0]);
   }
 
   /// after enkf, we should scatter velocities
@@ -425,6 +465,16 @@ int main(int argc, char *argv[]) {
       std::vector<float> vv = enkfAnly.createAMean(velSet);
 
       fmMethod.sfWriteVel(vv, params.vupdates);
+
+      /// calculate the objective function for the updated velocity
+      Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
+      fmMethod.bindVelocity(newvel);
+
+      float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
+      INFO() << format("iter %d, objval for meam model %e") % iter % obj;
+
+      absobj.push_back(obj);
+      norobj.push_back(obj / absobj[0]);
     }
     scatterVelocity(veldb, totalveldb, params);
 //    MPI_Barrier(MPI_COMM_WORLD);
@@ -448,6 +498,12 @@ int main(int argc, char *argv[]) {
 //    }
 
 //    finalizeAMean(vel);
+  }
+
+  /// write objective function values
+  if (rank == 0) {
+    sf_floatwrite(&absobj[0], absobj.size(), params.absobjs);
+    sf_floatwrite(&norobj[0], norobj.size(), params.norobjs);
   }
 
   /// release memory

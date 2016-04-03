@@ -269,7 +269,7 @@ void Damp4t10d::refillVelStencilBndry() {
 }
 
 void Damp4t10d::EssForwardModeling(const std::vector<float>& encSrc,
-    std::vector<float>& dcal) {
+    std::vector<float>& dcal) const {
   int nx = getnx();
   int nz = getnz();
   int ns = getns();
