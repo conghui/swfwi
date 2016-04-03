@@ -69,7 +69,7 @@ elif task == 'essfwi':
     ''' % essfwibin, stdout=-1, stdin=0)
 elif task == 'enfwi':
   Flow('vsnaps absobjs norobjs', 'smvel shots',
-    '''mpirun -np 1 %s
+    '''~/softs/install/mpi/bin/mpirun -np 1 %s
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 nb=30 seed=10 vmin=1450 vmax=5600 maxdv=200 nita=5
