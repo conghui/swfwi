@@ -170,7 +170,8 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
     const std::vector<float> &_wlt, const std::vector<float> &_dobs) :
     fmMethod(method), updateStenlelOp(updateSteplenOp), updateVelOp(_updateVelOp), wlt(_wlt), dobs(_dobs),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
-    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()), objval(0)
+    nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()),
+    updateobj(0), initobj(0)
 {
   g0.resize(nx*nz, 0);
   updateDirection.resize(nx*nz, 0);
@@ -192,6 +193,7 @@ void EssFwiFramework::epoch(int iter) {
   std::vector<float> vsrc(nt * ng, 0);
   vectorMinus(encobs, dcal, vsrc);
   float obj1 = cal_objective(&vsrc[0], vsrc.size());
+  initobj = iter == 0 ? obj1 : initobj;
   DEBUG() << format("obj: %e") % obj1;
 
   transVsrc(vsrc, nt, ng);
@@ -208,7 +210,7 @@ void EssFwiFramework::epoch(int iter) {
 
   updateStenlelOp.bindEncSrcObs(encsrc, encobs);
   float steplen;
-  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, objval);
+  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
 
   Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);
@@ -220,6 +222,10 @@ void EssFwiFramework::writeVel(sf_file file) const {
   fmMethod.sfWriteVel(fmMethod.getVelocity().dat, file);
 }
 
-float EssFwiFramework::getobjval() const {
-  return objval;
+float EssFwiFramework::getUpdateObj() const {
+  return updateobj;
+}
+
+float EssFwiFramework::getInitObj() const {
+  return initobj;
 }

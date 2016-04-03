@@ -20,7 +20,8 @@ public:
 
   void epoch(int iter);
   void writeVel(sf_file file) const;
-  float getobjval() const;
+  float getUpdateObj() const;
+  float getInitObj() const;
 
 private:
   Damp4t10d &fmMethod;
@@ -42,7 +43,8 @@ private: /// propagate from other construction
 private:
   std::vector<float> g0;               /// gradient in previous step
   std::vector<float> updateDirection;
-  float objval;
+  float updateobj;
+  float initobj;
 };
 
 #endif /* SRC_ESS_FWI2D_ESSFWIFRAMEWORK_H_ */

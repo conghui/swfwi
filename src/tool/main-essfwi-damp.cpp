@@ -107,11 +107,11 @@ Params::Params() {
   sf_putint(vupdates, "n3", niter);
   sf_putint(vupdates, "d3", 1);
   sf_putint(vupdates, "o3", 1);
-  sf_putint(absobjs, "n1", niter);
+  sf_putint(absobjs, "n1", niter + 1);
   sf_putfloat(absobjs, "d1", 1);
   sf_putfloat(absobjs, "o1", 1);
   sf_putstring(absobjs, "label1", "Absolute");
-  sf_putint(norobjs, "n1", niter);
+  sf_putint(norobjs, "n1", niter + 1);
   sf_putfloat(norobjs, "d1", 1);
   sf_putfloat(norobjs, "o1", 1);
   sf_putstring(norobjs, "label1", "Normalize");
@@ -188,16 +188,19 @@ int main(int argc, char *argv[]) {
 
   EssFwiFramework essfwi(fmMethod, updateSteplenOp, updatevelop, wlt, dobs);
 
-  std::vector<float> absobj(params.niter);
-  std::vector<float> norobj(params.niter);
-  float absobj0 = 0;
+  std::vector<float> absobj;
+  std::vector<float> norobj;
   for (int iter = 0; iter < params.niter; iter++) {
     essfwi.epoch(iter);
     essfwi.writeVel(params.vupdates);
-    float obj = essfwi.getobjval();
-    absobj0 = iter == 0 ? obj : absobj0;
-    absobj[iter] = obj;
-    norobj[iter] = obj / absobj0;
+    float obj = essfwi.getUpdateObj();
+    if (iter == 0) {
+      float obj0 = essfwi.getInitObj();
+      absobj.push_back(obj0);
+      norobj.push_back(1);
+    }
+    absobj.push_back(obj);
+    norobj.push_back(obj / absobj[0]);
   } /// end of iteration
 
   sf_floatwrite(&absobj[0], absobj.size(), params.absobjs);
