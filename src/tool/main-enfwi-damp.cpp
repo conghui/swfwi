@@ -11,6 +11,7 @@ extern "C" {
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <omp.h>
 
 #include "logger.h"
 #include "shot-position.h"
@@ -56,6 +57,7 @@ public:
   char *perin;
 
 public: // parameters from input files
+  int nthreads;
   int nz;
   int nx;
   float dz;
@@ -100,6 +102,7 @@ Params::Params() {
   if (!(perin = sf_getstring("perin"))) { sf_error("no perin"); } /* perturbation file */
   if (!sf_getint("seed", &seed))   { seed = 10; }                 /* seed for random numbers */
   if (!sf_getfloat("sigfac", &sigfac))   { sf_error("no sigfac"); } /* sigma factor */
+  if (!sf_getint("nthreads", &nthreads)) { sf_error("no nthreads"); } /* # of threads for OMP */
 
   /* get parameters from velocity model and recorded shots */
   if (!sf_histint(vinit, "n1", &nz)) { sf_error("no n1"); }       /* nz */
@@ -321,7 +324,6 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
   Environment::setDatapath();
-
   /// configure logger
   easyloggingpp::Configurations defaultConf;
   defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
@@ -329,6 +331,7 @@ int main(int argc, char *argv[]) {
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   Params params;
+  omp_set_num_threads(params.nthreads);
 
   int nz = params.nz;
   int nx = params.nx;

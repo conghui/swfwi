@@ -31,6 +31,7 @@ private:
 public:
   sf_file vinit;
   sf_file shots;
+  int nthreads;
   int nb;
   int nz;
   int nx;
@@ -63,6 +64,7 @@ Params::Params() {
   if (!sf_histint(vinit,"n2",&nx)) sf_error("no n2");
   if (!sf_histfloat(vinit,"d1",&dz)) sf_error("no d1");
   if (!sf_histfloat(vinit,"d2",&dx)) sf_error("no d2");
+  if (!sf_getint("nthreads", &nthreads)) sf_error("no nthreads");
 
   if (!sf_getfloat("amp",&amp)) amp=1000;
   /* maximum amplitude of ricker */
@@ -193,6 +195,8 @@ int main(int argc, char* argv[]) {
   defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
+
+  omp_set_num_threads(params.nthreads);
 
   int nz = params.nz;
   int nx = params.nx;

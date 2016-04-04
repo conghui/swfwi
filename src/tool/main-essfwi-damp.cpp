@@ -5,6 +5,7 @@ extern "C" {
 #include <vector>
 #include <cstdlib>
 #include <cmath>
+#include <omp.h>
 
 #include "logger.h"
 #include "shot-position.h"
@@ -38,6 +39,7 @@ public:
   int seed;
 
 public: // parameters from input files
+  int nthreads;
   int nz;
   int nx;
   float dz;
@@ -72,6 +74,7 @@ Params::Params() {
   if (!sf_getfloat("maxdv", &maxdv)) sf_error("no maxdv");        /* max delta v update two iteration*/
   if (!sf_getint("nita", &nita))   { sf_error("no nita"); }       /* max iter refining alpha */
   if (!sf_getint("seed", &seed))   { seed = 10; }                 /* seed for random numbers */
+  if (!sf_getint("nthreads", &nthreads)) { sf_error("no nthreads"); } /* # of threads for OMP */
 
   /* get parameters from velocity model and recorded shots */
   if (!sf_histint(vinit, "n1", &nz)) { sf_error("no n1"); }       /* nz */
@@ -152,6 +155,7 @@ int main(int argc, char *argv[]) {
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
+  omp_set_num_threads(params.nthreads);
   int nz = params.nz;
   int nx = params.nx;
   int nb = params.nb;
