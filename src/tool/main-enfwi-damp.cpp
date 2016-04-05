@@ -435,11 +435,13 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     /// calculate objective function
     std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+    DEBUG() << "sum vv: " << sum(vv);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
     absobj.push_back(obj);
     norobj.push_back(obj / absobj[0]);
+    DEBUG() << "obj: " << obj;
   }
 
   /// after enkf, we should scatter velocities
