@@ -54,7 +54,6 @@ EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
 }
 
 void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *> &velSet) const {
-//  Matrix gainMatrix = calGainMatrix(totalVelSet);
   Matrix gainMatrix = calGainMatrix(velSet);
 
   int rank;
@@ -72,7 +71,6 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     Matrix A_Perturb(N, modelSize);
     initAPerturb(A_Perturb, A, AMean, modelSize);
     DEBUG() << "sum of A_Perturb: " << getSum(A_Perturb);
-
 
     Matrix t5(N, modelSize);
     alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);

@@ -423,8 +423,6 @@ int main(int argc, char *argv[]) {
   /// collect all the data from other process to rank 0
   gatherVelocity(totalveldb, veldb, params);
 
-  /// in current implementation,only the root process perform the enkf analyze
-  /// we will further parallel this function
   std::vector<float *> velset = generateVelSet(veldb);
   std::vector<float *> totalVelSet;
 
@@ -442,11 +440,7 @@ int main(int argc, char *argv[]) {
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
     absobj.push_back(obj);
     norobj.push_back(obj / absobj[0]);
-
-    DEBUG() << format("obj %f") % obj;
   }
-  MPI_Finalize();
-  return 0;
 
   /// after enkf, we should scatter velocities
   scatterVelocity(veldb, totalveldb, params);
@@ -465,16 +459,12 @@ int main(int argc, char *argv[]) {
     TRACE() << "enkf analyze and update velocity";
     gatherVelocity(totalveldb, veldb, params);
     if (iter % niterenkf == 0) {
-      if (rank == 0) {
-        std::vector<float *> velSet = generateVelSet(totalveldb);
-        enkfAnly.analyze(velSet, velset);
-      }
+      enkfAnly.analyze(totalVelSet, velset);
     }
 
     if (rank == 0) {
       /// output velocity
-      std::vector<float *> velSet = generateVelSet(totalveldb);
-      std::vector<float> vv = enkfAnly.createAMean(velSet);
+      std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
 
       fmMethod.sfWriteVel(vv, params.vupdates);
 
