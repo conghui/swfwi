@@ -19,7 +19,7 @@ class EnkfAnalyze {
 public:
   EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt, const std::vector<float> &dobs, float sigmafactor);
 
-  void analyze(std::vector<float *> &velSet) const;
+  void analyze(std::vector<float *> &totalVelSet, std::vector<float *> &velSet) const;
   std::vector<float> createAMean(const std::vector<float *> &velSet) const;
 
 protected:

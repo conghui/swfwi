@@ -324,10 +324,14 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
   Environment::setDatapath();
+
   /// configure logger
+  /// configure logger
+  const char *logfile = "enfwi-damp.log";
+  std::remove(logfile);
   easyloggingpp::Configurations defaultConf;
   defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "enfwi-damp.log");
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
   Params params;
@@ -421,24 +425,31 @@ int main(int argc, char *argv[]) {
 
   /// in current implementation,only the root process perform the enkf analyze
   /// we will further parallel this function
-  if (rank == 0) {
-    std::vector<float *> velSet = generateVelSet(totalveldb);
-    enkfAnly.analyze(velSet);
+  std::vector<float *> velset = generateVelSet(veldb);
+  std::vector<float *> totalVelSet;
 
+  if (rank == 0) {
+    totalVelSet = generateVelSet(totalveldb);
+  }
+
+  enkfAnly.analyze(totalVelSet, velset);
+
+  if (rank == 0) {
     /// calculate objective function
-    std::vector<float> vv = enkfAnly.createAMean(velSet);
+    std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
     absobj.push_back(obj);
     norobj.push_back(obj / absobj[0]);
+
+    DEBUG() << format("obj %f") % obj;
   }
+  MPI_Finalize();
+  return 0;
 
   /// after enkf, we should scatter velocities
   scatterVelocity(veldb, totalveldb, params);
-
-//  MPI_Barrier(MPI_COMM_WORLD);
-
 
   TRACE() << "iterate the remaining iteration";
   for (int iter = 0; iter < params.niter; iter++) {
@@ -449,16 +460,14 @@ int main(int argc, char *argv[]) {
       int absvel = rank * k + ivel;
       INFO() << format("iter %d, rank %d on %dth velocity, sum %f") % iter % rank % absvel % sum(veldb[ivel]->dat);
       essfwis[ivel]->epoch(iter);
-//      exit(0);
     }
 
     TRACE() << "enkf analyze and update velocity";
     gatherVelocity(totalveldb, veldb, params);
-//    MPI_Barrier(MPI_COMM_WORLD);
     if (iter % niterenkf == 0) {
       if (rank == 0) {
         std::vector<float *> velSet = generateVelSet(totalveldb);
-        enkfAnly.analyze(velSet);
+        enkfAnly.analyze(velSet, velset);
       }
     }
 
@@ -480,27 +489,6 @@ int main(int argc, char *argv[]) {
       norobj.push_back(obj / absobj[0]);
     }
     scatterVelocity(veldb, totalveldb, params);
-//    MPI_Barrier(MPI_COMM_WORLD);
-
-
-//      TRACE() << "assign the average of all stored alpha to each sample";
-//      float *p = &PreservedAlpha::instance().getAlpha()[0];
-//      float alphaAvg = std::accumulate(p, p + N, 0.0f) / N;
-//      std::fill(p, p + N, alphaAvg);
-
-//    float *vel = createAMean(velSet, modelSize);
-//    float l1norm, l2norm;
-//    slownessL1L2Norm(config.accurate_vel, vel, config, l1norm, l2norm);
-//    INFO() << format("%4d/%d iter, slowness l1norm: %g, slowness l2norm: %g") % iter % params.niter % l1norm % l2norm;
-
-//    if (iter % 10 == 0) {
-//      TRACE() << "write the mean of velocity set";
-//      char buf[256];
-//      sprintf(buf, "vel%d.rsf", iter);
-//      writeVelocity(buf, vel, exvel.nx, exvel.nz, dx, dt);
-//    }
-
-//    finalizeAMean(vel);
   }
 
   /// write objective function values
