@@ -14,7 +14,6 @@
 #include <iomanip>
 #include <cmath>
 #include <sstream>
-#include <mkl.h>
 
 #include "Matrix.h"
 #include "logger.h"
@@ -45,12 +44,14 @@ std::streampos getFileSize(const std::string &filePath) {
 
 Matrix::Matrix(int ncol, int nrow) :
   mData(NULL), mNumRow(nrow), mNumCol(ncol) {
-  mData = (value_type *)mkl_malloc( nrow * ncol * sizeof( value_type ), 64 );
+//  mData = (value_type *)mkl_malloc( nrow * ncol * sizeof( value_type ), 64 );
+  posix_memalign((void **)&mData, 64, nrow * ncol * sizeof( value_type ) );
   std::fill(mData, mData + nrow * ncol, 0);
 }
 
 Matrix::~Matrix() {
-  mkl_free(mData);
+//  mkl_free(mData);
+  free(mData);
 }
 
 
@@ -105,27 +106,6 @@ Matrix::value_type *Matrix::getData() {
   return const_cast<value_type *>((static_cast<const Matrix *>(this))->getData());
 }
 
-void alpha_A_B_plus_beta_C(
-  const CBLAS_TRANSPOSE transA, const CBLAS_TRANSPOSE transB,
-  double alpha, const Matrix &A, const Matrix &B,
-  double beta, Matrix &C) {
-  int k = A.getNumCol();
-  if (transA == CblasTrans) {
-    k = A.getNumRow();
-  }
-  cblas_dgemm(CblasColMajor, transA, transB,
-              C.getNumRow(), C.getNumCol(), k,
-              alpha, // alpha
-              A.getData(), A.getNumRow(),
-              B.getData(), B.getNumRow(),
-              beta, // beta
-              C.getData(), C.getNumRow());
-}
-
-void alpha_A_B_plus_beta_C(double alpha, const Matrix &A, const Matrix &B,
-                           double beta, Matrix &C) {
-  alpha_A_B_plus_beta_C(CblasNoTrans, CblasNoTrans, alpha, A, B, beta, C);
-}
 
 void A_plus_B(const Matrix &A, const Matrix &B, Matrix &C) {
   assert(A.isCompatible(B));
@@ -147,10 +127,7 @@ void A_minus_B(const Matrix &A, const Matrix &B, Matrix &C) {
   std::transform(A.getData(), A.getData() + A.size(), B.getData(), C.getData(), std::minus<Matrix::value_type>());
 }
 
-void alpha_ATrans_B_plus_beta_C(double alpha, const Matrix& A, const Matrix& B,
-    double beta, Matrix& C) {
-  alpha_A_B_plus_beta_C(CblasTrans, CblasNoTrans, alpha, A, B, beta, C);
-}
+
 
 int clipPosition(const Matrix &M) {
   const Matrix::value_type relativeError = 0.001f;

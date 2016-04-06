@@ -15,17 +15,17 @@ if compiler_set == 'gnu':
   warn_flags      = ["-Wall", "-Wextra", "-Wno-write-strings"]
   optimize_flags  = ["-O2"]
   debug_flags     = ["-O0", "-g"]
-  other_flags     = ["-DNO_BLAS", "-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  other_flags     = ["-DMPICH_IGNORE_CXX_SEEK"]
   link_flags      = ["-O1"]
 
 elif compiler_set == 'intel':
-  c_compiler      = ["mpicc",  "-cc=icc",   "-openmp", "-mkl"]
-  cxx_compiler    = ["mpicxx", "-cxx=icpc", "-openmp", "-mkl"]
+  c_compiler      = ["mpicc",  "-cc=icc",   "-openmp"]
+  cxx_compiler    = ["mpicxx", "-cxx=icpc", "-openmp"]
   linker          = cxx_compiler
   warn_flags      = ["-Wall"]
   optimize_flags  = ["-O2"]
   debug_flags     = ["-O0", "-g"]
-  other_flags     = ["-DNO_BLAS", "-DMPICH_IGNORE_CXX_SEEK", "-DBOOST_LOG_DYN_LINK"]
+  other_flags     = ["-DMPICH_IGNORE_CXX_SEEK"]
   link_flags      = ["-O1"]
 
 else:
@@ -35,14 +35,6 @@ else:
 # set up boost direcotry
 boost_root = os.environ['INSTALL_ROOT'] + '/boost/'
 boost_inc = boost_root + 'include'
-
-mkl_root = os.environ['INSTALL_ROOT'] + '/intel/mkl/'
-mkl_inc = mkl_root + 'include'
-mkl_lib = mkl_root + 'lib/intel64'
-
-fftw_inc = mkl_inc + '/fftw'
-
-mkl_root = os.environ['INSTALL_ROOT'] + '/softs/install/intel/mkl/'
 
 # set the sub directories (key, value), where value is the name of directory
 # please make sure the source code are in src subdirectory
@@ -69,15 +61,9 @@ else:
   cur_cflags = optimize_flags + warn_flags + other_flags
 
 # add boost include_dir and lib dir
-cur_cflags += ["-isystem", boost_inc, "-isystem", fftw_inc]
+cur_cflags += ["-isystem", boost_inc]
 libpath     = ["#" + dirs['lib'], ]
-libs        = []
-
-# add additional includes and libs for gnu compiler
-if compiler_set == 'gnu':
-  cur_cflags += ["-isystem", mkl_inc]
-  libpath    += [mkl_lib]
-  libs       += ["mkl_intel_lp64", "mkl_core", "mkl_gnu_thread"]
+libs        = ['lapack']
 
 # setup environment
 env = Environment(CC      = c_compiler,

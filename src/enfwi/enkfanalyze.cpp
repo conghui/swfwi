@@ -193,7 +193,9 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
     Matrix matU(N, numDataSamples);
     Matrix matS(1, N);
     Matrix matVt(N, N);
-    Matrix superb(1, N - 1);
+
+    int lwork = std::max(1, std::max(3 * std::min(numDataSamples, N) + std::max(numDataSamples, N), 5 * std::min(numDataSamples, N)));
+    Matrix superb(1, lwork);
 
     int info = LAPACKE_dgesvd_col_major('S', 'S',
         band.getNumRow(), band.getNumCol(),
@@ -201,7 +203,7 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
         matS.getData(),
         matU.getData(), matU.getNumRow(),
         matVt.getData(), matVt.getNumRow(),
-        superb.getData());
+        superb.getData(), lwork);
 
     /* Check for convergence */
     if ( info > 0 ) {

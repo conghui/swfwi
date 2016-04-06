@@ -32,11 +32,8 @@ class Matrix {
   int mNumCol;
 };
 
-//void extract_each_col_from_each_row_mean(const Matrix &A, Matrix &ret);
-
-//void alpha_A_B_plus_beta_C(const CBLAS_TRANSPOSE transA, const CBLAS_TRANSPOSE transB, double alpha, const Matrix &A, const Matrix &B, double beta, Matrix &C);
-void alpha_ATrans_B_plus_beta_C(double alpha, const Matrix &A, const Matrix &B, double beta, Matrix &C);
-void alpha_A_B_plus_beta_C(double alpha, const Matrix &A, const Matrix &B, double beta, Matrix &C);
+void alpha_A_B_plus_beta_C(double alpha, Matrix &A, Matrix &B, double beta, Matrix &C);
+void alpha_ATrans_B_plus_beta_C(double alpha, Matrix& A, Matrix& B, double beta, Matrix& C);
 void A_plus_B(const Matrix &A, const Matrix &B, Matrix &C);
 void A_minus_B(const Matrix &A, const Matrix &B, Matrix &C);
 

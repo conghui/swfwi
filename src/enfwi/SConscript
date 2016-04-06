@@ -10,6 +10,7 @@ modules = """
 Matrix.cpp
 dgesvd.cpp
 enkfanalyze.cpp
+dgemm.cpp
           """.split()
 
 include_dir = [
