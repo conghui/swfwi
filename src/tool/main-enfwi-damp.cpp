@@ -4,6 +4,7 @@ extern "C" {
 
 #include <mpi.h>
 #include <cstdlib>
+#include <boost/lexical_cast.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <string>
@@ -325,16 +326,15 @@ int main(int argc, char *argv[]) {
   sf_init(argc, argv); /* initialize Madagascar */
   Environment::setDatapath();
 
+  Params params;
   /// configure logger
-  /// configure logger
-  const char *logfile = "enfwi-damp.log";
-  std::remove(logfile);
+  std::string logfile = std::string("enfwi-damp-") + boost::lexical_cast<std::string>(params.rank) + ".log";
+  std::remove(logfile.c_str());
   easyloggingpp::Configurations defaultConf;
   defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
+  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile.c_str());
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
-  Params params;
   omp_set_num_threads(params.nthreads);
 
   int nz = params.nz;

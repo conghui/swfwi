@@ -181,6 +181,10 @@ void EssFwiFramework::epoch(int iter) {
   // create random codes
   const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
 
+  std::stringstream ss;
+  std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
+  DEBUG() << ss.str();
+
   Encoder encoder(encodes);
   std::vector<float> encsrc  = encoder.encodeSource(wlt);
   std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
