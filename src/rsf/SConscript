@@ -1,16 +1,20 @@
 import os
 Import('*')
 
-lib = "modeling"
+lib = 'rsf'
 # these modules will compiled in to library
 lib_modules = """
-			  damp4t10d.cpp
+alloc.c
+c99.c
+error.c
+file.c
+getpar.c
+kiss_fft.c
+komplex.c
+simtab.c
               """.split()
 
 extra_include_dir = [
-  '#' + dirs['rsf'],
-  '#' + dirs['common'],
-  '#' + dirs['mdlib'],
 ]
 
 ############################### for library ###########################

@@ -19,6 +19,7 @@ lib_modules = """
               """.split()
 
 extra_include_dir = [
+  '#' + dirs['rsf'],
 ]
 
 ############################### for library ###########################

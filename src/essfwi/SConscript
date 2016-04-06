@@ -13,6 +13,7 @@ updatesteplenop.cpp
           """.split()
 
 include_dir = [
+  '#' + dirs['rsf'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],

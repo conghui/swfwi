@@ -12,11 +12,9 @@ compiler_set = 'intel' # intel or gnu
 debug_mode   = 0
 
 dep_include  = [os.environ['INSTALL_ROOT'] + '/boost/include', # boost
-                os.environ['RSFROOT'] + '/include', # madagascar
                ]
 
-dep_libs   =  [(os.environ['RSFROOT'] + '/lib', 'rsf'), # madagascar
-               ('/usr/lib64/', 'lapack'), # lapack
+dep_libs   =  [('/usr/lib64/', 'lapack'), # lapack
               ]
 
 if compiler_set == 'gnu':#{{{
@@ -53,6 +51,7 @@ dirlist = [
    ('common', 'src/common'),
    ('modeling', 'src/modeling'),
    ('mdlib', 'src/mdlib'),
+   ('rsf', 'src/rsf'),
 ]
 dirs = dict(dirlist)
 #}}}

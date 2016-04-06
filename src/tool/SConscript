@@ -15,6 +15,7 @@ modules = """
           """.split()
 
 include_dir = [
+  '#' + dirs['rsf'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
@@ -23,7 +24,7 @@ include_dir = [
 ]
 
 depend_libpath = []
-depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib']
+depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
