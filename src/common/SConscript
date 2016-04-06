@@ -19,14 +19,12 @@ lib_modules = """
               """.split()
 
 extra_include_dir = [
-  os.environ['RSFROOT'] + '/include',
 ]
 
 ############################### for library ###########################
 #######################################################################
 # clone the environment from global env and make some modification of it
 myenv    = env.Clone(CPPPATH = extra_include_dir)
-myenv.Append(CXXFLAGS = '-DNO_BLAS')
 
 # compile to object files
 lib_objs = myenv.StaticObject(lib_modules)

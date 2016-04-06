@@ -1,3 +1,4 @@
+# vim: fdm=marker fdl=0
 # usage:
 # scons [-j n]: compile in release mode
 # scons debug=1 [-j n]: compile in debug mode
@@ -7,8 +8,18 @@
 import os
 
 # host compiler options
-compiler_set = 'intel'
-if compiler_set == 'gnu':
+compiler_set = 'intel' # intel or gnu
+debug_mode   = 0
+
+dep_include  = [os.environ['INSTALL_ROOT'] + '/boost/include', # boost
+                os.environ['RSFROOT'] + '/include', # madagascar
+               ]
+
+dep_libs   =  [(os.environ['RSFROOT'] + '/lib', 'rsf'), # madagascar
+               ('/usr/lib64/', 'lapack'), # lapack
+              ]
+
+if compiler_set == 'gnu':#{{{
   c_compiler      = ["mpicc",  "-cc=gcc",  "-fopenmp"]
   cxx_compiler    = ["mpicxx", "-cxx=g++", "-fopenmp"]
   linker          = cxx_compiler
@@ -17,8 +28,8 @@ if compiler_set == 'gnu':
   debug_flags     = ["-O0", "-g"]
   other_flags     = ["-DMPICH_IGNORE_CXX_SEEK"]
   link_flags      = ["-O1"]
-
-elif compiler_set == 'intel':
+#}}}
+elif compiler_set == 'intel':#{{{
   c_compiler      = ["mpicc",  "-cc=icc",   "-openmp"]
   cxx_compiler    = ["mpicxx", "-cxx=icpc", "-openmp"]
   linker          = cxx_compiler
@@ -27,16 +38,11 @@ elif compiler_set == 'intel':
   debug_flags     = ["-O0", "-g"]
   other_flags     = ["-DMPICH_IGNORE_CXX_SEEK"]
   link_flags      = ["-O1"]
-
 else:
   print "Only GNU or Intel Compiler are supported now"
   Exit(-1)
-
-# set up boost direcotry
-boost_root = os.environ['INSTALL_ROOT'] + '/boost/'
-boost_inc = boost_root + 'include'
-
-# set the sub directories (key, value), where value is the name of directory
+#}}}
+# set the sub directories (key, value), where value is the name of directory#{{{
 # please make sure the source code are in src subdirectory
 dirlist = [
    ('lib', 'lib'),
@@ -49,23 +55,26 @@ dirlist = [
    ('mdlib', 'src/mdlib'),
 ]
 dirs = dict(dirlist)
-
-# normally, you don't need to modify from the line below
-# ---------------------------------------------------------------------- #
-is_debug_mode = ARGUMENTS.get('debug', 0)
+#}}}
+# choose debug/release flags#{{{
+is_debug_mode = ARGUMENTS.get('debug', debug_mode)
 if int(is_debug_mode):
   print "Debug mode"
   cur_cflags = debug_flags + warn_flags + other_flags
 else:
   print "Release mode"
   cur_cflags = optimize_flags + warn_flags + other_flags
-
-# add boost include_dir and lib dir
-cur_cflags += ["-isystem", boost_inc]
-libpath     = ["#" + dirs['lib'], ]
-libs        = ['lapack']
-
-# setup environment
+#}}}
+# set includes and libs#{{{
+libpath = ["#" + dirs['lib']]
+libs    = []
+for inc in dep_include:
+  cur_cflags += ["-isystem", inc]
+for lib in dep_libs:
+  libpath += [lib[0]]
+  libs    += [lib[1]]
+#}}}
+# setup environment#{{{
 env = Environment(CC      = c_compiler,
                   CXX     = cxx_compiler,
                   LINK    = linker + link_flags,
@@ -73,8 +82,8 @@ env = Environment(CC      = c_compiler,
                   LIBPATH = libpath,
                   LIBS    = libs,
                   ENV     = os.environ)
-
-# compile
+#}}}
+# compile#{{{
 for d in dirlist:
   if not "src/" in d[1]:
     continue
@@ -83,4 +92,4 @@ for d in dirlist:
              variant_dir = d[1].replace('src', 'build'),
              duplicate = 0,
              exports = "env dirs")
-
+#}}}

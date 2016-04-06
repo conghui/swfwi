@@ -15,7 +15,6 @@ modules = """
           """.split()
 
 include_dir = [
-  os.environ['RSFROOT'] + '/include',
   '#' + dirs['common'],
   '#' + dirs['modeling'],
   '#' + dirs['mdlib'],
@@ -23,14 +22,13 @@ include_dir = [
   '#' + dirs['enfwi'],
 ]
 
-depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'rsf']
+depend_libpath = []
+depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
 myenv.Append(LIBPATH = depend_libpath)
-myenv.Append(CXXFLAGS = '-DNO_BLAS')
-myenv.Append(LIBS = depend_libs)
+myenv.Prepend(LIBS = depend_libs)
 
 objs      = myenv.StaticObject(modules)
 

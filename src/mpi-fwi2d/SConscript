@@ -12,18 +12,15 @@ mpi-fwi-params.cpp
           """.split()
 
 include_dir = [
-  os.environ['RSFROOT'] + '/include',
   '#' + dirs['common'],
 ]
 
-depend_libpath = [os.environ['RSFROOT'] + '/lib']
-depend_libs = ['rsf', 'common']
+depend_libs = ['common']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
 myenv.Append(LIBPATH = depend_libpath)
-myenv.Append(CXXFLAGS = '-DNO_BLAS')
-myenv.Append(LIBS = depend_libs)
+myenv.Prepend(LIBS = depend_libs)
 
 objs      = myenv.StaticObject(modules)
 
