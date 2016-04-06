@@ -357,8 +357,6 @@ int main(int argc, char *argv[]) {
   int k = params.k;
   int ntask = params.ntask;
 
-  srand(params.seed);
-
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
   Damp4t10d fmMethod(allSrcPos, allGeoPos, dt, dx, fm, nb, nt);
@@ -435,18 +433,17 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     /// calculate objective function
     std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
-    DEBUG() << "sum vv: " << sum(vv);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
     absobj.push_back(obj);
     norobj.push_back(obj / absobj[0]);
-    DEBUG() << "obj: " << obj;
   }
 
   /// after enkf, we should scatter velocities
   scatterVelocity(veldb, totalveldb, params);
 
+  srand(params.seed + params.rank);
   TRACE() << "iterate the remaining iteration";
   for (int iter = 0; iter < params.niter; iter++) {
     TRACE() << "FWI for each velocity";

@@ -183,7 +183,7 @@ void EssFwiFramework::epoch(int iter) {
 
   std::stringstream ss;
   std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
-  DEBUG() << ss.str();
+  DEBUG() << "code is: " << ss.str();
 
   Encoder encoder(encodes);
   std::vector<float> encsrc  = encoder.encodeSource(wlt);
