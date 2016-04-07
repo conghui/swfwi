@@ -9,7 +9,8 @@
 #include <algorithm>
 #include "dgesvd.h"
 extern "C" {
-#include <rsf.h>
+#include <f2c.h>
+#include <clapack.h>
 }
 
 /**
@@ -32,10 +33,10 @@ int LAPACKE_dgesvd_col_major(char jobu, char jobvt, int m,
 //  int lwork = std::max(1, std::max(3 * std::min(m, n) + std::max(m, n), 5 * std::min(m, n)));
 //  int lwork =
 
-  int info;
-  dgesvd_(&jobu, &jobvt, &m,
-      &n, a, &lda, s, u, &ldu, vt,
-      &ldvt, superb, &lwork, &info);
+  integer info;
+  dgesvd_(&jobu, &jobvt, (integer *)&m,
+      (integer *)&n, a, (integer *)&lda, s, u, (integer *)&ldu, vt,
+      (integer *)&ldvt, superb, (integer *)&lwork, &info);
 
   return info;
 

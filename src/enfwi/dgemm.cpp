@@ -7,7 +7,8 @@
 
 #include "Matrix.h"
 extern "C" {
-#include <rsf.h>
+#include <f2c.h>
+#include <clapack.h>
 }
 
 static void alpha_A_B_plus_beta_C(
@@ -25,12 +26,12 @@ static void alpha_A_B_plus_beta_C(
   int ldb = B.getNumRow();
   int ldc = C.getNumRow();
   dgemm_(&transA, &transB,
-              &m, &n, &k,
+              (integer *)&m, (integer *)&n, (integer *)&k,
               &alpha, // alpha
-              A.getData(), &lda,
-              B.getData(), &ldb,
+              A.getData(), (integer *)&lda,
+              B.getData(), (integer *)&ldb,
               &beta, // beta
-              C.getData(), &ldc);
+              C.getData(), (integer *)&ldc);
 
 }
 

@@ -11,11 +11,10 @@ import os
 compiler_set = 'intel' # intel or gnu
 debug_mode   = 0
 
-dep_include  = [os.environ['INSTALL_ROOT'] + '/boost/include', # boost
-               ]
+dep_include  = ['./include', './lapack' ]
 
-dep_libs   =  [('/usr/lib64/', 'lapack'), # lapack
-              ]
+dep_libpath = ['#lapack']
+dep_libs   =  ['lapack-gcc', 'blas-gcc', 'fblas-gfortran', 'f2c-gcc'] # don't change the order
 
 if compiler_set == 'gnu':#{{{
   c_compiler      = ["mpicc",  "-cc=gcc",  "-fopenmp"]
@@ -45,6 +44,7 @@ else:
 dirlist = [
    ('lib', 'lib'),
    ('bin', 'bin'),
+   ('lapack', 'src/lapack'),
    ('essfwi', 'src/essfwi'),
    ('enfwi', 'src/enfwi'),
    ('tool', 'src/tool'),
@@ -70,8 +70,9 @@ libs    = []
 for inc in dep_include:
   cur_cflags += ["-isystem", inc]
 for lib in dep_libs:
-  libpath += [lib[0]]
-  libs    += [lib[1]]
+  libs    += [lib]
+for path in dep_libpath:
+  libpath += [path]
 #}}}
 # setup environment#{{{
 env = Environment(CC      = c_compiler,
