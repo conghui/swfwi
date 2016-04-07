@@ -9,7 +9,7 @@
 import os
 
 # compiler options
-compiler_set        = 'intel' # intel or gnu or sw
+compiler_set        = 'sw' # intel or gnu or sw
 debug_mode          = 0
 additional_includes = ['~/softs/install/boost/include/', ]
 additional_libpath  = []
@@ -25,7 +25,7 @@ if compiler_set == 'sw':#{{{
   other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
   link_flags      = ['-O1']
 #}}}
-if compiler_set == 'gnu':#{{{
+elif compiler_set == 'gnu':#{{{
   c_compiler      = ['mpicc',  '-cc=gcc',  '-fopenmp']
   cxx_compiler    = ['mpicxx', '-cxx=g++', '-fopenmp']
   linker          = cxx_compiler
