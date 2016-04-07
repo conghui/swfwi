@@ -4,7 +4,7 @@ extern "C" {
 }
 
 #include <cmath>
-#include "logger.h"
+#include <vector>
 #include "environment.h"
 
 namespace {
@@ -62,7 +62,6 @@ Params::~Params() {
 
 } /// end of name space
 
-_INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */

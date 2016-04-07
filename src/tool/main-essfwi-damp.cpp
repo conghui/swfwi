@@ -143,7 +143,6 @@ void Params::check() {
 
 } /// end of name space
 
-_INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
   sf_init(argc, argv);                /* initialize Madagascar */
@@ -152,11 +151,12 @@ int main(int argc, char *argv[]) {
 
   /// configure logger
   const char *logfile = "essfwi-damp.log";
-  std::remove(logfile);
-  easyloggingpp::Configurations defaultConf;
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
-  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
+  FILELog::setLogFile(logfile);
+//  std::remove(logfile);
+//  easyloggingpp::Configurations defaultConf;
+//  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
+//  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
+//  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
 #ifdef _OPENMP
   omp_set_num_threads(params.nthreads);

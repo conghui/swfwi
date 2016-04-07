@@ -9,7 +9,7 @@
 import os
 
 # compiler options
-compiler_set        = 'sw' # intel or gnu or sw
+compiler_set        = 'gnu' # intel or gnu or sw
 debug_mode          = 0
 additional_includes = ['~/softs/install/boost/include/', ]
 additional_libpath  = []

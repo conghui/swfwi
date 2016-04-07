@@ -322,8 +322,6 @@ void gatherVelocity(std::vector<Velocity *> &totalveldb, const std::vector<Veloc
 } /// end of name space
 
 
-_INITIALIZE_EASYLOGGINGPP
-
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   sf_init(argc, argv); /* initialize Madagascar */
@@ -332,11 +330,8 @@ int main(int argc, char *argv[]) {
   Params params;
   /// configure logger
   std::string logfile = std::string("enfwi-damp-") + boost::lexical_cast<std::string>(params.rank) + ".log";
-  std::remove(logfile.c_str());
-  easyloggingpp::Configurations defaultConf;
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date: %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile.c_str());
-  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
+  FILELog::setLogFile(logfile);
+
 
 #ifdef _OPENMP
   omp_set_num_threads(params.nthreads);

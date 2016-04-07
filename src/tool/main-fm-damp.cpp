@@ -182,8 +182,6 @@ void Params::check() {
 
 } /// end of name space
 
-_INITIALIZE_EASYLOGGINGPP
-
 int main(int argc, char* argv[]) {
   /* initialize Madagascar */
   sf_init(argc,argv);
@@ -193,10 +191,11 @@ int main(int argc, char* argv[]) {
   Timer totalTimer;
 
   /// configure logger
-  easyloggingpp::Configurations defaultConf;
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
-  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
-  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
+  FILELog::setLogFile("fm-damp.log");
+//  easyloggingpp::Configurations defaultConf;
+//  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
+//  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
+//  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
 #ifdef _OPENMP
   omp_set_num_threads(params.nthreads);
