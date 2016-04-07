@@ -3,7 +3,9 @@ extern "C" {
 #include <rsf.h>
 }
 
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 #include "logger.h"
 #include "sum.h"
@@ -196,7 +198,9 @@ int main(int argc, char* argv[]) {
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
+#ifdef _OPENMP
   omp_set_num_threads(params.nthreads);
+#endif
 
   int nz = params.nz;
   int nx = params.nx;

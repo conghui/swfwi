@@ -2,10 +2,13 @@ extern "C" {
 #include <rsf.h>
 }
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include <vector>
 #include <cstdlib>
 #include <cmath>
-#include <omp.h>
 
 #include "logger.h"
 #include "shot-position.h"
@@ -155,7 +158,10 @@ int main(int argc, char *argv[]) {
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile);
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
+#ifdef _OPENMP
   omp_set_num_threads(params.nthreads);
+#endif
+
   int nz = params.nz;
   int nx = params.nx;
   int nb = params.nb;

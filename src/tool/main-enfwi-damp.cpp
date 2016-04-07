@@ -2,6 +2,10 @@ extern "C" {
 #include <rsf.h>
 }
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include <mpi.h>
 #include <cstdlib>
 #include <boost/lexical_cast.hpp>
@@ -12,7 +16,6 @@ extern "C" {
 #include <cmath>
 #include <fstream>
 #include <sstream>
-#include <omp.h>
 
 #include "logger.h"
 #include "shot-position.h"
@@ -335,7 +338,9 @@ int main(int argc, char *argv[]) {
   defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, logfile.c_str());
   easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
+#ifdef _OPENMP
   omp_set_num_threads(params.nthreads);
+#endif
 
   int nz = params.nz;
   int nx = params.nx;

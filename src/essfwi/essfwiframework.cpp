@@ -12,9 +12,8 @@ extern "C"
 }
 
 #include <time.h>
-#include <cmath>
 
-#include <omp.h>
+#include <cmath>
 #include <algorithm>
 #include <iterator>
 #include <numeric>
