@@ -9,16 +9,16 @@
 import os
 
 # compiler options
-compiler_set        = 'gnu' # intel or gnu or sw
+compiler_set        = 'sw' # intel or gnu or sw
 debug_mode          = 0
 additional_includes = ['~/softs/install/boost/include/', ]
 additional_libpath  = []
 additional_libs     = []
 
 if compiler_set == 'sw':#{{{
-  c_compiler      = ['mpicc', ]
-  cxx_compiler    = ['mpicxx',]
-  linker          = cxx_compiler
+  c_compiler      = ['mpicc', '-ver', '5.421-sw-437', '-host']
+  cxx_compiler    = ['mpicxx', '-ver', '5.421-sw-437', '-host']
+  linker          = ['mpicxx']
   warn_flags      = ['-Wno-write-strings']
   optimize_flags  = ['-O2']
   debug_flags     = ['-O0', '-g']
@@ -106,5 +106,5 @@ for d in dirlist:
   SConscript(d[1] + '/SConscript',
              variant_dir = d[1].replace('src', 'build'),
              duplicate = 0,
-             exports = 'env dirs')
+             exports = 'env dirs compiler_set c_compiler cxx_compiler')
 #}}}

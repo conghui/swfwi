@@ -64,8 +64,29 @@ if task == 'fm':
     nthreads=%d
     ''' % (fmbin, omp_threads), stdout=-1, stdin=0)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
+elif task == 'fm-sw':
+  Flow('shots', 'vel', '''
+    /usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
+    -o bsub.out -J "fm-damp" %s
+    vinit=${SOURCES[0]} shots=${TARGETS[0]}
+    fm=10 amp=1 dt=0.0015 ns=47 ng=461 nt=2000 nb=30
+    sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
+    nthreads=%d
+    ''' % (fmbin, omp_threads), stdout=-1, stdin=0)
+  Plot('shots','grey color=g title=shot label2= unit2=', view=0)
 elif task == 'essfwi':
   Flow('vsnaps absobjs norobjs', 'smvel shots', '''%s
+    vin=${SOURCES[0]} shots=${SOURCES[1]}
+    vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
+    niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
+    nthreads=%d
+    ''' % (essfwibin, omp_threads), stdout=-1, stdin=0)
+elif task == 'essfwi-sw':
+  Flow('vsnaps absobjs norobjs', 'smvel shots', '''
+    /usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
+    -o bsub.out -J "fm-damp" %s
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5

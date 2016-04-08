@@ -6,15 +6,34 @@
  */
 
 #include "environment.h"
+#include "logger.h"
 #include <cstdlib>
 #include <unistd.h>
 #include <cstdio>
+#include <sys/types.h>
+#include <sys/stat.h>
 
+
+static bool isdir(const std::string &dirpath) {
+  struct stat sb;
+  if (stat(dirpath.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
+    return true;
+  }
+
+  return false;
+}
 
 void Environment::setDatapath() {
   std::string datapath = getcwd() + "/rsf/";
-  std::string mkdircmd = std::string("mkdir -p ") + datapath;
-  std::system(mkdircmd.c_str());
+
+  if (!isdir(datapath)) {
+    if( mkdir(datapath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
+      ERROR() << "mkdir faild";
+      exit(0);
+    }
+
+  }
+
   setenv("DATAPATH", datapath.c_str(), 1);
 }
 

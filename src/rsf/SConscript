@@ -14,13 +14,15 @@ komplex.c
 simtab.c
               """.split()
 
-extra_include_dir = [
-]
-
 ############################### for library ###########################
-#######################################################################
-# clone the environment from global env and make some modification of it
-myenv    = env.Clone(CPPPATH = extra_include_dir)
+if compiler_set == 'sw':
+  cflags = ['-O0']
+else:
+  cflags = ['-O2']
+
+myenv    = Environment(CC = c_compiler,
+                       CFLAGS = cflags,
+                       ENV = os.environ)
 
 # compile to object files
 lib_objs = myenv.StaticObject(lib_modules)
