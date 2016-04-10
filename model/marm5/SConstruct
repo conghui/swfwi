@@ -86,7 +86,7 @@ elif task == 'essfwi-sw':
   Flow('vsnaps absobjs norobjs', 'smvel shots', '''
     /usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
-    -o bsub.out -J "fm-damp" %s
+    -o bsub.out -J "essfwi" %s
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
@@ -101,11 +101,22 @@ elif task == 'enfwi':
     sigfac=0.2 niterenkf=10 nsample=20 nthreads=%d
     perin=/home/rice/data/marm/velpert533x193x100.bin
     ''' % (enfwibin, omp_threads), stdout=-1, stdin=0)
+elif task == 'enfwi-sw':
+  Flow('vsnaps absobjs norobjs', 'smvel shots', '''
+    /usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    -host_stack 1024 -share_size 4096 -n 20 -cgsp 64
+    -o bsub.out -J "enfwi" %s
+    vin=${SOURCES[0]} shots=${SOURCES[1]}
+    vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
+    niter=300 nb=30 seed=10 vmin=1450 vmax=5600 maxdv=200 nita=5
+    sigfac=0.2 niterenkf=1 nsample=20 nthreads=%d
+    perin=/home/export/online1/systest/swrice/data/marm/velpert533x193x100.bin
+    ''' % (enfwibin, omp_threads), stdout=-1, stdin=0)
 elif task == 'noise':
   Flow('shotsnoise', 'shots', '%s fac=0.05' % noisebin)
   Plot('shotsnoise','grey color=g title=shot label2= unit2=', view=0)
 
-if 'fwi' in task:
+if 'fwi' in str(task):
   windowAndDraw('vsnaps', 'vel', [50, 100, 200, 300])
   # plot objs norms#{{{
   plotcurve('absobjs', 'Absolute objective value')
@@ -117,4 +128,5 @@ if 'fwi' in task:
   plotcurve('l1norm', 'l1norm')
   plotcurve('l2norm', 'l2norm')
 #}}}
+
 End()
