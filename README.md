@@ -12,4 +12,5 @@
   }
 ```
 
-
+  it cannot support `std::numeric_limits<double>::quiet_NaN())`, so I use
+  `std::isnan`
