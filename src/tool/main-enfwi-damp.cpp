@@ -155,7 +155,7 @@ Params::Params() {
 
   MPI_Comm_size(MPI_COMM_WORLD, &np);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  k = std::ceil(static_cast<float>(nsample) / np);
+  k = std::ceil(nsample * 1.0 / np);
   ntask = std::min(k, nsample - rank*k);
 
   check();
