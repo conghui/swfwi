@@ -236,7 +236,13 @@ void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
   float alpha4, obj_val4;
   if (toParabolic) {
     DEBUG() << "parabolic fit";
+
+    TRACE() << "max_alpha3: " << max_alpha3;
+    TRACE() << "alpha1: " << alpha1 << ", obj_val1: " << obj_val1 << ", alpha2: " << alpha2 << ", obj_val2: " << obj_val2
+            << "alpha3: " << alpha3 << ", obj_val3: " << obj_val3;
     parabolaVertex(alpha1, obj_val1, alpha2, obj_val2, alpha3, obj_val3, max_alpha3, alpha4, obj_val4);
+    TRACE() << "parabolaVertex done";
+
     if (alpha4 > max_alpha3) {
       DEBUG() << format("alpha4 = %e, max_alpha3 = %e") % alpha4 % max_alpha3;
       DEBUG() << format("alpha4 is greater than max_alpha3, set it to alpha3");

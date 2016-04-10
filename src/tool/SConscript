@@ -2,11 +2,12 @@ import os
 Import('*')
 
 bin_list = [
-			("fm-damp", "main-fm-damp.cpp"),
-			("essfwi-damp", "main-essfwi-damp.cpp"),
-			("enfwi-damp", "main-enfwi-damp.cpp"),
-			("norm", "main-norm.cpp"),
-			("noise", "main-noise.cpp"),
+("fm-damp", "main-fm-damp.cpp"),
+("essfwi-damp", "main-essfwi-damp.cpp"),
+("enfwi-damp", "main-enfwi-damp.cpp"),
+("norm", "main-norm.cpp"),
+("noise", "main-noise.cpp"),
+("test", "main-test.cpp"),
            ]
 
 lib = 'tool'

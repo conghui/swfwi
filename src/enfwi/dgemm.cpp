@@ -15,23 +15,23 @@ static void alpha_A_B_plus_beta_C(
   char transA, char transB,
   double alpha, Matrix &A, Matrix &B,
   double beta, Matrix &C) {
-  int k = A.getNumCol();
+  integer k = A.getNumCol();
   if (transA == 't' || transA == 'T') {
     k = A.getNumRow();
   }
 
-  int m = C.getNumRow();
-  int n = C.getNumCol();
-  int lda = A.getNumRow();
-  int ldb = B.getNumRow();
-  int ldc = C.getNumRow();
+  integer m = C.getNumRow();
+  integer n = C.getNumCol();
+  integer lda = A.getNumRow();
+  integer ldb = B.getNumRow();
+  integer ldc = C.getNumRow();
   dgemm_(&transA, &transB,
-              (integer *)&m, (integer *)&n, (integer *)&k,
+              &m, &n, &k,
               &alpha, // alpha
-              A.getData(), (integer *)&lda,
-              B.getData(), (integer *)&ldb,
+              A.getData(), &lda,
+              B.getData(), &ldb,
               &beta, // beta
-              C.getData(), (integer *)&ldc);
+              C.getData(), &ldc);
 
 }
 
