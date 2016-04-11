@@ -159,6 +159,13 @@ Params::Params() {
   sf_putint(shots,"jsz",jsz);
   sf_putint(shots,"jgx",jgx);
   sf_putint(shots,"jgz",jgz);
+  sf_putint(shots, "nb", nb);
+
+  Velocity v = SfVelocityReader::read(vinit, nx, nz);
+  float vmin = *std::min_element(v.dat.begin(), v.dat.end());
+  float vmax = *std::max_element(v.dat.begin(), v.dat.end());
+  sf_putfloat(shots, "vmin", vmin);
+  sf_putfloat(shots, "vmax", vmax);
 
   check();
 }
@@ -192,10 +199,6 @@ int main(int argc, char* argv[]) {
 
   /// configure logger
   FILELog::setLogFile("fm-damp.log");
-//  easyloggingpp::Configurations defaultConf;
-//  defaultConf.setAll(easyloggingpp::ConfigurationType::Format, "[%level] %date %log");
-//  defaultConf.setAll(easyloggingpp::ConfigurationType::Filename, "fm-damp.log");
-//  easyloggingpp::Loggers::reconfigureAllLoggers(defaultConf);
 
 #ifdef _OPENMP
   omp_set_num_threads(params.nthreads);

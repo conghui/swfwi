@@ -16,7 +16,7 @@ def run_fm(SWCompiler, fmbin):
 #}}}
   Flow('shots', 'vel', submit_cmd + '''%s
     vinit=${SOURCES[0]} shots=${TARGETS[0]}
-    fm=10 amp=1 dt=0.0015 ns=47 ng=461 nt=2000 nb=30
+    fm=10 amp=1 dt=0.0015 ns=4 ng=461 nt=2000 nb=30
     sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
     nthreads=%d
     ''' % (fmbin, omp_threads), stdout=-1, stdin=0)
@@ -33,7 +33,7 @@ def run_essfwi(SWCompiler, essfwibin):
   Flow('vsnaps absobjs norobjs', 'smvel shots', submit_cmd + '''%s
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
-    niter=300 nb=30 seed=10 vmin=1500 vmax=5500 maxdv=200 nita=5
+    niter=300 seed=10 maxdv=200 nita=5
     nthreads=%d
     ''' % (essfwibin, omp_threads), stdout=-1, stdin=0)
 
@@ -48,7 +48,7 @@ def run_enfwi(SWCompiler, enfwibin):
   Flow('vsnaps absobjs norobjs', 'smvel shots', submit_cmd + '''%s
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
-    niter=300 nb=30 seed=10 vmin=1450 vmax=5600 maxdv=200 nita=5
+    niter=300 seed=10 maxdv=200 nita=5
     sigfac=0.2 niterenkf=10 nsample=20 nthreads=%d
     perin=/home/rice/data/marm/velpert533x193x100.bin
     ''' % (enfwibin, omp_threads), stdout=-1, stdin=0)

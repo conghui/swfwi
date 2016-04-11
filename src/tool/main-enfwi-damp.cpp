@@ -96,9 +96,6 @@ Params::Params() {
   norobjs = sf_output("norobjs"); /* normalized values of objective function in iterations */
 
   if (!sf_getint("niter", &niter)) { sf_error("no niter"); }      /* number of iterations */
-  if (!sf_getint("nb",&nb))        { sf_error("no nb"); }         /* thickness of sponge ABC  */
-  if (!sf_getfloat("vmin", &vmin)) { sf_error("no vmin"); }       /* minimal velocity in real model*/
-  if (!sf_getfloat("vmax", &vmax)) { sf_error("no vmax"); }       /* maximal velocity in real model*/
   if (!sf_getfloat("maxdv", &maxdv)) sf_error("no maxdv");        /* max delta v update two iteration*/
   if (!sf_getint("nita", &nita))   { sf_error("no nita"); }       /* max iter refining alpha */
   if (!sf_getint("nsample", &nsample)){ sf_error("no nsample"); } /* # of samples for enkf */
@@ -127,7 +124,11 @@ Params::Params() {
   if (!sf_histint(shots, "jsz", &jsz)) { sf_error("no jsz"); }      /* source z-axis jump interval  */
   if (!sf_histint(shots, "jgx", &jgx)) { sf_error("no jgx"); }      /* receiver x-axis jump interval  */
   if (!sf_histint(shots, "jgz", &jgz)) { sf_error("no jgz"); }      /* receiver z-axis jump interval  */
-
+  if (!sf_histint(shots,  "nb",&nb))        { sf_error("no nb"); }  /* thickness of sponge ABC  */
+  if (!sf_histfloat(shots, "vmin", &vmin)) { sf_error("no vmin"); } /* minimal velocity in real model*/
+  if (!sf_histfloat(shots, "vmax", &vmax)) { sf_error("no vmax"); } /* maximal velocity in real model*/
+  vmin -= 50;
+  vmax += 100;
 
   /**
    * output parameters
@@ -331,7 +332,6 @@ int main(int argc, char *argv[]) {
   /// configure logger
   std::string logfile = std::string("enfwi-damp-") + boost::lexical_cast<std::string>(params.rank) + ".log";
   FILELog::setLogFile(logfile);
-
 
 #ifdef _OPENMP
   omp_set_num_threads(params.nthreads);

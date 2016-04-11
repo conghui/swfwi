@@ -57,3 +57,16 @@ objective function values, L1 L2 normalized model fit and inverted images.
   `std::isnan`
 
 - `posix_memalign` doesn't work, use `malloc` instead.
+
+## TODO
+- the perturbation file for ENFWI is generated from matlab code in `matlab`
+  directory. Not all machine has matlab installed. So it is a good idea to
+  convert the function into C++ code or use madagascar to generate the file.
+
+- in ENFWI, the velocity samples in different processes is gathered/scattered
+  via `MPI_Send` and `MPI_Recv` because different velocity resides in different
+  part of memory, which is not in a contineous way. If the total numer of
+  samples becomes large (tens of thousands), the communication performance may
+  decrease dramatically. One possible solution is to refactor the `Velocity`
+  class as a wrapper, making a contains a pointer which points to the actual
+  velocity data.
