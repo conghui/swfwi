@@ -137,14 +137,14 @@ noisebin  = bindir + 'noise'
 # fm, essfwi, enfwi, noise
 # fm-sw, essfwi-sw, enfwi-sw, noise-sw
 task = ARGUMENTS.get('task')
-if task == 'fm' or task == 'fm-sw':
+if 'fm' in task:
   run_fm(task, fmbin)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
-elif task == 'essfwi' or task == 'essfwi-sw':
+elif 'essfwi' in task:
   run_essfwi(task, essfwibin)
-elif task == 'enfwi' or task == 'enfwi-sw':
+elif 'enfwi' in task:
   run_enfwi(task, enfwibin)
-elif task == 'noise' or task == 'noise-sw':
+elif 'noise' in task:
   run_noise('sw' in str(task), noisebin)
   Plot('shotsnoise','grey color=g title=shot label2= unit2=', view=0)
 
