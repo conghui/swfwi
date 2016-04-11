@@ -58,7 +58,7 @@ objective function values, L1 L2 normalized model fit and inverted images.
 
 - `posix_memalign` doesn't work, use `malloc` instead.
 
-## TODO
+## Remaining issues (TODO)
 - the perturbation file for ENFWI is generated from matlab code in `matlab`
   directory. Not all machine has matlab installed. So it is a good idea to
   convert the function into C++ code or use madagascar to generate the file.
@@ -70,3 +70,6 @@ objective function values, L1 L2 normalized model fit and inverted images.
   decrease dramatically. One possible solution is to refactor the `Velocity`
   class as a wrapper, making a contains a pointer which points to the actual
   velocity data.
+
+- the memory is not enough on SW when the number of samples is 100. 50 is ok.
+
