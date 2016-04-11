@@ -12,6 +12,7 @@ The recommended way to run the programs is to create separate folders for each
 cases. The following is a general work flow in normal cases:
 
 ```
+  cp -r data/ ~/
   mkdir -p job/01
   cd job
   vim README.md   # write some comments about case 01
@@ -21,6 +22,9 @@ cases. The following is a general work flow in normal cases:
   vim run.sh      # choose the task you want to start
   ./run.sh
 ```
+
+If you want to run `enfwi` or `enfwi-sw`, you will need perturbation files as
+input. You can generate this file by compiling and runing the `
 
 ## Show result
 In the same directory where you run the case, you can check the result including
