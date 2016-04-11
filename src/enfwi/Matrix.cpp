@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <cmath>
 #include <sstream>
+#include <cstring>
 
 #include "Matrix.h"
 #include "logger.h"
@@ -40,17 +41,18 @@ std::streampos getFileSize(const std::string &filePath) {
 
 }
 
-
-
 Matrix::Matrix(int ncol, int nrow) :
   mData(NULL), mNumRow(nrow), mNumCol(ncol) {
-//  mData = (value_type *)mkl_malloc( nrow * ncol * sizeof( value_type ), 64 );
-  posix_memalign((void **)&mData, 64, nrow * ncol * sizeof( value_type ) );
+  mData = (value_type *)malloc(nrow * ncol * sizeof(value_type));
+  if (mData == NULL) {
+    ERROR() << __PRETTY_FUNCTION__ << ": malloc fails";
+    perror("reason is:");
+    exit(0);
+  }
   std::fill(mData, mData + nrow * ncol, 0);
 }
 
 Matrix::~Matrix() {
-//  mkl_free(mData);
   free(mData);
 }
 
