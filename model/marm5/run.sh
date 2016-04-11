@@ -11,6 +11,7 @@ export DATAPATH=`pwd`/
 allowed_tasks=( \
   "fm" "essfwi" "enfwi" "noise" \
   "fm-sw" "essfwi-sw" "enfwi-sw" "noise-sw" \
+  "fm-swintel" "essfwi-swintel" "enfwi-swintel" "noise-swintel" \
   )
 
 # check the parameters#{{{

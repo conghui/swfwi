@@ -2,12 +2,15 @@
 
 from rsf.proj import *
 
-def run_fm(SWCompiler, fmbin):
+def run_fm(task, fmbin):
   # setup submit_cmd#{{{
-  if SWCompiler:
+  if task == 'fm-sw':
     submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
-    -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
+    -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
     -o bsub.out -J "fm" '''
+  elif task == 'fm-swintel':
+    submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
+    -n 1 -p q_x86_bio '''
   else:
     submit_cmd = ''
 #}}}
@@ -17,12 +20,15 @@ def run_fm(SWCompiler, fmbin):
     sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
     ''' % (fmbin), stdout=-1, stdin=0)
 
-def run_essfwi(SWCompiler, essfwibin):
+def run_essfwi(task, essfwibin):
   # setup submit_cmd#{{{
-  if SWCompiler:
+  if task == 'essfwi-sw':
     submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
-    -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
+    -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
     -o bsub.out -J "essfwi" '''
+  elif task == 'essfwi-swintel':
+    submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
+    -n 1 -p q_x86_bio '''
   else:
     submit_cmd = ''
 #}}}
@@ -32,11 +38,14 @@ def run_essfwi(SWCompiler, essfwibin):
     niter=300 seed=10 maxdv=200 nita=5
     ''' % (essfwibin), stdout=-1, stdin=0)
 
-def run_enfwi(SWCompiler, enfwibin):
-  if SWCompiler:
+def run_enfwi(task, enfwibin):
+  if task == 'enfwi-sw':
     submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
-    -host_stack 1024 -share_size 4096 -n 20 -np 1 -cgsp 64
+    -host_stack 1024 -share_size 7000 -n 20 -np 1 -cgsp 64
     -o bsub.out -J "essfwi" '''
+  elif task == 'enfwi-swintel':
+    submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
+    -n 20 -p q_x86_bio '''
   else:
     submit_cmd = '~/softs/install/mpi/bin/mpirun -np 1 '
 
@@ -129,12 +138,12 @@ noisebin  = bindir + 'noise'
 # fm-sw, essfwi-sw, enfwi-sw, noise-sw
 task = ARGUMENTS.get('task')
 if task == 'fm' or task == 'fm-sw':
-  run_fm('sw' in str(task), fmbin)
+  run_fm(task, fmbin)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
 elif task == 'essfwi' or task == 'essfwi-sw':
-  run_essfwi('sw' in str(task), essfwibin)
+  run_essfwi(task, essfwibin)
 elif task == 'enfwi' or task == 'enfwi-sw':
-  run_enfwi('sw' in str(task), enfwibin)
+  run_enfwi(task, enfwibin)
 elif task == 'noise' or task == 'noise-sw':
   run_noise('sw' in str(task), noisebin)
   Plot('shotsnoise','grey color=g title=shot label2= unit2=', view=0)

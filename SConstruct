@@ -9,7 +9,7 @@
 import os
 
 # compiler options
-compiler_set        = 'intel' # intel or gnu or sw
+compiler_set        = 'intel' # intel, gnu, sw, swintel
 debug_mode          = 0
 additional_includes = ['~/softs/install/boost/include/', ]
 additional_libpath  = []
@@ -20,6 +20,16 @@ if compiler_set == 'sw':#{{{
   cxx_compiler    = ['mpicxx', '-ver', '5.421-sw-437', '-host']
   linker          = ['mpicxx']
   warn_flags      = ['-Wno-write-strings']
+  optimize_flags  = ['-O2']
+  debug_flags     = ['-O0', '-g']
+  other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
+  link_flags      = ['-O1']
+#}}}
+elif compiler_set == 'swintel':#{{{
+  c_compiler      = ['mpiicc',  '-openmp']
+  cxx_compiler    = ['mpiicpc', '-openmp']
+  linker          = cxx_compiler
+  warn_flags      = ['-Wall']
   optimize_flags  = ['-O2']
   debug_flags     = ['-O0', '-g']
   other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
@@ -45,7 +55,7 @@ elif compiler_set == 'intel':#{{{
   other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
   link_flags      = ['-O1']
 else:
-  print 'Only GNU or Intel or SW Compilers are supported now'
+  print 'Only GNU, Intel, SW, SWIntel Compilers are supported now'
   Exit(-1)
 #}}}
 # set the sub directories (key, value), where value is the name of directory#{{{
