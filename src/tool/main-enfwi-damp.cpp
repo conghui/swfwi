@@ -61,7 +61,6 @@ public:
   char *perin;
 
 public: // parameters from input files
-  int nthreads;
   int nz;
   int nx;
   float dz;
@@ -103,7 +102,6 @@ Params::Params() {
   if (!(perin = sf_getstring("perin"))) { sf_error("no perin"); } /* perturbation file */
   if (!sf_getint("seed", &seed))   { seed = 10; }                 /* seed for random numbers */
   if (!sf_getfloat("sigfac", &sigfac))   { sf_error("no sigfac"); } /* sigma factor */
-  if (!sf_getint("nthreads", &nthreads)) { sf_error("no nthreads"); } /* # of threads for OMP */
 
   /* get parameters from velocity model and recorded shots */
   if (!sf_histint(vinit, "n1", &nz)) { sf_error("no n1"); }       /* nz */
@@ -332,10 +330,6 @@ int main(int argc, char *argv[]) {
   /// configure logger
   std::string logfile = std::string("enfwi-damp-") + boost::lexical_cast<std::string>(params.rank) + ".log";
   FILELog::setLogFile(logfile);
-
-#ifdef _OPENMP
-  omp_set_num_threads(params.nthreads);
-#endif
 
   int nz = params.nz;
   int nx = params.nx;
