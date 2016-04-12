@@ -40,7 +40,7 @@ objective function values, L1 L2 normalized model fit and inverted images.
 - of course, you can also checkout the log manually.
 
 ## SWC++ compiler issues
-- we can only pass the `-O0` optimized flags to the `mpicxx -ver 5.421-sw-437 -host`. Compile it with `-O2` will creash the program.
+- we can only pass the `-O0` optimized flags to the `mpicxx -ver 5.421-sw-437 -host` when compiling `rsf` library. Compile it with `-O2` will creash the program.
 
 - the follow codes in `src/common/parabola-vertex.cpp`
 
