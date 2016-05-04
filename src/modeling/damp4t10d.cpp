@@ -10,13 +10,13 @@
 #include "damp4t10d.h"
 #include "logger.h"
 #include "sum.h"
-#include "fd4t10s-damp-zjh.h"
-#include "fd4t10s-zjh.h"
 #include "sfutil.h"
 #include "common.h"
 
 extern "C" {
 #include <rsf.h>
+#include "fd4t10s-damp-zjh.h"
+#include "fd4t10s-zjh.h"
 }
 
 static void initbndr(std::vector<float> &bndr, int nb) {
@@ -150,10 +150,9 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 }
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
-  fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz, bx0, dx, dt);
-//  fd4t10s_zjh_2d(p0, p1, &vel->dat[0], vel->nx, vel->nz, nb + FDLEN, dx, dt);
-//  applySponge(p0, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
-//  applySponge(p1, &bndr[0], vel->nx, vel->nz, nb + FDLEN);
+  static std::vector<float> u2(vel->nx * vel->nz, 0);
+
+  fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], &u2[0], vel->nx, vel->nz, bx0);
 }
 
 void Damp4t10d::bindVelocity(const Velocity& _vel) {
@@ -186,7 +185,8 @@ const Velocity& Damp4t10d::getVelocity() const {
 }
 
 void Damp4t10d::stepBackward(float* p0, float* p1) const {
-  fd4t10s_zjh_2d_vtrans(p0, p1, &vel->dat[0], vel->nx, vel->nz);
+  static std::vector<float> u2(vel->nx * vel->nz, 0);
+  fd4t10s_zjh_2d_vtrans(p0, p1, &vel->dat[0], &u2[0], vel->nx, vel->nz);
 }
 
 void Damp4t10d::addSource(float* p, const float* source,

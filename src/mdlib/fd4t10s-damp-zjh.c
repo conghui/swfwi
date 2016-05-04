@@ -5,20 +5,19 @@
  *      Author: rice
  */
 
-#include <vector>
-#include <cstdio>
 #include "fd4t10s-damp-zjh.h"
 
 /**
  * please note that the velocity is transformed
  */
-void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float *vel, int nx, int nz, int nb, float dx, float dt) {
+void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float *vel, float *u2, int nx, int nz, int nb) {
   float a[6];
 
   const int d = 6;
   const int bz = nb;
   const int bx = nb;
   const float max_delta = 0.05;
+  int ix, iz;
 
   /// Zhang, Jinhai's method
   a[0] = +1.53400796;
@@ -28,11 +27,9 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
   a[4] = -0.01626042;
   a[5] = +0.00216736;
 
-  std::vector<float> u2(nx * nz, 0);
-
-  #pragma omp parallel for
-  for (int ix = d - 1; ix < nx - (d - 1); ix ++) {
-    for (int iz = d - 1; iz < nz - (d - 1); iz ++) {
+  #pragma omp parallel for default(shared) private(ix, iz)
+  for (ix = d - 1; ix < nx - (d - 1); ix ++) {
+    for (iz = d - 1; iz < nz - (d - 1); iz ++) {
       int curPos = ix * nz + iz;
       u2[curPos] = -4.0 * a[0] * curr_wave[curPos] +
                    a[1] * (curr_wave[curPos - 1]  +  curr_wave[curPos + 1]  +
@@ -49,9 +46,9 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
     }
   }
 
-  #pragma omp parallel for
-  for (int ix = d; ix < nx - d; ix++) { /// the range of ix is different from that in previous for loop
-    for (int iz = d; iz < nz - d; iz++) { /// be careful of the range of iz
+  #pragma omp parallel for default(shared) private(ix, iz)
+  for (ix = d; ix < nx - d; ix++) { /// the range of ix is different from that in previous for loop
+    for (iz = d; iz < nz - d; iz++) { /// be careful of the range of iz
       float delta;
       float dist = 0;
       if (ix >= bx && ix < nx - bx &&

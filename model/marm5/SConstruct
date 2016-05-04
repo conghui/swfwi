@@ -136,7 +136,7 @@ noisebin  = bindir + 'noise'
 # possible option:
 # fm, essfwi, enfwi, noise
 # fm-sw, essfwi-sw, enfwi-sw, noise-sw
-task = ARGUMENTS.get('task')
+task = str(ARGUMENTS.get('task'))
 if 'fm' in task:
   run_fm(task, fmbin)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
