@@ -14,7 +14,15 @@ extra_include_dir = [
 ############################### for library ###########################
 #######################################################################
 # clone the environment from global env and make some modification of it
-myenv    = env.Clone(CPPPATH = extra_include_dir)
+new_c_compiler = c_compiler
+# if compiler_set == 'sw':
+  # new_c_compiler = ['swacc']
+# else:
+  # new_c_compiler = c_compiler
+
+myenv    = env.Clone(
+    CC = new_c_compiler,
+    CPPPATH = extra_include_dir)
 
 # compile to object files
 lib_objs = myenv.StaticObject(lib_modules)

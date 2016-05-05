@@ -2,12 +2,14 @@
 
 from rsf.proj import *
 
+sw_queue = str(ARGUMENTS.get('queue'))
+
 def run_fm(task, fmbin):
   # setup submit_cmd#{{{
   if task == 'fm-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
     -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
-    -o bsub.out -J "fm" '''
+    -o bsub.out -J "fm" ''' % sw_queue
   elif task == 'fm-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 1 -p q_x86_bio '''
@@ -16,16 +18,16 @@ def run_fm(task, fmbin):
 #}}}
   Flow('shots', 'vel', submit_cmd + '''%s
     vinit=${SOURCES[0]} shots=${TARGETS[0]}
-    fm=10 amp=1 dt=0.0015 ns=47 ng=461 nt=2000 nb=30
+    fm=10 amp=1 dt=0.0015 ns=1 ng=461 nt=2000 nb=30
     sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
     ''' % (fmbin), stdout=-1, stdin=0)
 
 def run_essfwi(task, essfwibin):
   # setup submit_cmd#{{{
   if task == 'essfwi-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
     -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
-    -o bsub.out -J "essfwi" '''
+    -o bsub.out -J "essfwi" ''' % sw_queue
   elif task == 'essfwi-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 1 -p q_x86_bio '''
@@ -40,9 +42,9 @@ def run_essfwi(task, essfwibin):
 
 def run_enfwi(task, enfwibin):
   if task == 'enfwi-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
     -host_stack 1024 -share_size 7000 -n 20 -np 1 -cgsp 64
-    -o bsub.out -J "essfwi" '''
+    -o bsub.out -J "essfwi" ''' % sw_queue
   elif task == 'enfwi-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 20 -p q_x86_bio '''
@@ -59,9 +61,9 @@ def run_enfwi(task, enfwibin):
 def run_noise(SWCompiler, normbin):#{{{
   # setup submit_cmd#{{{
   if SWCompiler:
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
     -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
-    -o bsub.out -J "norm" '''
+    -o bsub.out -J "norm" ''' % sw_queue
   else:
     submit_cmd = ''
 #}}}
@@ -70,9 +72,9 @@ def run_noise(SWCompiler, normbin):#{{{
 def run_norm(SWCompiler, normbin):#{{{
   # setup submit_cmd#{{{
   if SWCompiler:
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
     -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
-    -o bsub.out -J "norm" '''
+    -o bsub.out -J "norm" ''' % sw_queue
   else:
     submit_cmd = ''
 #}}}
