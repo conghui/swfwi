@@ -1,24 +1,12 @@
-/*
- * fd4t10s-damp-zjh.cpp
- *
- *  Created on: Mar 4, 2016
- *      Author: rice
- */
-
-#include <stdio.h>
-#include "fd4t10s-damp-zjh.h"
-
-/**
- * please note that the velocity is transformed
- */
 void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float *vel, float *u2, int nx, int nz, int nb) {
   float a[6];
 
-  const int d = 6;
-  const int bz = nb;
-  const int bx = nb;
-  const float max_delta = 0.05;
+  int d = 6;
+  int bz = nb;
+  int bx = nb;
+  float max_delta = 0.05;
   int ix, iz;
+  int len = nx * nz;
 
   /// Zhang, Jinhai's method
   a[0] = +1.53400796;
@@ -28,15 +16,14 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
   a[4] = -0.01626042;
   a[5] = +0.00216736;
 
-#ifdef USE_OPENMP
-  #pragma omp parallel for default(shared) private(ix, iz)
-#endif
-
-
-#ifdef USE_SWACC
 /*#pragma acc parallel loop copyin(nx,nz,d) annotate(readonly=(nx,nz,d))*/
-#pragma acc parallel loop
-#endif
+#pragma acc parallel loop \
+  private(ix, iz) \
+  copyin(nx,nz,d,a,curr_wave) \
+  copyout(u2) \
+  annotate(readonly=(nx,nz,d)) \
+  annotate(dimension(curr_wave(len), u2(len))) \
+  annotate(entire(a))
   for (ix = d - 1; ix < nx - (d - 1); ix++) {
     for (iz = d - 1; iz < nz - (d - 1); iz++) {
       int curPos = ix * nz + iz;
@@ -55,7 +42,6 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
     }
   }
 
-  #pragma omp parallel for default(shared) private(ix, iz)
   for (ix = d; ix < nx - d; ix++) { /// the range of ix is different from that in previous for loop
     for (iz = d; iz < nz - d; iz++) { /// be careful of the range of iz
       float delta;

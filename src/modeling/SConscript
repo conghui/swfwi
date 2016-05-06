@@ -17,7 +17,7 @@ extra_include_dir = [
 
 new_c_compiler = c_compiler
 if compiler_set == 'sw':
-  new_c_compiler = ['swacc']
+  new_c_compiler = ['swacc', '-priv', ]
   cflags = ['-DUSE_SWACC']
 else:
   new_c_compiler = c_compiler
