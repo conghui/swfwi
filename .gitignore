@@ -9,3 +9,4 @@ job/
 .cproject
 .project
 .tune_err
+.privateAnalyse.dat

@@ -5,6 +5,7 @@
  *      Author: rice
  */
 
+#include <stdio.h>
 #include "fd4t10s-damp-zjh.h"
 
 /**
@@ -27,7 +28,15 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
   a[4] = -0.01626042;
   a[5] = +0.00216736;
 
+#ifdef USE_OPENMP
   #pragma omp parallel for default(shared) private(ix, iz)
+#endif
+
+
+#ifdef USE_SWACC
+  printf("using swacc\n");
+#pragma acc parallel loop
+#endif
   for (ix = d - 1; ix < nx - (d - 1); ix ++) {
     for (iz = d - 1; iz < nz - (d - 1); iz ++) {
       int curPos = ix * nz + iz;

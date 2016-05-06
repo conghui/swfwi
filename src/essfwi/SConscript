@@ -16,11 +16,10 @@ include_dir = [
   '#' + dirs['rsf'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
-  '#' + dirs['mdlib'],
 ]
 
 depend_libpath = []
-depend_libs = ['modeling', 'mdlib', 'common']
+depend_libs = ['modeling', 'common']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)

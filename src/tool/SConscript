@@ -2,28 +2,33 @@ import os
 Import('*')
 
 bin_list = [
-("fm-damp", "main-fm-damp.cpp"),
 ("essfwi-damp", "main-essfwi-damp.cpp"),
 ("enfwi-damp", "main-enfwi-damp.cpp"),
 ("norm", "main-norm.cpp"),
 ("noise", "main-noise.cpp"),
 ("test", "main-test.cpp"),
+("fm-damp", "main-fm-damp.cpp"),
            ]
 
 modules = """
           """.split()
 
+modeling_objs = [
+  '#build/modeling/damp4t10d.o',
+  '#build/modeling/fd4t10s-damp-zjh.o',
+  '#build/modeling/fd4t10s-zjh.o',
+]
+
 include_dir = [
   '#' + dirs['rsf'],
   '#' + dirs['common'],
   '#' + dirs['modeling'],
-  '#' + dirs['mdlib'],
   '#' + dirs['essfwi'],
   '#' + dirs['enfwi'],
 ]
 
 depend_libpath = []
-depend_libs = ['enfwi', 'essfwi', 'modeling', 'common', 'mdlib', 'rsf']
+depend_libs = ['enfwi', 'essfwi', 'common', 'rsf']
 
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
@@ -33,5 +38,5 @@ myenv.Prepend(LIBS = depend_libs)
 # compile each binary
 for bin in bin_list:
   bin_obj = myenv.StaticObject(bin[1])
-  bin_target = myenv.Program(target = bin[0], source = bin_obj)
+  bin_target = myenv.Program(target = bin[0], source = bin_obj + modeling_objs)
   myenv.Install("#" + dirs['bin'], bin_target)

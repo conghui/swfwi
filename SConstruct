@@ -17,8 +17,8 @@ additional_libs     = []
 
 if compiler_set == 'sw':#{{{
   c_compiler      = ['mpicc', '-ver', '5.421-sw-437', '-host']
-  cxx_compiler    = ['mpicxx', '-ver', '5.421-sw-437', '-host']
-  linker          = ['mpicxx']
+  cxx_compiler    = ['mpiCC', '-ver', '5.421-sw-437', '-host']
+  linker          = ['swaCC']
   warn_flags      = ['-Wno-write-strings']
   optimize_flags  = ['-O2']
   debug_flags     = ['-O0', '-g']
@@ -68,7 +68,6 @@ dirlist = [
    ('tool', 'src/tool'),
    ('common', 'src/common'),
    ('modeling', 'src/modeling'),
-   ('mdlib', 'src/mdlib'),
    ('rsf', 'src/rsf'),
 ]
 dirs = dict(dirlist)

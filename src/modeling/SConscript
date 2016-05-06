@@ -5,18 +5,32 @@ lib = "modeling"
 # these modules will compiled in to library
 lib_modules = """
 			  damp4t10d.cpp
+			  fd4t10s-damp-zjh.c
+			  fd4t10s-zjh.c
               """.split()
 
 extra_include_dir = [
   '#' + dirs['rsf'],
   '#' + dirs['common'],
-  '#' + dirs['mdlib'],
+  # '#' + dirs['mdlib'],
 ]
+
+new_c_compiler = c_compiler
+if compiler_set == 'sw':
+  new_c_compiler = ['swacc']
+  cflags = ['-DUSE_SWACC']
+else:
+  new_c_compiler = c_compiler
+  cflags = ['-DUSE_OPENMP']
 
 ############################### for library ###########################
 #######################################################################
 # clone the environment from global env and make some modification of it
-myenv    = env.Clone(CPPPATH = extra_include_dir)
+myenv    = env.Clone(
+    CC= new_c_compiler,
+    CPPPATH = extra_include_dir)
+
+myenv.Append(CFLAGS = cflags)
 
 # compile to object files
 lib_objs = myenv.StaticObject(lib_modules)
