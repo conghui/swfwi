@@ -1,0 +1,14 @@
+import os
+
+bin_list = [
+    ('hello', 'hello.cpp')
+]
+
+libs = ['pthread']
+
+env = Environment(
+    LIBS = libs,
+    ENV = os.environ)
+
+for bin in bin_list:
+  env.Program(bin[0], bin[1])

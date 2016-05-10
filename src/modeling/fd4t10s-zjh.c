@@ -10,7 +10,7 @@
 void fd4t10s_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float *vel, float *u2, int nx, int nz) {
   float a[6];
 
-  const int d = 5;
+  const int d = 6;
   int ix, iz;
 
   /// Zhang, Jinhai's method
@@ -22,8 +22,8 @@ void fd4t10s_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float
   a[5] = +0.00216736;
 
   #pragma omp parallel for default(shared) private(ix, iz)
-  for (ix = d; ix < nx - d; ix ++) {
-    for (iz = d; iz < nz - d; iz ++) {
+  for (ix = d - 1; ix < nx - (d - 1); ix ++) {
+    for (iz = d - 1; iz < nz - (d - 1); iz ++) {
       int curPos = ix * nz + iz;
       u2[curPos] = -4.0 * a[0] * curr_wave[curPos] +
                    a[1] * (curr_wave[curPos - 1]  +  curr_wave[curPos + 1]  +
@@ -41,8 +41,8 @@ void fd4t10s_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const float
   }
 
   #pragma omp parallel for default(shared) private(ix, iz)
-  for (ix = d + 1; ix < nx - d - 1; ix++) { /// the range of ix is different from that in previous for loop
-    for (iz = d + 1; iz < nz - d - 1; iz++) { /// be careful of the range of iz
+  for (ix = d; ix < nx - d; ix++) { /// the range of ix is different from that in previous for loop
+    for (iz = d; iz < nz - d; iz++) { /// be careful of the range of iz
       int curPos = ix * nz + iz;
       float curvel = vel[curPos];
 

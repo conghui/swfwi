@@ -2,14 +2,12 @@
 
 from rsf.proj import *
 
-sw_queue = str(ARGUMENTS.get('queue'))
-
 def run_fm(task, fmbin):
   # setup submit_cmd#{{{
   if task == 'fm-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
-    -o bsub.out -J "fm" ''' % sw_queue
+    -o bsub.out -J "fm" '''
   elif task == 'fm-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 1 -p q_x86_bio '''
@@ -25,9 +23,9 @@ def run_fm(task, fmbin):
 def run_essfwi(task, essfwibin):
   # setup submit_cmd#{{{
   if task == 'essfwi-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
-    -o bsub.out -J "essfwi" ''' % sw_queue
+    -o bsub.out -J "essfwi" '''
   elif task == 'essfwi-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 1 -p q_x86_bio '''
@@ -42,9 +40,9 @@ def run_essfwi(task, essfwibin):
 
 def run_enfwi(task, enfwibin):
   if task == 'enfwi-sw':
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 7000 -n 20 -np 1 -cgsp 64
-    -o bsub.out -J "essfwi" ''' % sw_queue
+    -o bsub.out -J "essfwi" '''
   elif task == 'enfwi-swintel':
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 20 -p q_x86_bio '''
@@ -61,9 +59,9 @@ def run_enfwi(task, enfwibin):
 def run_noise(SWCompiler, normbin):#{{{
   # setup submit_cmd#{{{
   if SWCompiler:
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
-    -o bsub.out -J "norm" ''' % sw_queue
+    -o bsub.out -J "norm" '''
   else:
     submit_cmd = ''
 #}}}
@@ -72,9 +70,9 @@ def run_noise(SWCompiler, normbin):#{{{
 def run_norm(SWCompiler, normbin):#{{{
   # setup submit_cmd#{{{
   if SWCompiler:
-    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q q_sw_yyz
     -host_stack 1024 -share_size 4096 -n 1 -cgsp 64
-    -o bsub.out -J "norm" ''' % sw_queue
+    -o bsub.out -J "norm" '''
   else:
     submit_cmd = ''
 #}}}
@@ -111,13 +109,13 @@ Fetch('marmvel.hh', 'marm', server = 'local', top = os.environ['HOME'] + '/data/
 Flow('vel','marmvel.hh',
   '''
   dd form=native |
-  window j1=5 j2=5 |
+  window j1=10 j2=10 |
   put label1=Depth  unit1=m label2=Lateral unit2=m
   ''')
 #}}}
 # smooth initial model#{{{
 Flow('smvel', 'vel', '''math output="1/input" |
-  smooth rect1=25 rect2=60 |
+  smooth rect1=5 rect2=20 |
   math output="1/input"
   ''')
 #}}}
