@@ -1,14 +1,16 @@
 import os
 
-bin_list = [
-    ('hello', 'hello.cpp')
-]
-
 libs = ['pthread']
 
 env = Environment(
     LIBS = libs,
     ENV = os.environ)
 
-for bin in bin_list:
-  env.Program(bin[0], bin[1])
+hello = env.Program('hello', 'hello.cpp')
+
+run = env.Command('hello.log', hello, './hello')
+Depends(run, hello)
+
+# AlwaysBuild(run)
+# env.Alias('run', hello, hello[0].abspath)
+
