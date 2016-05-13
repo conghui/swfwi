@@ -10,6 +10,12 @@
 
 #define NUM_THREADS 3
 #define D 2
+const int nx = 117;
+const int nz = 47;
+const int max_strip_4_ldm = 5;
+static int ldm_p0[max_strip_4_ldm][nz];
+static int ldm_p1[max_strip_4_ldm][nz];
+static int ldm_v[max_strip_4_ldm][nz];
 
 int myrand() {
   return rand() % 10;
@@ -77,6 +83,53 @@ void *stencil_wrapper(void *_arg) {
   std::memcpy(&local_p0[0], arg.p0 + strip_begin * arg.nz, strip_len * arg.nz * sizeof *arg.p0);
   std::memcpy(&local_p1[0], arg.p1 + strip_begin * arg.nz, strip_len * arg.nz * sizeof *arg.p1);
   std::memcpy(&local_v[0], arg.v + strip_begin * arg.nz, strip_len * arg.nz * sizeof *arg.v);
+
+  stencil_kernel(&local_p0[0], &local_p1[0], &local_v[0], strip_end - strip_begin, arg.nz);
+
+  int p0_x_output_begin = arg.tid == 0 ? D : nstrip_per_thread * arg.tid;
+  int local_p0_x_output_begin = D;
+  int local_p0_x_output_len = strip_end - strip_begin - 2 * D;
+
+  if (arg.tid == 0) {
+    //std::printf("nstrip_per_thread: %d, xbegin: %d, xend: %d\n", nstrip_per_thread, xbegin, xend);
+    //std::printf("tid: %d, p0_x_output_begin: %d, local_p0_x_output_begin: %d, local_p0_x_output_len: %d \n",
+        //arg.tid, p0_x_output_begin, local_p0_x_output_begin, local_p0_x_output_len);
+
+    //printf("\nglobal_p0:\n");
+    //print(arg.p0, arg.nx, arg.nz);
+
+    //printf("\nlocal_p0\n");
+    //print(&local_p0[0], (xend - xbegin), arg.nz);
+
+    //printf("\nlocal_p1:\n");
+    //print(&local_p1[0], (xend - xbegin), arg.nz);
+    /// calculate sum before output
+
+  }
+  std::memcpy(arg.p0 + (p0_x_output_begin * arg.nz), &local_p0[local_p0_x_output_begin*arg.nz], local_p0_x_output_len * arg.nz * sizeof(*arg.p0));
+
+  return NULL;
+}
+
+void *stencil_wrapper2(void *_arg) {
+  struct args_t arg = *(struct args_t *)_arg;
+  int nstrip_per_thread = std::ceil(1.0 * arg.nx / arg.nthreads); // # of rows for each threads
+  int strip_begin = std::max(nstrip_per_thread * arg.tid - D, 0); // x starts for each threads
+  int strip_end =  std::min(nstrip_per_thread * (arg.tid + 1) + D, arg.nx); /// x ends for each threads
+  int strip_len = strip_end - strip_begin;
+
+  //std::vector<int> local_p0(arg.nz * max_strip_4_ldm);
+  //std::vector<int> local_p1(arg.nz * max_strip_4_ldm);
+  //std::vector<int> local_v(arg.nz * max_strip_4_ldm);
+  int istrip;
+  for (istrip = 0; istrip < max_strip_4_ldm; istrip++) {
+    std::memcpy(ldm_p0[istrip], arg.p0 + istrip * nz, nz * sizeof *arg.p0);
+    std::memcpy(ldm_p1[istrip], arg.p1 + istrip * nz, nz * sizeof *arg.p1);
+    std::memcpy(ldm_v[istrip], arg.v + istrip * nz, nz * sizeof *arg.v);
+  }
+  //std::memcpy(&local_p0[0], arg.p0 + max_strip_4_ldm * arg.nz, max_strip_4_ldm * arg.nz * sizeof *arg.p0);
+  //std::memcpy(&local_p1[0], arg.p1 + max_strip_4_ldm * arg.nz, max_strip_4_ldm * arg.nz * sizeof *arg.p1);
+  //std::memcpy(&local_v[0], arg.v + max_strip_4_ldm * arg.nz, max_strip_4_ldm * arg.nz * sizeof *arg.v);
 
   stencil_kernel(&local_p0[0], &local_p1[0], &local_v[0], strip_end - strip_begin, arg.nz);
 
