@@ -11,17 +11,12 @@
 
 #define NUM_THREADS 3
 #define D 2
+const int nt = 1;
 const int nx = 11;
 const int nz = 6;
-const int nt = 1;
-const int max_strip_4_ldm = 5;
-//static int ldm_p0[max_strip_4_ldm][nz];
-//static int ldm_p1[max_strip_4_ldm][nz];
-//static int ldm_v[max_strip_4_ldm][nz];
-
-//static int *ldm_p0_ptr[max_strip_4_ldm];
-//static int *ldm_p1_ptr[max_strip_4_ldm];
-//static int *ldm_v_ptr[max_strip_4_ldm];
+const int max_stencil_len = 2 * D + 1;
+const int max_strip_4_ldm = 6; /// must be >= max_stencil_len
+const int update_strip_len = max_strip_4_ldm - max_stencil_len + 1;
 
 pthread_barrier_t barr;
 
@@ -98,10 +93,12 @@ void stencil_kernel_3(int **p0, int **p1, int **p2, int **v, int nx, int nz) {
   }
 }
 
-void run_serial(int *p0, int *p1, int *v, int nx, int nz, int nt) {
+std::vector<int> run_serial(int *p0, int *p1, int *v, int nx, int nz, int nt) {
   int *p0_ptr[nx];
   int *p1_ptr[nx];
   int *v_ptr[nx];
+
+  std::vector<int> sum;
   for (int it = 0; it < nt; it++) {
     for (int ix = 0; ix < nx; ix++) {
       p0_ptr[ix] = &p0[ix * nz];
@@ -110,10 +107,15 @@ void run_serial(int *p0, int *p1, int *v, int nx, int nz, int nt) {
     }
     //stencil_kernel(p0, p1, v, nx, nz);
     stencil_kernel_2(p0_ptr, p1_ptr, v_ptr, nx, nz);
-    print(p0_ptr[0], nx, nz);
-    std::printf("it: %d, sum of p0: %d\n", it, std::accumulate(p0, p0 + nx * nz, 0));
+//    print(p0_ptr[0], nx, nz);
+    int s = std::accumulate(p0, p0 + nx * nz, 0);
+    sum.push_back(s);
+    std::printf("it: %d, sum of p0: %d\n", it, s);
+
     std::swap(p0, p1);
   }
+
+  return sum;
 }
 
 struct args_t {
@@ -179,7 +181,7 @@ void *stencil_wrapper2(void *_arg) {
   int nstrip_per_thread = std::ceil(1.0 * arg.nx / arg.nthreads); // # of rows for each threads
   int strip_begin = std::max(nstrip_per_thread * arg.tid - D, 0); // x starts for each threads
   int strip_end =  std::min(nstrip_per_thread * (arg.tid + 1) + D, arg.nx); /// x ends for each threads
-  int strip_len = strip_end - strip_begin;
+  int strip_len = std::max(strip_end - strip_begin, 0);
 
   int host_istrip;
   if (arg.tid == 0) {
@@ -195,10 +197,10 @@ void *stencil_wrapper2(void *_arg) {
     //printf("copied:\n");
   }
 
-  int ldm_p0[max_strip_4_ldm][nz];
-  int ldm_p1[max_strip_4_ldm][nz];
-  int ldm_p2[max_strip_4_ldm][nz];
-  int ldm_v[max_strip_4_ldm][nz];
+  int ldm_p0[max_strip_4_ldm][nz] = {0};
+  int ldm_p1[max_strip_4_ldm][nz] = {0};
+  int ldm_p2[max_strip_4_ldm][nz] = {0};
+  int ldm_v[max_strip_4_ldm][nz]  = {0};
 
   int *ldm_p0_ptr[max_strip_4_ldm];
   int *ldm_p1_ptr[max_strip_4_ldm];
@@ -212,7 +214,7 @@ void *stencil_wrapper2(void *_arg) {
     ldm_v_ptr[host_istrip] = ldm_v[host_istrip];
   }
 
-  for (host_istrip = 0; host_istrip < max_strip_4_ldm - 1; host_istrip++) {
+  for (host_istrip = 0; host_istrip < std::min(max_strip_4_ldm - update_strip_len, strip_len); host_istrip++) {
     std::memcpy(ldm_p0[host_istrip], arg.p0 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
     std::memcpy(ldm_p2[host_istrip], arg.p0 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
     std::memcpy(ldm_p1[host_istrip], arg.p1 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p1);
@@ -241,26 +243,31 @@ void *stencil_wrapper2(void *_arg) {
   //}
   //pthread_barrier_wait(&barr);
 
-  for (; host_istrip < strip_len; host_istrip++) {
-    if (arg.tid == 0) {
+  while (host_istrip < strip_len) {
+    int num_strip_to_copy = std::min(update_strip_len, strip_len - host_istrip);
+    if (arg.tid == 1) {
       printf("before copy\n");
       print(ldm_p0_ptr, max_strip_4_ldm, nz);
     }
 
-    /// copy the last strip
-    std::memcpy(ldm_p0_ptr[max_strip_4_ldm - 1], arg.p0 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
-    std::memcpy(ldm_p2_ptr[max_strip_4_ldm - 1], arg.p0 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
-    std::memcpy(ldm_p1_ptr[max_strip_4_ldm - 1], arg.p1 + (host_istrip + strip_begin) * nz, nz * sizeof *arg.p1);
-    std::memcpy(ldm_v_ptr[max_strip_4_ldm - 1], arg.v + (host_istrip + strip_begin ) * nz, nz * sizeof *arg.v);
+    /// copy the strip
+    for (int i = 0; i < num_strip_to_copy; i++) {
+      std::memcpy(ldm_p0_ptr[max_strip_4_ldm - update_strip_len + i], arg.p0 + (i + host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
+      std::memcpy(ldm_p2_ptr[max_strip_4_ldm - update_strip_len + i], arg.p0 + (i + host_istrip + strip_begin) * nz, nz * sizeof *arg.p0);
+      std::memcpy(ldm_p1_ptr[max_strip_4_ldm - update_strip_len + i], arg.p1 + (i + host_istrip + strip_begin) * nz, nz * sizeof *arg.p1);
+      std::memcpy(ldm_v_ptr[max_strip_4_ldm - update_strip_len + i], arg.v +   (i + host_istrip + strip_begin ) * nz, nz * sizeof *arg.v);
+    }
 
-    if (arg.tid == 0) {
+    if (arg.tid == 1) {
       printf("before stencil\n");
       print(ldm_p0_ptr, max_strip_4_ldm, nz);
     }
 
-    stencil_kernel_3(ldm_p0_ptr, ldm_p1_ptr, ldm_p2_ptr, ldm_v_ptr, max_strip_4_ldm, nz);
+    usleep(0.1 * 1e6);
+//  pthread_barrier_wait(&barr);
+    stencil_kernel_3(ldm_p0_ptr, ldm_p1_ptr, ldm_p2_ptr, ldm_v_ptr, max_strip_4_ldm - (update_strip_len - num_strip_to_copy), nz);
 
-    if (arg.tid == 0) {
+    if (arg.tid == 1) {
       printf("after stencil: %d\n", host_istrip);
       print(ldm_p2_ptr, max_strip_4_ldm, nz);
     }
@@ -270,30 +277,63 @@ void *stencil_wrapper2(void *_arg) {
     //}
 
     ///copy the data out
-    int dst_istrp = host_istrip - 2;
-    int src_istrp = max_strip_4_ldm - 3;
-    std::memcpy(arg.p0 + (dst_istrp + strip_begin) * nz, ldm_p2_ptr[src_istrp], nz * sizeof *arg.p0);
+    for (int i = 0; i < num_strip_to_copy; i++) {
+//      int dst_istrp = host_istrip - D + i;
+      int dst_istrp = host_istrip - update_strip_len + i;
+//      int src_istrp = max_strip_4_ldm - (D + 1) + i;
+      int src_istrp = D + i;
+      std::memcpy(arg.p0 + (dst_istrp + strip_begin) * nz, ldm_p2_ptr[src_istrp], nz * sizeof *arg.p0);
+    }
 
     usleep(0.1 * 1e6);
-    if (arg.tid == 0) {
+    if (arg.tid == 1) {
       printf("global p:\n");
       print(arg.p0, nx, nz);
     }
+
     /// copy next strip in
-    int *p0tmp = ldm_p0_ptr[0];
-    int *p1tmp = ldm_p1_ptr[0];
-    int *p2tmp = ldm_p2_ptr[0];
-    int *vtmp = ldm_v_ptr[0];
-    for (int i = 0; i < max_strip_4_ldm - 1; i++) {
-      ldm_p0_ptr[i] = ldm_p0_ptr[i + 1];
-      ldm_p1_ptr[i] = ldm_p1_ptr[i + 1];
-      ldm_p2_ptr[i] = ldm_p2_ptr[i + 1];
-      ldm_v_ptr[i]  = ldm_v_ptr[i+ 1];
+    int *p0tmp[update_strip_len];
+    int *p1tmp[update_strip_len];
+    int *p2tmp[update_strip_len];
+    int *vtmp[update_strip_len];
+    for (int i = 0; i < update_strip_len; i++) {
+      p0tmp[i] = ldm_p0_ptr[i];
+      p1tmp[i] = ldm_p1_ptr[i];
+      p2tmp[i] = ldm_p2_ptr[i];
+      vtmp[i] = ldm_v_ptr[i];
     }
-    ldm_p0_ptr[max_strip_4_ldm - 1] = p0tmp;
-    ldm_p1_ptr[max_strip_4_ldm - 1] = p1tmp;
-    ldm_p2_ptr[max_strip_4_ldm - 1] = p2tmp;
-    ldm_v_ptr[max_strip_4_ldm - 1]  = vtmp;
+    for (int i = 0; i < max_strip_4_ldm - update_strip_len; i++) {
+      ldm_p0_ptr[i] = ldm_p0_ptr[i + update_strip_len];
+      ldm_p1_ptr[i] = ldm_p1_ptr[i + update_strip_len];
+      ldm_p2_ptr[i] = ldm_p2_ptr[i + update_strip_len];
+      ldm_v_ptr[i]  = ldm_v_ptr[i+ update_strip_len];
+    }
+
+//    for (int i = max_strip_4_ldm - update_strip_len; i < max_strip_4_ldm; i++) {
+    for (int i = 0; i < update_strip_len; i++) {
+      ldm_p0_ptr[max_strip_4_ldm - update_strip_len + i] = p0tmp[i];
+      ldm_p1_ptr[max_strip_4_ldm - update_strip_len + i] = p1tmp[i];
+      ldm_p2_ptr[max_strip_4_ldm - update_strip_len + i] = p2tmp[i];
+      ldm_v_ptr[max_strip_4_ldm - update_strip_len + i]  = vtmp[i];
+    }
+
+
+//    int *p0tmp = ldm_p0_ptr[0];
+//    int *p1tmp = ldm_p1_ptr[0];
+//    int *p2tmp = ldm_p2_ptr[0];
+//    int *vtmp = ldm_v_ptr[0];
+//    for (int i = 0; i < max_strip_4_ldm - 1; i++) {
+//      ldm_p0_ptr[i] = ldm_p0_ptr[i + 1];
+//      ldm_p1_ptr[i] = ldm_p1_ptr[i + 1];
+//      ldm_p2_ptr[i] = ldm_p2_ptr[i + 1];
+//      ldm_v_ptr[i]  = ldm_v_ptr[i+ 1];
+//    }
+//    ldm_p0_ptr[max_strip_4_ldm - 1] = p0tmp;
+//    ldm_p1_ptr[max_strip_4_ldm - 1] = p1tmp;
+//    ldm_p2_ptr[max_strip_4_ldm - 1] = p2tmp;
+//    ldm_v_ptr[max_strip_4_ldm - 1]  = vtmp;
+
+    host_istrip += num_strip_to_copy;
 
   }
 
@@ -330,10 +370,11 @@ void run_parallel0(int *p0, int *p1, int *v, int nx, int nz, int nt) {
   }
 }
 
-void run_parallel(int *p0, int *p1, int *v, int nx, int nz, int nt) {
+std::vector<int> run_parallel(int *p0, int *p1, int *v, int nx, int nz, int nt) {
   pthread_t threads[NUM_THREADS];
   struct args_t arg[NUM_THREADS];
 
+  std::vector<int> sum;
   for (int it = 0; it < nt; it++) {
 
     for (int tid = 0; tid < NUM_THREADS; tid++) {
@@ -355,9 +396,13 @@ void run_parallel(int *p0, int *p1, int *v, int nx, int nz, int nt) {
     for (int tid = 0; tid < NUM_THREADS; tid++) {
       pthread_join(threads[tid], NULL);
     }
-    std::printf("it: %d, sum of p0: %d\n", it, std::accumulate(p0, p0 + nx * nz, 0));
+    int s = std::accumulate(p0, p0 + nx * nz, 0);
+    sum.push_back(s);
+    std::printf("it: %d, sum of p0: %d\n", it, s);
     std::swap(p0, p1);
   }
+
+  return sum;
 }
 
 void *PrintHello(void *threadid)
@@ -394,31 +439,43 @@ int main(int argc, char *argv[])
   //std::printf("\nv:\n");
   //print(&v[0], nx, nz);
 
+  std::vector<int> sum_serial;
   {
     std::vector<int> tmp_p0 = p0;
     std::vector<int> tmp_p1 = p1;
     std::vector<int> tmp_v = v;
-    run_serial(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
+    sum_serial = run_serial(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
+    print(&tmp_p0[0], nx, nz);
   }
 
   //run_serial(&p0[0], &p1[0], &v[0], nx, nz, nt);
   //std::printf("p0:\n");
   //print(&p0[0], nx, nz);
 
+//  {
+//    std::vector<int> tmp_p0 = p0;
+//    std::vector<int> tmp_p1 = p1;
+//    std::vector<int> tmp_v = v;
+//    run_parallel0(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
+//  }
+
+  std::vector<int> sum_parallel;
   {
     std::vector<int> tmp_p0 = p0;
     std::vector<int> tmp_p1 = p1;
     std::vector<int> tmp_v = v;
-    run_parallel0(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
+    sum_parallel = run_parallel(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
+//    print(&tmp_p0[0], nx, nz);
   }
 
-  {
-    std::vector<int> tmp_p0 = p0;
-    std::vector<int> tmp_p1 = p1;
-    std::vector<int> tmp_v = v;
-    run_parallel(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
-    print(&tmp_p0[0], nx, nz);
+  for (int i = 0; i < nt; i++) {
+    if (sum_serial[i] != sum_parallel[i]) {
+      printf("error\n");
+      exit(0);
+    }
   }
+
+  printf("test pass!\n");
 
   return 0;
    //pthread_t threads[NUM_THREADS];

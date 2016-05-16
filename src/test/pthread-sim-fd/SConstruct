@@ -4,6 +4,7 @@ libs = ['pthread']
 
 env = Environment(
     LIBS = libs,
+    CXXFLAGS = ['-g', '-O0'],
     ENV = os.environ)
 
 hello = env.Program('hello', 'hello.cpp')
