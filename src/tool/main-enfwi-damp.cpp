@@ -393,6 +393,8 @@ int main(int argc, char *argv[]) {
   /// if the number of samples become large, it would be the bottleneck.
   /// TODO: refactor the Velocity class. keep the real data of all velocity in ONE array and
   /// each Velocity has a pointer that points to the correct location.
+
+  //TODO: need modifying, delete scatter and gather, make processes reading files in parallel
   scatterVelocity(veldb, totalveldb, params);
   DEBUG() << "dispatching velocity finished!";
 //  MPI_Barrier(MPI_COMM_WORLD);
@@ -424,9 +426,17 @@ int main(int argc, char *argv[]) {
 
   enkfAnly.analyze(totalVelSet, velset);
 
+
+  //TODO: need modifying, createAMean
+  //scatterVelocity(veldb, totalveldb, params);
+	//std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);
+
   if (rank == 0) {
     /// calculate objective function
+
     std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+		//enkfAnly.check(vvt, vv);
+		//exit(1);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);

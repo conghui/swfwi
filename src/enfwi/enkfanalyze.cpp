@@ -37,6 +37,7 @@ void initAPerturb(Matrix &matAPerturb, const std::vector<float *> &velSet,
   assert((size_t)matAPerturb.getNumCol() == velSet.size()); // the matrix is row-majored
   assert(matAPerturb.getNumRow() == modelSize);
 
+	printf("initAPerturb, col = %d, row = %d\n", matAPerturb.getNumCol(), matAPerturb.getNumRow()); 
   for (int i = 0; i < matAPerturb.getNumCol(); i++) {
     Matrix::value_type *p = matAPerturb.getData() + (i * matAPerturb.getNumRow());
     std::transform(velSet[i], velSet[i] + modelSize, AMean.begin(), p, std::minus<Matrix::value_type>());
@@ -59,6 +60,38 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  int local_n = velSet.size();
+  int N = 0;
+  MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
+	int nSamples = N;
+	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  float dt = fm.getdt();
+  float dx = fm.getdx();
+  std::vector<float *> &local_A = velSet; /// velSet <==> matA
+  std::vector<float> pAMean = pCreateAMean(local_A, nSamples);
+  Matrix local_A_Perturb(local_n, modelSize);
+  initAPerturb(local_A_Perturb, local_A, pAMean, modelSize);
+	char filename[20];
+	sprintf(filename, "HA_Perturb%d.txt", rank);
+	local_A_Perturb.print(filename);
+	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
+	/*
+	int check = 4;
+	printf("local_n = %d\n", local_n);
+	for(int i = 0 ; i < local_n ; i ++)
+	{
+		printf("p rank=%d, index=%d, %f\n", rank, i, local_A[i][check]);
+	}
+	if(rank == 0)
+	{
+		for(int i = 0 ; i < nSamples; i ++)
+		{
+			printf("A index=%d, %f\n", i, totalVelSet[i][check]);
+		}
+	}
+	*/
+
   if (rank == 0) {
     float dt = fm.getdt();
     float dx = fm.getdx();
@@ -67,14 +100,43 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     int N = totalVelSet.size();
     std::vector<float> AMean = createAMean(A);
     DEBUG() << "sum of AMean: " << sum(AMean);
+    DEBUG() << "sum of pAMean: " << sum(pAMean);
+
+		/*
+		printf("AMean=%f, pAMean=%f\n", AMean[check], pAMean[check]);
+		printf("here\n");
+		for(int i = 0 ; i < AMean.size() ; i ++)
+		{
+			if(fabs(AMean[i] - pAMean[i]) > 0.000002)
+			{
+				printf("%d %f %f\n", i, AMean[i], pAMean[i]);
+				break;
+			}
+		}
+		*/
 
     Matrix A_Perturb(N, modelSize);
     initAPerturb(A_Perturb, A, AMean, modelSize);
     DEBUG() << "sum of A_Perturb: " << getSum(A_Perturb);
+    DEBUG() << "sum of local_A_Perturb: " << sum_A_Perturb;
 
     Matrix t5(N, modelSize);
     alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
     DEBUG() << "sum of t5: " << getSum(t5);
+
+		//printf("A_Perturb: %d %d\n", A_Perturb.getNumRow(), A_Perturb.getNumCol());
+		//A_Perturb.print("A_Perturb.txt");
+		//A_Perturb.printInfo("A_Perturb.info");
+		//printf("\n");
+		//printf("gainMatrix: %d %d\n", gainMatrix.getNumRow(), gainMatrix.getNumCol());
+		//gainMatrix.print("gainMatrix.txt");
+		//gainMatrix.printInfo("gainMatrix.info");
+		//printf("\n");
+		//printf("t5: %d %d\n", t5.getNumRow(), t5.getNumCol());
+		//t5.print("t5.txt");
+		//t5.printInfo("t5.info");
+		//printf("\n");
+		exit(1);
 
     TRACE() << "add the update back to velocity model";
     for (size_t i = 0; i < totalVelSet.size(); i++) {
@@ -112,6 +174,9 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
   int N = 0;
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 
+	//added by cbw
+	int nSamples = N;
+	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
@@ -161,33 +226,64 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
   MPI_Gather(local_HOnA.getData(), count, MPI_DOUBLE, HOnA.getData(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   Matrix t4(N, N); /// HA' * U * SSqInv * U' * (D - HA)
+
+	Matrix::value_type sum_local_D = pGetSum2(local_D, N);
+	Matrix::value_type sum_local_HOnA = pGetSum2(local_HOnA, N);
+  Matrix local_HA_Perturb(local_n, numDataSamples);
+	pInitGamma(local_HOnA, local_HA_Perturb, nSamples);
+	Matrix::value_type sum_HA_Pertrub = pGetSum2(local_HA_Perturb, nSamples);
+  Matrix local_perturbation(local_n, numDataSamples);
+  pInitPerturbation2(local_perturbation, local_HA_Perturb, rank, nSamples);
+	Matrix::value_type sum_local_perturbation = pGetSum2(local_perturbation, nSamples);
+  std::transform(local_D.getData(), local_D.getData() + local_D.size(), local_perturbation.getData(), local_D.getData(), std::plus<Matrix::value_type>());
+	Matrix::value_type sum_local_D2 = pGetSum2(local_D, nSamples);
+  Matrix local_gamma(local_n, numDataSamples);
+  pInitGamma(local_perturbation, local_gamma, nSamples);
+	Matrix::value_type sum_local_gamma = pGetSum2(local_gamma, nSamples);
+  Matrix local_band(local_n, numDataSamples);
+  A_plus_B(local_HA_Perturb, local_gamma, local_band);
+	Matrix::value_type sum_local_band = pGetSum2(local_band, nSamples);
+	char filename[20];
+	sprintf(filename, "band%d", rank);
+	local_band.print(filename);
+
   if (rank == 0) {
+		exit(1);
     DEBUG() << "sum of D: " << getSum(D);
+    DEBUG() << "sum of pD: " << sum_local_D;
     DEBUG() << "sum of HOnA: " << getSum(HOnA);
+    DEBUG() << "sum of pHOnA: " << sum_local_HOnA;
 
     Matrix HA_Perturb(N, numDataSamples);
     initGamma(HOnA, HA_Perturb);
     DEBUG() << "sum of HA_Perturb: " << getSum(HA_Perturb);
+    DEBUG() << "sum of pHA_Perturb: " << sum_HA_Pertrub;
 
     TRACE() << "initialize the perturbation";
     Matrix perturbation(N, numDataSamples);
     initPerturbation(perturbation, HA_Perturb);
 
     DEBUG() << "sum of perturbation: " << getSum(perturbation);
+    DEBUG() << "sum of p perturbation: " << sum_local_perturbation;
 
     TRACE() << "add perturbation to observed data";
     std::transform(D.getData(), D.getData() + D.size(), perturbation.getData(), D.getData(), std::plus<Matrix::value_type>());
     DEBUG() << "sum of D with perturbation added: " << getSum(D);
+    DEBUG() << "sum of pD with perturbation added: " << sum_local_D2;
 
     TRACE() << "calculate the gamma";
     Matrix gamma(N, numDataSamples);
     initGamma(perturbation, gamma);
     DEBUG() << "sum of gamma: " << getSum(gamma);
+    DEBUG() << "sum of p gamma: " << sum_local_gamma;
 
     TRACE() << "calculate the band";
     Matrix band(N, numDataSamples);
     A_plus_B(HA_Perturb, gamma, band);
     DEBUG() << "sum of band: " << getSum(band);
+    DEBUG() << "sum of p band: " << sum_local_band;
+
+		//band.print("band.txt");
 
     TRACE() << "svd of band";
     Matrix matU(N, numDataSamples);
@@ -204,6 +300,15 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
         matU.getData(), matU.getNumRow(),
         matVt.getData(), matVt.getNumRow(),
         superb.getData(), lwork);
+
+		/*
+		matU.print("U.txt");
+		matU.printInfo("U.info");
+		matS.print("S.txt");
+		matS.printInfo("S.info");
+		matVt.print("Vt.txt");
+		matVt.printInfo("Vt.info");
+		*/
 
     /* Check for convergence */
     if ( info > 0 ) {
@@ -273,11 +378,61 @@ void EnkfAnalyze::initGamma(const Matrix& perturbation, Matrix& gamma) const {
 
     Matrix::value_type avg = sum / gamma.getNumCol();
 
+		//printf("%f ", avg);
+
     for (int icol = 0; icol < gamma.getNumCol(); icol++) {
       int idx = icol * gamma.getNumRow() + irow;
       gamma.getData()[idx] = p[idx] - avg;
     }
   }
+	//printf("\n");
+}
+
+void EnkfAnalyze::pInitGamma(const Matrix& perturbation, Matrix& gamma, const int nSamples) const {
+  assert(perturbation.isCompatible(gamma));
+
+  const Matrix::value_type *p = perturbation.getData();
+	Matrix::value_type *sum_t = (Matrix::value_type*)malloc(sizeof(Matrix::value_type) * gamma.getNumRow());
+	memset(sum_t, 0.0, sizeof(Matrix::value_type) * gamma.getNumRow());
+	Matrix::value_type *sum = (Matrix::value_type*)malloc(sizeof(Matrix::value_type) * gamma.getNumRow());
+
+  for (int irow = 0; irow < gamma.getNumRow(); irow++) {
+    for (int icol = 0; icol < gamma.getNumCol(); icol++) {
+      sum_t[irow] += p[icol * gamma.getNumRow() + irow];
+    }
+	}
+
+	MPI_Allreduce(sum_t, sum, gamma.getNumRow(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+	/*
+  for (int irow = 0; irow < gamma.getNumRow(); irow++) {
+		printf("%f ", sum[irow]);
+	}
+	*/
+
+
+  for (int irow = 0; irow < gamma.getNumRow(); irow++) {
+		Matrix::value_type avg = sum[irow] / nSamples;
+		//printf("%f ", avg);
+    for (int icol = 0; icol < gamma.getNumCol(); icol++) {
+      int idx = icol * gamma.getNumRow() + irow;
+      gamma.getData()[idx] = p[idx] - avg;
+    }
+  }
+}
+
+void EnkfAnalyze::checkMatrix(const Matrix& a, const Matrix& b) const {
+	for(int irow = 0 ; irow < a.getNumRow() ; irow ++)
+	{
+		for(int icol = 0 ; icol < a.getNumCol() ; icol ++)
+		{
+      int idx = icol * a.getNumRow() + irow;
+			Matrix::value_type abserr = fabs(a.getData()[idx] - b.getData()[idx]);
+			Matrix::value_type objerr = abserr / a.getData()[idx];
+			if(objerr > 0.0001)
+				printf("irow = %d, icol = %d, abserr = %lf, objerr = %lf\n", irow, icol, abserr, objerr);
+		}
+	}
 }
 
 std::vector<float> EnkfAnalyze::createAMean(const std::vector<float*>& velSet) const {
@@ -292,13 +447,47 @@ std::vector<float> EnkfAnalyze::createAMean(const std::vector<float*>& velSet) c
 
     ret[i] = sum / velSet.size();
   }
+  return ret;
+}
+
+std::vector<float> EnkfAnalyze::pCreateAMean(const std::vector<float*>& velSet, const int nSamples) const {
+  int modelSize = fm.getnx() * fm.getnz();
+  std::vector<float> ret(modelSize);
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	std::vector<float> sum(modelSize);
+  for (int i = 0; i < modelSize; i++) {
+    for (size_t j = 0; j < velSet.size(); j++) {
+      sum[i] += velSet[j][i];
+    }
+  }
+	MPI_Allreduce(&sum[0], &ret[0], modelSize, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+
+  for (int i = 0; i < modelSize; i++) {
+		ret[i] /= nSamples;
+	}
 
   return ret;
 }
 
+void EnkfAnalyze::check(std::vector<float> a, std::vector<float> b)
+{
+	printf("Checking...\n");
+	for(int i = 0 ; i < a.size() ; i ++)
+	{
+		float abserr = fabs(a[i] - b[i]);
+		float relerr = abserr / a[i];
+		if(relerr > 0.000001)
+		{
+			printf("Check index: %d %f %f %f\n", i, a[i], b[i], relerr);
+		}
+	}
+}
+
 void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Perturb) const {
   if (!initSigma) {
-    initSigma = true;
+    //initSigma = true;
     int seed = 1;
     double mean = 0;
     double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
@@ -310,4 +499,45 @@ void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Pertur
 
   std::generate(perturbation.getData(), perturbation.getData() + perturbation.size(), *generator);
 
+}
+
+void EnkfAnalyze::pInitPerturbation(Matrix& perturbation, const Matrix &HA_Perturb, const int rank, const int nSamples) const {
+  if (!initSigma) {
+    //initSigma = true;
+		//how to make time seed in parallel program
+    //int seed = 1;
+    int seed = rank;
+    double mean = 0;
+    double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
+		double totalMaxHAP = 0;
+		MPI_Allreduce(&maxHAP, &totalMaxHAP, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+		double sigma = initPerturbSigma(totalMaxHAP, sigmaFactor);
+		DEBUG() << "p sigmaIter0: " << sigma;
+		sigmaIter0 = sigma;
+		generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
+  }
+
+  std::generate(perturbation.getData(), perturbation.getData() + perturbation.size(), *generator);
+}
+
+void EnkfAnalyze::pInitPerturbation2(Matrix& perturbation, const Matrix &HA_Perturb, const int rank, const int nSamples) const {
+  if (!initSigma) {
+    //initSigma = true;
+    int seed = 1;
+    double mean = 0;
+    double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
+		double totalMaxHAP = 0;
+		MPI_Allreduce(&maxHAP, &totalMaxHAP, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+		double sigma = initPerturbSigma(totalMaxHAP, sigmaFactor);
+		DEBUG() << "p sigmaIter0: " << sigma;
+		sigmaIter0 = sigma;
+		generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
+  }
+
+	double *perturbation_t = (double *)malloc(sizeof(double) * nSamples * perturbation.getNumRow());
+	if(rank == 0)
+	{
+		std::generate(perturbation_t, perturbation_t + nSamples * perturbation.getNumRow(), *generator);
+	}
+	MPI_Scatter(perturbation_t, perturbation.size(), MPI_DOUBLE, perturbation.getData(), perturbation.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
