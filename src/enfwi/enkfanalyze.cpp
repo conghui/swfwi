@@ -76,21 +76,26 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 	sprintf(filename, "HA_Perturb%d.txt", rank);
 	local_A_Perturb.print(filename);
 	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
-	/*
-	int check = 4;
-	printf("local_n = %d\n", local_n);
-	for(int i = 0 ; i < local_n ; i ++)
-	{
-		printf("p rank=%d, index=%d, %f\n", rank, i, local_A[i][check]);
-	}
-	if(rank == 0)
-	{
-		for(int i = 0 ; i < nSamples; i ++)
-		{
-			printf("A index=%d, %f\n", i, totalVelSet[i][check]);
-		}
-	}
-	*/
+  Matrix local_t5(local_n, modelSize);
+	pAlpha_A_B_plus_beta_C(1, local_A_Perturb, gainMatrix, 0, local_t5, nSamples);
+	Matrix::value_type sum_local_t5 = pGetSum2(local_t5, nSamples);
+
+  for (size_t i = 0; i < velSet.size(); i++) {
+    float *vel = velSet[i];
+    DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    TRACE() << "transform velocity to original";
+    std::transform(vel, vel + modelSize, vel, boost::bind(velRecover<float>, _1, dx, dt));
+    DEBUG() << format("vel recoverty,       velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    TRACE() << "add value calculated from ENKF to velocity";
+    Matrix::value_type *pu = local_t5.getData() + i * local_t5.getNumRow();
+    std::transform(vel, vel + modelSize, pu, vel, std::plus<Matrix::value_type>());
+    TRACE() << "sum velset " << i << ": " << std::accumulate(vel, vel + modelSize, 0.0f);
+    DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
+  }
 
   if (rank == 0) {
     float dt = fm.getdt();
@@ -102,19 +107,6 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     DEBUG() << "sum of AMean: " << sum(AMean);
     DEBUG() << "sum of pAMean: " << sum(pAMean);
 
-		/*
-		printf("AMean=%f, pAMean=%f\n", AMean[check], pAMean[check]);
-		printf("here\n");
-		for(int i = 0 ; i < AMean.size() ; i ++)
-		{
-			if(fabs(AMean[i] - pAMean[i]) > 0.000002)
-			{
-				printf("%d %f %f\n", i, AMean[i], pAMean[i]);
-				break;
-			}
-		}
-		*/
-
     Matrix A_Perturb(N, modelSize);
     initAPerturb(A_Perturb, A, AMean, modelSize);
     DEBUG() << "sum of A_Perturb: " << getSum(A_Perturb);
@@ -123,20 +115,7 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     Matrix t5(N, modelSize);
     alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
     DEBUG() << "sum of t5: " << getSum(t5);
-
-		//printf("A_Perturb: %d %d\n", A_Perturb.getNumRow(), A_Perturb.getNumCol());
-		//A_Perturb.print("A_Perturb.txt");
-		//A_Perturb.printInfo("A_Perturb.info");
-		//printf("\n");
-		//printf("gainMatrix: %d %d\n", gainMatrix.getNumRow(), gainMatrix.getNumCol());
-		//gainMatrix.print("gainMatrix.txt");
-		//gainMatrix.printInfo("gainMatrix.info");
-		//printf("\n");
-		//printf("t5: %d %d\n", t5.getNumRow(), t5.getNumCol());
-		//t5.print("t5.txt");
-		//t5.printInfo("t5.info");
-		//printf("\n");
-		exit(1);
+    DEBUG() << "sum of pt5: " << sum_local_t5;
 
     TRACE() << "add the update back to velocity model";
     for (size_t i = 0; i < totalVelSet.size(); i++) {
@@ -161,7 +140,6 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 
       std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
     }
-
   }
 }
 
@@ -243,12 +221,13 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
   Matrix local_band(local_n, numDataSamples);
   A_plus_B(local_HA_Perturb, local_gamma, local_band);
 	Matrix::value_type sum_local_band = pGetSum2(local_band, nSamples);
-	char filename[20];
-	sprintf(filename, "band%d", rank);
-	local_band.print(filename);
+  Matrix local_matU(local_n, numDataSamples);
+  Matrix local_matS(nSamples, 1);
+  Matrix local_matVt(local_n, nSamples);
+	pSvd(local_band, local_matU, local_matS, local_matVt, nSamples);
+	Matrix::value_type sum_local_matU = pGetSum2(local_matU, nSamples);
 
   if (rank == 0) {
-		exit(1);
     DEBUG() << "sum of D: " << getSum(D);
     DEBUG() << "sum of pD: " << sum_local_D;
     DEBUG() << "sum of HOnA: " << getSum(HOnA);
@@ -317,7 +296,10 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
     }
 
     DEBUG() << "sum of matU: " << getSum(matU);
+    DEBUG() << "sum of pMatU: " << sum_local_matU;
     DEBUG() << "sum of matS: " << getSum(matS);
+    DEBUG() << "sum of pMatS: " << getSum(local_matS);
+		exit(1);
 
     TRACE() << "calculate matSSqInv";
     int clip = clipPosition(matS);

@@ -9,8 +9,11 @@
 #include "dgesvd.h"
 
 extern "C" {
-#include <f2c.h>
-#include <clapack.h>
+//#include <f2c.h>
+//#include <clapack.h>
+int dgesvd_(char *jobu, char *jobvt, int *m, int *n,
+      double *a, int *lda, double *s, double *u, int *ldu, double *vt,
+      int *ldvt, double *superb, int *lwork, int *info);
 }
 
 int LAPACKE_dgesvd_col_major(
@@ -18,18 +21,17 @@ int LAPACKE_dgesvd_col_major(
     double* a, int _lda, double* s, double* u, int _ldu, double* vt,
     int _ldvt, double* superb, int _lwork) {
 
-  integer m    = _m;
-  integer n    = _n;
-  integer lda  = _lda;
-  integer ldu  = _ldu;
-  integer ldvt = _ldvt;
-  integer lwork = _lwork;
+  int m    = _m;
+  int n    = _n;
+  int lda  = _lda;
+  int ldu  = _ldu;
+  int ldvt = _ldvt;
+  int lwork = _lwork;
 
-  integer info;
+  int info;
   dgesvd_(&jobu, &jobvt, &m, &n,
       a, &lda, s, u, &ldu, vt,
       &ldvt, superb, &lwork, &info);
 
   return info;
 }
-

@@ -14,6 +14,7 @@
 #include <boost/random/variate_generator.hpp>
 #include "damp4t10d.h"
 #include "Matrix.h"
+#include "pMatrix.h"
 
 class EnkfAnalyze {
 public:

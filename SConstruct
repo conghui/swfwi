@@ -86,11 +86,14 @@ inc_path       = ['-isystem', 'lapack']
 libpath        = ['#' + dirs['lib'], '#lapack']
 lapack_gnu_lib = ['lapack-gnu', 'blas-gnu', 'fblas-gnu', 'f2c-gnu'] # don't change the order
 lapack_sw_lib  = ['lapack-sw', 'blas-sw', 'fblas-sw', 'f2c-sw'] # don't change the order
+scalapack_gnu_lib = ['scalapack', 'lapack', 'refblas'] # don't change the order
+
 libs           = []
 if compiler_set == 'sw':
   libs = lapack_sw_lib
 else:
-  libs = lapack_gnu_lib
+  libs = scalapack_gnu_lib
+#libs = lapack_gnu_lib + scalapack_gnu_lib
 for inc in additional_includes:
   inc_path += ['-isystem', inc]
 for lib in additional_libs:
