@@ -11,7 +11,7 @@
 
 #define NUM_THREADS 3
 #define D 2
-const int nt = 1;
+const int nt = 2;
 const int nx = 11;
 const int nz = 6;
 const int max_stencil_len = 2 * D + 1;
@@ -243,6 +243,8 @@ void *stencil_wrapper2(void *_arg) {
   //}
   //pthread_barrier_wait(&barr);
 
+  int dstPos = strip_begin + D;
+
   int watched_thread = 1;
   while (host_istrip < strip_len) {
     int num_strip_to_copy = std::min(update_strip_len, strip_len - host_istrip);
@@ -264,7 +266,7 @@ void *stencil_wrapper2(void *_arg) {
       print(ldm_p0_ptr, max_strip_4_ldm, nz);
     }
 
-    usleep(0.1 * 1e6);
+//    usleep(0.1 * 1e6);
 //  pthread_barrier_wait(&barr);
     stencil_kernel_3(ldm_p0_ptr, ldm_p1_ptr, ldm_p2_ptr, ldm_v_ptr, max_strip_4_ldm - (update_strip_len - num_strip_to_copy), nz);
 
@@ -281,13 +283,17 @@ void *stencil_wrapper2(void *_arg) {
     for (int i = 0; i < num_strip_to_copy; i++) {
 //      int dst_istrp = host_istrip - D + i;
 //      int dst_istrp = host_istrip - update_strip_len + i;
-      int dst_istrp = host_istrip - num_strip_to_copy + i;
+//      int dst_istrp = host_istrip - num_strip_to_copy + i;
+      int dst_istrp = dstPos;
+      printf("dstpos: %d\n", dstPos);
 //      int src_istrp = max_strip_4_ldm - (D + 1) + i;
       int src_istrp = D + i;
-      std::memcpy(arg.p0 + (dst_istrp + strip_begin) * nz, ldm_p2_ptr[src_istrp], nz * sizeof *arg.p0);
+      std::memcpy(arg.p0 + (dst_istrp) * nz, ldm_p2_ptr[src_istrp], nz * sizeof *arg.p0);
+
+      dstPos++;
     }
 
-    usleep(0.1 * 1e6);
+//    usleep(0.1 * 1e6);
     if (arg.tid == watched_thread) {
       printf("global p:\n");
       print(arg.p0, nx, nz);
