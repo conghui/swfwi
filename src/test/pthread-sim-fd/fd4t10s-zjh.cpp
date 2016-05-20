@@ -22,7 +22,7 @@ const int nt = 2;
 const int nx = 20;
 const int nz = 20;
 const int max_stencil_len = 2 * D + 1;
-const int max_strip_4_ldm = 13; /// must be >= max_stencil_len
+const int max_strip_4_ldm = 15; /// must be >= max_stencil_len
 const int update_strip_len = max_strip_4_ldm - max_stencil_len + 1;
 
 pthread_barrier_t barr;
@@ -425,17 +425,6 @@ int main(int argc, char *argv[])
     print(&tmp_p0[0], nx, nz);
   }
 
-  //run_serial(&p0[0], &p1[0], &v[0], nx, nz, nt);
-  //std::printf("p0:\n");
-  //print(&p0[0], nx, nz);
-
-//  {
-//    std::vector<int> tmp_p0 = p0;
-//    std::vector<int> tmp_p1 = p1;
-//    std::vector<int> tmp_v = v;
-//    run_parallel0(&tmp_p0[0], &tmp_p1[0], &tmp_v[0], nx, nz, nt);
-//  }
-
   std::vector<float> sum_parallel;
   {
     std::vector<float> tmp_p0 = p0;
@@ -455,19 +444,5 @@ int main(int argc, char *argv[])
   printf("test pass!\n");
 
   return 0;
-   //pthread_t threads[NUM_THREADS];
-   //int rc;
-   //long t;
-   //for(t=0;t<NUM_THREADS;t++){
-     //printf("In main: creating thread %ld\n", t);
-     //rc = pthread_create(&threads[t], NULL, PrintHello, (void *)t);
-     //if (rc){
-       //printf("ERROR; return code from pthread_create() is %d\n", rc);
-       //exit(-1);
-       //}
-     //}
-
-   //[> Last thing that main() should do <]
-   //pthread_exit(NULL);
 }
 
