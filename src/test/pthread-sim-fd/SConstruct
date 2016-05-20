@@ -8,8 +8,9 @@ env = Environment(
     ENV = os.environ)
 
 hello = env.Program('hello', 'hello.cpp')
+fd = env.Program('fd', 'fd4t10s-zjh.cpp')
 
-run = env.Command('hello.log', hello, './hello')
+run = env.Command('fd.log', fd, './fd')
 Depends(run, hello)
 
 # AlwaysBuild(run)
