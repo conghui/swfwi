@@ -91,6 +91,7 @@ pMatrix::pMatrix(double *_data, int _grow, int _gcol, int _lrow, int _lcol, bool
 	lcol = _lcol;
 	global = _global;
 	desc = (int *)malloc(sizeof(int) * DLEN_);
+	int rank;
 	initGrid();
 }
 
@@ -99,11 +100,16 @@ void pMatrix::initGrid()
 	//mb = lrow;
 	nb = lcol;
 	mb = nb;	//in svd, mb should be equal to nb
-	printf("nprow = %d, npcol = %d, mb = %d, nb = %d\n", nprow, npcol, mb, nb);
+	//printf("nprow = %d, npcol = %d, mb = %d, nb = %d\n", nprow, npcol, mb, nb);
 	mp = numroc_(&grow, &mb, &myrow, &i_zero, &nprow);
 	nq = numroc_(&gcol, &nb, &mycol, &i_zero, &npcol);
 	lld = std::max(mp, 1);
 	descinit_(desc, &grow, &gcol, &mb, &nb, &i_zero, &i_zero, &ictxt, &lld, &info);
+}
+
+void pMatrix::printInfo(const char head[])
+{
+	printf("%s: myrow = %d, mycol = %d, grow = %d, gcol = %d, lrow = %d, lcol = %d, mb = %d, nb = %d, mp = %d, nq = %d\n", head, myrow, mycol, grow, gcol, lrow, lcol, mb, nb, mp, nq);
 }
 
 void pMatrix::print()
@@ -134,10 +140,9 @@ void pMatrix::print(const char filename[])
 
 void pMatrix::read(char *filename)
 {
-	printf("a\n");
 	if(global && mycol != 0)
 		return;
-	printf("row = %d, col = %d\n", lrow, lcol);
+	//printf("row = %d, col = %d\n", lrow, lcol);
 	FILE *f = fopen(filename,"r");
 	for(int i = 0 ; i < mp ; i ++)
 	{
@@ -145,7 +150,6 @@ void pMatrix::read(char *filename)
 			fscanf(f, "%lf", &data[j * mp + i]);
 	}
 	fclose(f);
-	printf("b\n");
 }
 
 double* pMatrix::getData()
@@ -172,16 +176,16 @@ pMatrix::~pMatrix()
 {
 }
 
-pMatrixMM::pMatrixMM(double _alpha, pMatrix *_A, pMatrix *_B, double _beta, pMatrix *_C)
+pMatrixMM::pMatrixMM(char _transa, char _transb, int _M, int _N, int _K, double _alpha, pMatrix *_A, pMatrix *_B, double _beta, pMatrix *_C)
 {
-	transa = 'N';
-	transb = 'N';
+	transa = _transa;
+	transb = _transb;
 	A = _A;
 	B = _B;
 	C = _C;
-	M = A->getGRow();
-	N = B->getGCol();
-	K = A->getGCol();
+	M = _M;
+	N = _N;
+	K = _K;
 	alpha = _alpha;
 	beta = _beta;
 }
@@ -215,54 +219,102 @@ void pMatrixSVD::run()
 	//printf("info = %d\n", info);
 }
 
-void pAlpha_A_B_plus_beta_C(double alpha, Matrix &tA, Matrix &tB, double beta, Matrix &tC, const int nSamples)
+int pMatrixSVD::getInfo()
+{
+	return info;
+}
+
+void pAlpha_A_B_plus_beta_C(double alpha, Matrix &tA, int kindA, Matrix &tB, int kindB, double beta, Matrix &tC, int kindC, const int nSamples)
+{
+	pAlpha_A_B_plus_beta_C('N', 'N', alpha, tA, kindA, tB, kindB, beta, tC, kindC, nSamples);
+}
+
+void pAlpha_ATrans_B_plus_beta_C(double alpha, Matrix &tA, int kindA, Matrix &tB, int kindB, double beta, Matrix &tC, int kindC, const int nSamples)
+{
+	pAlpha_A_B_plus_beta_C('T', 'N', alpha, tA, kindA, tB, kindB, beta, tC, kindC, nSamples);
+}
+
+void row_col(int &M, int &N, int &grow, int &gcol, int &lrow, int &lcol, bool &global, int size, int kind)
+{
+	if(kind == 0)
+	{
+		MPI_Bcast(&M, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	}
+	if(kind / 2 == 1)
+		M *= size;
+	if(kind % 2 == 1)
+		N *= size;
+	grow = M;
+	gcol = N;
+	lrow = M;
+	lcol = N;
+	global = true;
+	
+	if(kind / 2 == 1)
+	{
+		lrow /= size;
+		global = false;
+	}
+	if(kind % 2 == 1)
+	{
+		lcol /= size;
+		global = false;
+	}
+}
+
+//kind: 0 stands for global, 1 stands for column partitioning, 2 stands for row partitioning
+void pAlpha_A_B_plus_beta_C(char transa, char transb, double alpha, Matrix &tA, int kindA, Matrix &tB, int kindB, double beta, Matrix &tC, int kindC, const int nSamples)
 {
 	int rank;
 	int size;
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	int M = tA.getNumRow();
-	int K = nSamples;
-	int N = nSamples;
+	int grow_A, gcol_A, lrow_A, lcol_A;
+	bool global_A;
+	int M_A = tA.getNumRow();
+	int N_A = tA.getNumCol();
+	row_col(M_A, N_A, grow_A, gcol_A, lrow_A, lcol_A, global_A, size, kindA);
+		
+	int grow_B, gcol_B, lrow_B, lcol_B;
+	bool global_B;
+	int M_B = tB.getNumRow();
+	int N_B = tB.getNumCol();
+	row_col(M_B, N_B, grow_B, gcol_B, lrow_B, lcol_B, global_B, size, kindB);
 
-	int grow_A = M;
-	int gcol_A = K;
-	int lrow_A = M;
-	int lcol_A = K / size;
+	int grow_C, gcol_C, lrow_C, lcol_C;
+	bool global_C;
+	int M_C = tC.getNumRow();
+	int N_C = tC.getNumCol();
+	row_col(M_C, N_C, grow_C, gcol_C, lrow_C, lcol_C, global_C, size, kindC);
 
-	int grow_B = K;
-	int gcol_B = N;
-	int lrow_B = K;
-	int lcol_B = N;
-
-	int grow_C = M;
-	int gcol_C = N;
-	int lrow_C = M;
-	int lcol_C = N / size;
+	int M, N, K;
+	if(transa == 'N')
+	{
+		M = grow_A;
+		K = gcol_A;
+	}
+	else
+	{
+		M = gcol_A;
+		K = grow_A;
+	}
+	if(transb == 'N')
+		N = gcol_B;
+	else
+		N = grow_B;
 
 	pMatrix::init(size);
-	pMatrix A(tA.getData(), grow_A, gcol_A, lrow_A, lcol_A, false);
-	pMatrix B(tB.getData(), grow_B, gcol_B, lrow_B, lcol_B, true);
-	pMatrix C(tC.getData(), grow_C, gcol_C, lrow_C, lcol_C, false);
+	pMatrix A(tA.getData(), grow_A, gcol_A, lrow_A, lcol_A, global_A);
+	pMatrix B(tB.getData(), grow_B, gcol_B, lrow_B, lcol_B, global_B);
+	pMatrix C(tC.getData(), grow_C, gcol_C, lrow_C, lcol_C, global_C);
 
-	pMatrixMM mm(alpha, &A, &B, beta, &C);
+	pMatrixMM mm(transa, transb, M, N, K, alpha, &A, &B, beta, &C);
 	mm.run();
-
-	char scope = 'A';
-	blacs_barrier_(&pMatrix::ictxt, &scope);
-	/*
-	char filename[20];
-	sprintf(filename, "local_Perturb%d.txt", rank);
-	A.print(filename);
-	sprintf(filename, "local_Matrix%d.txt", rank);
-	B.print(filename);
-	sprintf(filename, "local_t5%d.txt", rank);
-	C.print(filename);
-	*/
 }
 
-void pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
+int pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
 {
 	int rank;
 	int size;
@@ -299,22 +351,22 @@ void pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
 	pMatrix S(tS.getData(), grow_S, gcol_S, lrow_S, lcol_S, false);
 	pMatrix Vt(tVt.getData(), grow_Vt, gcol_Vt, lrow_Vt, lcol_Vt, false);
 
+	/*
 	char filename[20];
 	sprintf(filename, "output_band%d", rank);
 	band.print(filename);
+	*/
 
-	printf("here1\n");
 	pMatrixSVD svd(&band, &U, &S, &Vt);
 	svd.run();
+	return svd.getInfo();
 
-	printf("here2\n");
-
+	/*
 	sprintf(filename, "U%d.txt", rank);
 	U.print(filename);
 	sprintf(filename, "S%d.txt", rank);
 	S.print(filename);
 	sprintf(filename, "Vt%d.txt", rank);
 	Vt.print(filename);
-	MPI_Barrier(MPI_COMM_WORLD);
-
+	*/
 }

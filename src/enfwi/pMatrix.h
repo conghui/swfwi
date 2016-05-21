@@ -37,6 +37,7 @@ class pMatrix
 		void initContent();
 		void print();
 		void print(const char filename[]);
+		void printInfo(const char head[]);
 		void read(char *filename);
 		void test();
 		double* getData();
@@ -75,8 +76,9 @@ class pMatrixMM
 {
 	public:
 		//A: M*K, B: K*N, C: M*N
-		pMatrixMM(double _alpha, pMatrix *_A, pMatrix *_B, double _beta, pMatrix *_C);
+		pMatrixMM(char _transa, char _transb, int _M, int _N, int _K, double _alpha, pMatrix *_A, pMatrix *_B, double _beta, pMatrix *_C);
 		void run();
+		void row_col(int &M, int &N, int &grow, int &gcol, int &lrow, int &lcol, bool &global, int size, int kind);
 	private:
 		char transa;
 		char transb;
@@ -95,6 +97,7 @@ class pMatrixSVD
 	public:
 		pMatrixSVD(pMatrix *_A, pMatrix *_U, pMatrix *_S, pMatrix *_Vt);
 		void run();
+		int getInfo();
 	private:
 		char JOBU;
 		char JOBV;
@@ -109,7 +112,9 @@ class pMatrixSVD
 		int info;
 };
 
-void pAlpha_A_B_plus_beta_C(double alpha, Matrix &A, Matrix &B, double beta, Matrix &C, const int nSamples);
-void pSvd(Matrix &A, Matrix &U, Matrix &S, Matrix &Vt, const int nSamples);
+void pAlpha_A_B_plus_beta_C(double alpha, Matrix &A, int kindA, Matrix &B, int kindB, double beta, Matrix &C, int kindC, const int nSamples);
+void pAlpha_ATrans_B_plus_beta_C(double alpha, Matrix &tA, int kindA, Matrix &tB, int kindB, double beta, Matrix &tC, int kindC, const int nSamples);
+void pAlpha_A_B_plus_beta_C(char transa, char transb, double alpha, Matrix &A, int kindA, Matrix &B, int kindB, double beta, Matrix &C, int kindC, const int nSamples);
+int pSvd(Matrix &A, Matrix &U, Matrix &S, Matrix &Vt, const int nSamples);
 
 #endif

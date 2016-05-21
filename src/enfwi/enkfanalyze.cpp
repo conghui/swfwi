@@ -55,7 +55,9 @@ EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
 }
 
 void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *> &velSet) const {
-  Matrix gainMatrix = calGainMatrix(velSet);
+  std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+  Matrix gainMatrix = calGainMatrix(velSet, code);
+  Matrix pGainMatrix = pCalGainMatrix(velSet, code);
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -65,6 +67,14 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 	int nSamples = N;
 	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	Matrix::value_type sum_pGainMatrix = pGetSum2(pGainMatrix, nSamples);
+	if(rank == 0)
+	{
+		DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
+		DEBUG() << "sum of pGainMatrix: " << sum_pGainMatrix;
+	}
+
 
   float dt = fm.getdt();
   float dx = fm.getdx();
@@ -77,7 +87,7 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 	local_A_Perturb.print(filename);
 	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
   Matrix local_t5(local_n, modelSize);
-	pAlpha_A_B_plus_beta_C(1, local_A_Perturb, gainMatrix, 0, local_t5, nSamples);
+	pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, gainMatrix, 0, 0.0, local_t5, 1, nSamples);
 	Matrix::value_type sum_local_t5 = pGetSum2(local_t5, nSamples);
 
   for (size_t i = 0; i < velSet.size(); i++) {
@@ -115,7 +125,7 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     Matrix t5(N, modelSize);
     alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
     DEBUG() << "sum of t5: " << getSum(t5);
-    DEBUG() << "sum of pt5: " << sum_local_t5;
+    //DEBUG() << "sum of pt5: " << sum_local_t5;
 
     TRACE() << "add the update back to velocity model";
     for (size_t i = 0; i < totalVelSet.size(); i++) {
@@ -140,10 +150,171 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 
       std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
     }
+		exit(1);
   }
 }
 
-Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
+Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector<int> code) const {
+  int local_n = velSet.size();
+  int nt = fm.getnt();
+  int ng = fm.getng();
+  int numDataSamples = nt * ng;
+
+  int N = 0;
+  MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
+
+  //std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+  MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
+
+  Matrix local_HOnA(local_n, numDataSamples);
+  Matrix local_D(local_n, numDataSamples);
+  Matrix HOnA(N, numDataSamples);
+  Matrix D(N, numDataSamples);
+
+  for (int i = 0; i < local_n; i++) {
+    DEBUG() << format("calculate HA on velocity %2d/%d") % (i + 1) % velSet.size();
+
+    /// "making encoded shot, both sources and receivers";
+    Encoder encoder(code);
+    std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+
+    /// "save encoded data";
+    std::vector<float> trans(encobs.size());
+    matrix_transpose(&encobs[0], &trans[0], ng, nt);
+    const float *pdata = &trans[0];
+    std::copy(pdata, pdata + numDataSamples, local_D.getData() + i * numDataSamples);
+
+    DEBUG() << format("sum D %.20f") % getSum(local_D);
+
+    /// "H operate on A, and store data in HOnA";
+    std::vector<float> dcal(encobs.size(), 0);
+
+    ///// this decrease the performance ///
+    Damp4t10d newfm = fm;
+    Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
+    newfm.bindVelocity(curvel);
+
+    DEBUG() << format("   curvel %.20f") % sum(curvel.dat);
+    newfm.EssForwardModeling(encsrc, dcal);
+    matrix_transpose(&dcal[0], &trans[0], ng, nt);
+    std::copy(pdata, pdata + numDataSamples, local_HOnA.getData() + i * numDataSamples);
+
+    DEBUG() << format("   sum HonA %.20f") % getSum(local_HOnA);
+  }
+
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int count = local_D.getNumCol() * local_D.getNumRow();
+  MPI_Gather(local_D.getData(), count, MPI_DOUBLE, D.getData(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Gather(local_HOnA.getData(), count, MPI_DOUBLE, HOnA.getData(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  Matrix t4(N, N); /// HA' * U * SSqInv * U' * (D - HA)
+
+  if (rank == 0) {
+    DEBUG() << "sum of D: " << getSum(D);
+    DEBUG() << "sum of HOnA: " << getSum(HOnA);
+
+    Matrix HA_Perturb(N, numDataSamples);
+    initGamma(HOnA, HA_Perturb);
+    DEBUG() << "sum of HA_Perturb: " << getSum(HA_Perturb);
+		HOnA.print("HOnA.txt");
+		HA_Perturb.print("HA_Perturb.txt");
+
+    TRACE() << "initialize the perturbation";
+    Matrix perturbation(N, numDataSamples);
+    initPerturbation(perturbation, HA_Perturb);
+
+    DEBUG() << "sum of perturbation: " << getSum(perturbation);
+
+    TRACE() << "add perturbation to observed data";
+    std::transform(D.getData(), D.getData() + D.size(), perturbation.getData(), D.getData(), std::plus<Matrix::value_type>());
+    DEBUG() << "sum of D with perturbation added: " << getSum(D);
+
+    TRACE() << "calculate the gamma";
+    Matrix gamma(N, numDataSamples);
+    initGamma(perturbation, gamma);
+    DEBUG() << "sum of gamma: " << getSum(gamma);
+
+    TRACE() << "calculate the band";
+    Matrix band(N, numDataSamples);
+    A_plus_B(HA_Perturb, gamma, band);
+    DEBUG() << "sum of band: " << getSum(band);
+
+		//band.print("band.txt");
+
+    TRACE() << "svd of band";
+		Matrix matU(N, numDataSamples);
+		Matrix matS(1, N);
+    Matrix matVt(N, N);
+
+    int lwork = std::max(1, std::max(3 * std::min(numDataSamples, N) + std::max(numDataSamples, N), 5 * std::min(numDataSamples, N)));
+    Matrix superb(1, lwork);
+
+    int info = LAPACKE_dgesvd_col_major('S', 'S',
+        band.getNumRow(), band.getNumCol(),
+        band.getData(), band.getNumRow(),
+        matS.getData(),
+        matU.getData(), matU.getNumRow(),
+        matVt.getData(), matVt.getNumRow(),
+        superb.getData(), lwork);
+
+    /* Check for convergence */
+    if ( info > 0 ) {
+      ERROR() << "The algorithm computing SVD failed to converge.";
+      exit( 1 );
+    }
+
+    DEBUG() << "sum of matU: " << getSum(matU);
+    DEBUG() << "sum of matS: " << getSum(matS);
+
+    TRACE() << "calculate matSSqInv";
+    int clip = clipPosition(matS);
+    DEBUG() << "clip: " << clip;
+    DEBUG() << "matS: ";
+    matS.print();
+
+		Matrix matSSqInv(N, N);
+    {
+      Matrix::value_type *p = matSSqInv.getData();
+      Matrix::value_type *s = matS.getData();
+      const int nrow = matSSqInv.getNumRow();
+      for (int i = 0; i < clip; i++) {
+        p[i * nrow + i] = (1 / s[i]) * (1 / s[i]);
+      }
+    }
+    DEBUG() << "sum of matSSqInv: " << getSum(matSSqInv);
+    TRACE() << "matSSQInv: ";
+		matSSqInv.print("matSSqInv");
+
+		Matrix t0(N, numDataSamples); /// D - HA
+    A_minus_B(D, HOnA, t0);
+    DEBUG() << "sum of t0: " << getSum(t0);
+
+		Matrix t1(N, N); /// U' * (D - HA)
+    alpha_ATrans_B_plus_beta_C(1, matU, t0, 0, t1);
+    DEBUG() << "sum of t1: " << getSum(t1);
+		t1.print("t1.txt");
+
+    Matrix t2(N, N); /// HA' * U
+    alpha_ATrans_B_plus_beta_C(1, HA_Perturb, matU, 0, t2);
+    DEBUG() << "sum of t2: " << getSum(t2);
+
+		Matrix t3(N, N); /// HA' * U * SSqInv
+    alpha_A_B_plus_beta_C(1, t2, matSSqInv, 0, t3);
+    DEBUG() << "sum of t3: " << getSum(t3);
+
+    alpha_A_B_plus_beta_C(1, t3, t1, 0, t4);
+    DEBUG() << "sum of t4: " << getSum(t4);
+    DEBUG() << "print HA' * U * SSqInv * U' * (D - HA)";
+		t4.print("t4_new.txt");
+    t4.print();
+  }
+  return t4;
+}
+
+Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vector<int> code) const {
   int local_n = velSet.size();
   int nt = fm.getnt();
   int ng = fm.getng();
@@ -156,7 +327,7 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
 	int nSamples = N;
 	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+  //std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
 
   Matrix local_HOnA(local_n, numDataSamples);
@@ -222,126 +393,76 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet) const {
   A_plus_B(local_HA_Perturb, local_gamma, local_band);
 	Matrix::value_type sum_local_band = pGetSum2(local_band, nSamples);
   Matrix local_matU(local_n, numDataSamples);
-  Matrix local_matS(nSamples, 1);
+  Matrix local_matS(1, nSamples);
   Matrix local_matVt(local_n, nSamples);
-	pSvd(local_band, local_matU, local_matS, local_matVt, nSamples);
+	int info = pSvd(local_band, local_matU, local_matS, local_matVt, nSamples);
+  Matrix matU2(N, numDataSamples);
+  Matrix matVt2(N, nSamples);
 	Matrix::value_type sum_local_matU = pGetSum2(local_matU, nSamples);
-
-  if (rank == 0) {
-    DEBUG() << "sum of D: " << getSum(D);
-    DEBUG() << "sum of pD: " << sum_local_D;
-    DEBUG() << "sum of HOnA: " << getSum(HOnA);
-    DEBUG() << "sum of pHOnA: " << sum_local_HOnA;
-
-    Matrix HA_Perturb(N, numDataSamples);
-    initGamma(HOnA, HA_Perturb);
-    DEBUG() << "sum of HA_Perturb: " << getSum(HA_Perturb);
-    DEBUG() << "sum of pHA_Perturb: " << sum_HA_Pertrub;
-
-    TRACE() << "initialize the perturbation";
-    Matrix perturbation(N, numDataSamples);
-    initPerturbation(perturbation, HA_Perturb);
-
-    DEBUG() << "sum of perturbation: " << getSum(perturbation);
-    DEBUG() << "sum of p perturbation: " << sum_local_perturbation;
-
-    TRACE() << "add perturbation to observed data";
-    std::transform(D.getData(), D.getData() + D.size(), perturbation.getData(), D.getData(), std::plus<Matrix::value_type>());
-    DEBUG() << "sum of D with perturbation added: " << getSum(D);
-    DEBUG() << "sum of pD with perturbation added: " << sum_local_D2;
-
-    TRACE() << "calculate the gamma";
-    Matrix gamma(N, numDataSamples);
-    initGamma(perturbation, gamma);
-    DEBUG() << "sum of gamma: " << getSum(gamma);
-    DEBUG() << "sum of p gamma: " << sum_local_gamma;
-
-    TRACE() << "calculate the band";
-    Matrix band(N, numDataSamples);
-    A_plus_B(HA_Perturb, gamma, band);
-    DEBUG() << "sum of band: " << getSum(band);
-    DEBUG() << "sum of p band: " << sum_local_band;
-
-		//band.print("band.txt");
-
-    TRACE() << "svd of band";
-    Matrix matU(N, numDataSamples);
-    Matrix matS(1, N);
-    Matrix matVt(N, N);
-
-    int lwork = std::max(1, std::max(3 * std::min(numDataSamples, N) + std::max(numDataSamples, N), 5 * std::min(numDataSamples, N)));
-    Matrix superb(1, lwork);
-
-    int info = LAPACKE_dgesvd_col_major('S', 'S',
-        band.getNumRow(), band.getNumCol(),
-        band.getData(), band.getNumRow(),
-        matS.getData(),
-        matU.getData(), matU.getNumRow(),
-        matVt.getData(), matVt.getNumRow(),
-        superb.getData(), lwork);
-
-		/*
-		matU.print("U.txt");
-		matU.printInfo("U.info");
-		matS.print("S.txt");
-		matS.printInfo("S.info");
-		matVt.print("Vt.txt");
-		matVt.printInfo("Vt.info");
-		*/
-
-    /* Check for convergence */
+  Matrix local_matSSqInv(N, N);
+	if(	rank == 0) {
+    DEBUG() << "parallel: sum of local_D: " << sum_local_D;
+    DEBUG() << "parallel: sum of local_HOnA: " << sum_local_HOnA;
+    DEBUG() << "parallel: sum of local_HA_Perturb: " << sum_HA_Pertrub;
+    TRACE() << "parallel: initialize the perturbation";
+    DEBUG() << "parallel: sum of local_perturbation: " << sum_local_perturbation;
+    TRACE() << "parallel: add perturbation to observed data";
+    DEBUG() << "parallel: sum of local_D with perturbation added: " << sum_local_D2;
+    TRACE() << "parallel: calculate the gamma";
+    DEBUG() << "parallel: sum of local_gamma: " << sum_local_gamma;
+    TRACE() << "parallel: calculate the band";
+    DEBUG() << "parallel: sum of local_band: " << sum_local_band;
+    TRACE() << "parallel: svd of band";
     if ( info > 0 ) {
       ERROR() << "The algorithm computing SVD failed to converge.";
       exit( 1 );
     }
-
-    DEBUG() << "sum of matU: " << getSum(matU);
-    DEBUG() << "sum of pMatU: " << sum_local_matU;
-    DEBUG() << "sum of matS: " << getSum(matS);
-    DEBUG() << "sum of pMatS: " << getSum(local_matS);
-		exit(1);
-
-    TRACE() << "calculate matSSqInv";
-    int clip = clipPosition(matS);
-    DEBUG() << "clip: " << clip;
-    DEBUG() << "matS: ";
-    matS.print();
-
-    Matrix matSSqInv(N, N);
+    DEBUG() << "parallel: sum of local_matU: " << sum_local_matU;
+    DEBUG() << "parallel: sum of local_matS: " << getSum(local_matS);
+    TRACE() << "parallel: calculate matSSqInv";
+    int local_clip = clipPosition(local_matS);
+    DEBUG() << "parallel: local_clip: " << local_clip;
+    DEBUG() << "parallel: local_matS: ";
+    local_matS.print();
     {
-      Matrix::value_type *p = matSSqInv.getData();
-      Matrix::value_type *s = matS.getData();
-      const int nrow = matSSqInv.getNumRow();
-      for (int i = 0; i < clip; i++) {
+      Matrix::value_type *p = local_matSSqInv.getData();
+      Matrix::value_type *s = local_matS.getData();
+      const int nrow = local_matSSqInv.getNumRow();
+      for (int i = 0; i < local_clip; i++) {
         p[i * nrow + i] = (1 / s[i]) * (1 / s[i]);
       }
     }
-    DEBUG() << "sum of matSSqInv: " << getSum(matSSqInv);
-    TRACE() << "matSSQInv: ";
-
-    Matrix t0(N, numDataSamples); /// D - HA
-    A_minus_B(D, HOnA, t0);
-    DEBUG() << "sum of t0: " << getSum(t0);
-
-    Matrix t1(N, N); /// U' * (D - HA)
-    alpha_ATrans_B_plus_beta_C(1, matU, t0, 0, t1);
-    DEBUG() << "sum of t1: " << getSum(t1);
-
-    Matrix t2(N, N); /// HA' * U
-    alpha_ATrans_B_plus_beta_C(1, HA_Perturb, matU, 0, t2);
-    DEBUG() << "sum of t2: " << getSum(t2);
-
-    Matrix t3(N, N); /// HA' * U * SSqInv
-    alpha_A_B_plus_beta_C(1, t2, matSSqInv, 0, t3);
-    DEBUG() << "sum of t3: " << getSum(t3);
-
-    alpha_A_B_plus_beta_C(1, t3, t1, 0, t4);
-    DEBUG() << "sum of t4: " << getSum(t4);
-    DEBUG() << "print HA' * U * SSqInv * U' * (D - HA)";
-    t4.print();
-  }
-
-  return t4;
+		local_matSSqInv.print("local_matSSqInv.txt");
+	}
+  Matrix local_t0(local_n, numDataSamples); /// D - HA
+	A_minus_B(local_D, local_HOnA, local_t0);
+	Matrix::value_type sum_local_t0 = pGetSum2(local_t0, nSamples);
+  Matrix local_t1(local_n, nSamples); /// U' * (D - HA)
+  pAlpha_ATrans_B_plus_beta_C(1.0, local_matU, 1, local_t0, 1, 0.0, local_t1, 1, nSamples);
+	Matrix::value_type sum_local_t1 = pGetSum2(local_t1, nSamples);
+  Matrix local_t2(local_n, nSamples); /// U' * (D - HA)
+  pAlpha_ATrans_B_plus_beta_C(1.0, local_HA_Perturb, 1, local_matU, 1, 0.0, local_t2, 1, nSamples);
+	Matrix::value_type sum_local_t2 = pGetSum2(local_t2, nSamples);
+  Matrix local_t3(local_n, nSamples); /// U' * (D - HA)
+  pAlpha_A_B_plus_beta_C(1.0, local_t2, 1, local_matSSqInv, 0, 0.0, local_t3, 1, nSamples);
+	Matrix::value_type sum_local_t3 = pGetSum2(local_t3, nSamples);
+  Matrix local_t4(local_n, nSamples); /// U' * (D - HA)
+  pAlpha_A_B_plus_beta_C(1.0, local_t3, 1, local_t1, 1, 0.0, local_t4, 1, nSamples);
+	Matrix::value_type sum_local_t4 = pGetSum2(local_t4, nSamples);
+	char filename[20];
+	sprintf(filename, "local_t4%d.txt", rank);
+	local_t4.print(filename);
+	if(rank == 0)
+	{
+    DEBUG() << "parallel: sum of matSSqInv: " << getSum(local_matSSqInv);
+    TRACE() << "parallel: matSSQInv: ";
+    DEBUG() << "parallel: sum of t0: " << sum_local_t0;
+    DEBUG() << "parallel: sum of t1: " << sum_local_t1;
+    DEBUG() << "parallel: sum of t2: " << sum_local_t2;
+    DEBUG() << "parallel: sum of t3: " << sum_local_t3;
+    DEBUG() << "parallel: sum of t4: " << sum_local_t4;
+	}
+	return local_t4;
 }
 
 double EnkfAnalyze::initPerturbSigma(double maxHAP, float factor) const {

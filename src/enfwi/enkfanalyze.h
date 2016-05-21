@@ -15,6 +15,8 @@
 #include "damp4t10d.h"
 #include "Matrix.h"
 #include "pMatrix.h"
+#include <iostream>
+#include <vector>
 
 class EnkfAnalyze {
 public:
@@ -26,7 +28,8 @@ public:
 	void check(std::vector<float> a, std::vector<float> b);
 
 protected:
-  Matrix calGainMatrix(const std::vector<float *> &velSet) const;
+  Matrix calGainMatrix(const std::vector<float *> &velSet, std::vector<int> code) const;
+  Matrix pCalGainMatrix(const std::vector<float *> &velSet, std::vector<int> code) const;
   double initPerturbSigma(double maxHAP, float factor) const;
   void initGamma(const Matrix &perturbation, Matrix &gamma) const;
   void pInitGamma(const Matrix &perturbation, Matrix &gamma, const int nSamples) const;
