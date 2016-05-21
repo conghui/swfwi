@@ -429,14 +429,14 @@ int main(int argc, char *argv[]) {
 
   //TODO: need modifying, createAMean
   //scatterVelocity(veldb, totalveldb, params);
-	//std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);
+	std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);
 
   if (rank == 0) {
     /// calculate objective function
 
     std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
 		//enkfAnly.check(vvt, vv);
-		//exit(1);
+		exit(1);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);

@@ -183,3 +183,11 @@ int clipPosition(const Matrix &M) {
 
   return pos + 1;
 }
+
+float getSum(std::vector<float> &v)
+{
+	float sum = 0.0;
+	for(int i = 0 ; i < v.size() ; i ++)
+		sum += v[i];
+	return sum;
+}
