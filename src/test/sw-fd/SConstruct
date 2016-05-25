@@ -1,0 +1,55 @@
+import os
+
+sw_queue = 'q_sw_err_slow'
+# macro = ['-DNUM_THREADS=64',
+# '-DD=6',
+# '-DNX=533',
+# '-DNZ=193',
+# '-DNT=1']
+
+# cflags = ['-g', '-O0', '-Wall']
+cflags = ['-O3', '-Wall']
+
+
+env = Environment(
+    CC       = ['sw5cc', '-slave', '-std=c99'],
+    CXX      = ['sw5cc', '-host'],
+    LINK     = ['sw5cc', '-hybrid', ],
+    LIBS     = ['stdc++'],
+    CFLAGS   = cflags,
+    CXXFLAGS = cflags,
+    ENV      = os.environ)
+
+div_src = """
+master.cpp
+slave.c
+""".split()
+
+div_objs = env.StaticObject(div_src)
+div_bin = env.Program(target = 'div', source = div_objs)
+
+fd_src = """
+fd4t10s-zjh.cpp
+fd4t10s-zjh_slave.c
+""".split()
+
+fd_objs = env.StaticObject(fd_src)
+fd_bin = env.Program(target = 'fd', source = fd_objs)
+
+hello_src = """
+hello.cpp
+hello_slave.c
+""".split()
+hello_objs = env.StaticObject(hello_src)
+hello_bin = env.Program(target = 'hello', source = hello_objs)
+
+# submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+# -host_stack 1024 -share_size 7000 -n 1 -np 1 -cgsp 64
+# -o bsub.out -J "div" ''' % sw_queue
+
+run = env.Command('div.log', [fd_bin], './run.sh')
+Depends(run, div_bin)
+
+# AlwaysBuild(run)
+# env.Alias('run', hello, hello[0].abspath)
+
