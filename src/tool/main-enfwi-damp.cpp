@@ -393,6 +393,8 @@ int main(int argc, char *argv[]) {
   /// if the number of samples become large, it would be the bottleneck.
   /// TODO: refactor the Velocity class. keep the real data of all velocity in ONE array and
   /// each Velocity has a pointer that points to the correct location.
+
+  //TODO: need modifying, delete scatter and gather, make processes reading files in parallel
   scatterVelocity(veldb, totalveldb, params);
   DEBUG() << "dispatching velocity finished!";
 //  MPI_Barrier(MPI_COMM_WORLD);
@@ -422,11 +424,20 @@ int main(int argc, char *argv[]) {
     totalVelSet = generateVelSet(totalveldb);
   }
 
-  enkfAnly.analyze(totalVelSet, velset);
+  //enkfAnly.analyze(totalVelSet, velset);
+  enkfAnly.pAnalyze(velset);
+
+
+  //TODO: need modifying, createAMean
+	std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);
 
   if (rank == 0) {
     /// calculate objective function
-    std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+
+    //std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+    std::vector<float> vv = vvt;
+		//enkfAnly.check(vvt, vv);
+		//exit(1);
     Velocity newvel(vv, fmMethod.getnx(), fmMethod.getnz());
     fmMethod.bindVelocity(newvel);
     float obj = calobj(fmMethod, wlt, dobs, ns, ng, nt);
@@ -435,7 +446,7 @@ int main(int argc, char *argv[]) {
   }
 
   /// after enkf, we should scatter velocities
-  scatterVelocity(veldb, totalveldb, params);
+  //scatterVelocity(veldb, totalveldb, params);
 
   srand(params.seed + params.rank);
   TRACE() << "iterate the remaining iteration";
@@ -450,14 +461,17 @@ int main(int argc, char *argv[]) {
     }
 
     TRACE() << "enkf analyze and update velocity";
-    gatherVelocity(totalveldb, veldb, params);
+    //gatherVelocity(totalveldb, veldb, params);
     if (iter % niterenkf == 0) {
-      enkfAnly.analyze(totalVelSet, velset);
+      //enkfAnly.analyze(totalVelSet, velset);
+      enkfAnly.pAnalyze(velset);
     }
 
+		std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);
     if (rank == 0) {
       /// output velocity
-      std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+      //std::vector<float> vv = enkfAnly.createAMean(totalVelSet);
+      std::vector<float> vv = vvt;
 
       fmMethod.sfWriteVel(vv, params.vupdates);
 
@@ -471,7 +485,7 @@ int main(int argc, char *argv[]) {
       absobj.push_back(obj);
       norobj.push_back(obj / absobj[0]);
     }
-    scatterVelocity(veldb, totalveldb, params);
+    //scatterVelocity(veldb, totalveldb, params);
   }
 
   /// write objective function values

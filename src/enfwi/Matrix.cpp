@@ -15,6 +15,7 @@
 #include <cmath>
 #include <sstream>
 #include <cstring>
+#include <mpi.h>
 
 #include "Matrix.h"
 #include "logger.h"
@@ -82,6 +83,23 @@ void Matrix::print() const {
   DEBUG() << ss.str();
 }
 
+//row-majored print
+void Matrix::print(char *filename) const {
+	FILE *f = fopen(filename, "w");
+  for (int row = 0; row < getNumRow(); row++) {
+		for (int col = 0; col < getNumCol(); col++) {
+			fprintf(f, "%lf ", mData[col * mNumRow + row]);
+		}
+		fprintf(f, "\n");
+	}
+	fclose(f);
+}
+
+void Matrix::printInfo(char *filename) const {
+	FILE *f = fopen(filename, "w");
+	fprintf(f, "%d %d", getNumRow(), getNumCol());
+	fclose(f);
+}
 
 bool Matrix::isCompatible(const Matrix &rhs) const {
   return mNumRow == rhs.mNumRow && mNumCol == rhs.mNumCol;
@@ -119,7 +137,27 @@ Matrix::value_type getSum(const Matrix &M) {
   const Matrix::value_type *p = M.getData();
   const int size = M.getNumRow() * M.getNumCol();
   Matrix::value_type sum = std::accumulate(p, p + size, 0.0);
+  return sum;
+}
 
+Matrix::value_type pGetSum(const Matrix &M, const int nSamples) {
+  const Matrix::value_type *p = M.getData();
+  const int size = M.getNumRow() * M.getNumCol();
+  Matrix::value_type sum = std::accumulate(p, p + size, 0.0);
+	//printf("sum = %e\n", sum);
+	Matrix::value_type ret = 0;
+	MPI_Reduce(&sum, &ret, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	//printf("ret = %e\n", ret);
+  return ret;
+}
+
+Matrix::value_type pGetSum2(const Matrix &M, const int nSamples) {
+	Matrix total_M(nSamples, M.getNumRow());
+  int size = M.getNumRow() * M.getNumCol();
+	MPI_Gather(M.getData(), size, MPI_DOUBLE, total_M.getData(), size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  const Matrix::value_type *p = total_M.getData();
+	size = total_M.getNumRow() * total_M.getNumCol();
+  Matrix::value_type sum = std::accumulate(p, p + size, 0.0);
   return sum;
 }
 
@@ -128,8 +166,6 @@ void A_minus_B(const Matrix &A, const Matrix &B, Matrix &C) {
   assert(A.isCompatible(C));
   std::transform(A.getData(), A.getData() + A.size(), B.getData(), C.getData(), std::minus<Matrix::value_type>());
 }
-
-
 
 int clipPosition(const Matrix &M) {
   const Matrix::value_type relativeError = 0.001f;
@@ -146,4 +182,12 @@ int clipPosition(const Matrix &M) {
   }
 
   return pos + 1;
+}
+
+float getSum(std::vector<float> &v)
+{
+	float sum = 0.0;
+	for(int i = 0 ; i < v.size() ; i ++)
+		sum += v[i];
+	return sum;
 }

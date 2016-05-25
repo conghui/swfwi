@@ -7,24 +7,29 @@
 
 #include "Matrix.h"
 extern "C" {
-#include <f2c.h>
-#include <clapack.h>
+int dgemm_(char *transA, char *transB,
+              int *m, int *n, int *k,
+              double *alpha, // alpha
+              double *A, int *lda,
+              double *B, int *ldb,
+              double *beta, // beta
+              double *C, int *ldc);
 }
 
 static void alpha_A_B_plus_beta_C(
   char transA, char transB,
   double alpha, Matrix &A, Matrix &B,
   double beta, Matrix &C) {
-  integer k = A.getNumCol();
+  int k = A.getNumCol();
   if (transA == 't' || transA == 'T') {
     k = A.getNumRow();
   }
 
-  integer m = C.getNumRow();
-  integer n = C.getNumCol();
-  integer lda = A.getNumRow();
-  integer ldb = B.getNumRow();
-  integer ldc = C.getNumRow();
+  int m = C.getNumRow();
+  int n = C.getNumCol();
+  int lda = A.getNumRow();
+  int ldb = B.getNumRow();
+  int ldc = C.getNumRow();
   dgemm_(&transA, &transB,
               &m, &n, &k,
               &alpha, // alpha

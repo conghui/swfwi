@@ -18,6 +18,8 @@ class Matrix {
   ~Matrix();
   void readFromFile(const std::string &filename);
   void print() const;
+  void print(char *filename) const;
+  void printInfo(char *filename) const;
 
   bool isCompatible(const Matrix &rhs) const;
   int getNumCol() const;
@@ -38,6 +40,8 @@ void A_plus_B(const Matrix &A, const Matrix &B, Matrix &C);
 void A_minus_B(const Matrix &A, const Matrix &B, Matrix &C);
 
 Matrix::value_type getSum(const Matrix &M);
+Matrix::value_type pGetSum(const Matrix &M, const int nSamples);
+Matrix::value_type pGetSum2(const Matrix &M, const int nSamples);
 
 /// compute clip position
 int clipPosition(const Matrix &M);
