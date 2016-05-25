@@ -9,9 +9,10 @@
 import os
 
 # compiler options
-compiler_set        = 'gnu' # intel, gnu, sw, swintel
+compiler_set        = 'intel' # intel, gnu, sw, swintel
 debug_mode          = 0
-additional_includes = [os.environ['HOME'] + '/softs/install/boost', ]
+# additional_includes = [os.environ['HOME'] + '/softs/install/boost', ]
+additional_includes = []
 additional_libpath  = []
 additional_libs     = []
 
@@ -84,7 +85,7 @@ else:
 # set includes and libs#{{{
 inc_path          = []
 libpath           = ['#' + dirs['lib'], '#scalapack']
-scalapack_gnu_lib = ['scalapack', 'lapack', 'refblas'] # don't change the order
+scalapack_gnu_lib = ['scalapack-gnu', 'lapack-gnu', 'refblas-gnu'] # don't change the order
 libs              = []
 
 if compiler_set == 'sw':
