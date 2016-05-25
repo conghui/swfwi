@@ -56,64 +56,18 @@ EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
 
 void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *> &velSet) const {
   std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
-  //Matrix gainMatrix = calGainMatrix(velSet, code);
-  Matrix pGainMatrix = pCalGainMatrix(velSet, code);
+  Matrix gainMatrix = calGainMatrix(velSet, code);
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  int local_n = velSet.size();
-  int N = 0;
-  MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
-	int nSamples = N;
-	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-	Matrix::value_type sum_pGainMatrix = pGetSum2(pGainMatrix, nSamples);
-	if(rank == 0)
-	{
-		//DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
-		DEBUG() << "sum of pGainMatrix: " << sum_pGainMatrix;
-	}
-
-
-  float dt = fm.getdt();
-  float dx = fm.getdx();
-  std::vector<float *> &local_A = velSet; /// velSet <==> matA
-  std::vector<float> pAMean = pCreateAMean(local_A, nSamples);
-  Matrix local_A_Perturb(local_n, modelSize);
-  initAPerturb(local_A_Perturb, local_A, pAMean, modelSize);
-	char filename[20];
-	sprintf(filename, "HA_Perturb%d.txt", rank);
-	local_A_Perturb.print(filename);
-	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
-  Matrix local_t5(local_n, modelSize);
-	//pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, gainMatrix, 0, 0.0, local_t5, 1, nSamples);
-	pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, pGainMatrix, 1, 0.0, local_t5, 1, nSamples);
-	Matrix::value_type sum_local_t5 = pGetSum2(local_t5, nSamples);
+	gainMatrix.print("gainMatrix");
 
 	if(rank == 0)
 	{
-    DEBUG() << "sum of pAMean: " << sum(pAMean);
-    DEBUG() << "sum of local_A_Perturb: " << sum_A_Perturb;
-    DEBUG() << "sum of pt5: " << sum_local_t5;
-    TRACE() << "add the update back to velocity model";
+		DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
 	}
-  for (size_t i = 0; i < velSet.size(); i++) {
-    float *vel = velSet[i];
-    DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
-        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
-    TRACE() << "transform velocity to original";
-    std::transform(vel, vel + modelSize, vel, boost::bind(velRecover<float>, _1, dx, dt));
-    DEBUG() << format("vel recoverty,       velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
-        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
-    TRACE() << "add value calculated from ENKF to velocity";
-    Matrix::value_type *pu = local_t5.getData() + i * local_t5.getNumRow();
-    std::transform(vel, vel + modelSize, pu, vel, std::plus<Matrix::value_type>());
-    TRACE() << "sum velset " << i << ": " << std::accumulate(vel, vel + modelSize, 0.0f);
-    DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % i % velSet.size() %
-        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
-    std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
-  }
+
 
   if (rank == 0) {
     float dt = fm.getdt();
@@ -129,8 +83,7 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
     DEBUG() << "sum of A_Perturb: " << getSum(A_Perturb);
 
     Matrix t5(N, modelSize);
-    //alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
-    alpha_A_B_plus_beta_C(1, A_Perturb, pGainMatrix, 0, t5);
+    alpha_A_B_plus_beta_C(1, A_Perturb, gainMatrix, 0, t5);
     DEBUG() << "sum of t5: " << getSum(t5);
 
     TRACE() << "add the update back to velocity model";
@@ -159,6 +112,75 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
   }
 }
 
+void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
+  std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+  Matrix pGainMatrix = pCalGainMatrix(velSet, code);
+
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	/*
+	gainMatrix.print("gainMatrix");
+	char fname[20];
+	sprintf(fname, "pGainMatrix%d", rank);
+	pGainMatrix.print(fname);
+	*/
+
+
+  int local_n = velSet.size();
+  int N = 0;
+  MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
+	int nSamples = N;
+	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	Matrix::value_type sum_pGainMatrix = pGetSum2(pGainMatrix, nSamples);
+	if(rank == 0)
+	{
+		//DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
+		DEBUG() << "sum of pGainMatrix: " << sum_pGainMatrix;
+	}
+
+
+  float dt = fm.getdt();
+  float dx = fm.getdx();
+  std::vector<float *> &local_A = velSet; /// velSet <==> matA
+  std::vector<float> pAMean = pCreateAMean(local_A, nSamples);
+  Matrix local_A_Perturb(local_n, modelSize);
+  initAPerturb(local_A_Perturb, local_A, pAMean, modelSize);
+	char filename[20];
+	sprintf(filename, "HA_Perturb%d.txt", rank);
+	local_A_Perturb.print(filename);
+	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
+  Matrix local_t5(local_n, modelSize);
+	pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, pGainMatrix, 1, 0.0, local_t5, 1, nSamples);
+	Matrix::value_type sum_local_t5 = pGetSum2(local_t5, nSamples);
+
+	if(rank == 0)
+	{
+    DEBUG() << "sum of pAMean: " << sum(pAMean);
+    DEBUG() << "sum of local_A_Perturb: " << sum_A_Perturb;
+    DEBUG() << "sum of pt5: " << sum_local_t5;
+    TRACE() << "add the update back to velocity model";
+	}
+  for (size_t i = 0; i < velSet.size(); i++) {
+    float *vel = velSet[i];
+    DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    TRACE() << "transform velocity to original";
+    std::transform(vel, vel + modelSize, vel, boost::bind(velRecover<float>, _1, dx, dt));
+    DEBUG() << format("vel recoverty,       velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    TRACE() << "add value calculated from ENKF to velocity";
+    Matrix::value_type *pu = local_t5.getData() + i * local_t5.getNumRow();
+    std::transform(vel, vel + modelSize, pu, vel, std::plus<Matrix::value_type>());
+    TRACE() << "sum velset " << i << ": " << std::accumulate(vel, vel + modelSize, 0.0f);
+    DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % i % velSet.size() %
+        (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
+    std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
+  }
+
+}
+
 Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector<int> code) const {
   int local_n = velSet.size();
   int nt = fm.getnt();
@@ -168,7 +190,8 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
   int N = 0;
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 
-  //std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+	if(code.size() == 0)
+		code = RandomCode::genPlus1Minus1(fm.getns());
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
 
   Matrix local_HOnA(local_n, numDataSamples);
@@ -332,7 +355,8 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
 	int nSamples = N;
 	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  //std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+	if(code.size() == 0)
+		std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
 
   Matrix local_HOnA(local_n, numDataSamples);
@@ -512,13 +536,6 @@ void EnkfAnalyze::pInitGamma(const Matrix& perturbation, Matrix& gamma, const in
 
 	MPI_Allreduce(sum_t, sum, gamma.getNumRow(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-	/*
-  for (int irow = 0; irow < gamma.getNumRow(); irow++) {
-		printf("%f ", sum[irow]);
-	}
-	*/
-
-
   for (int irow = 0; irow < gamma.getNumRow(); irow++) {
 		Matrix::value_type avg = sum[irow] / nSamples;
 		//printf("%f ", avg);
@@ -560,11 +577,11 @@ std::vector<float> EnkfAnalyze::createAMean(const std::vector<float*>& velSet) c
 
 std::vector<float> EnkfAnalyze::pCreateAMean(const std::vector<float*>& velSet, const int nSamples) const {
   int modelSize = fm.getnx() * fm.getnz();
-  float *ret= (float*)malloc(sizeof(float) * modelSize);
+	std::vector<float> ret(modelSize);
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  float *sum = (float*)malloc(sizeof(float) * modelSize);
+	std::vector<float> sum(modelSize);
   for (int i = 0; i < modelSize; i++) {
     for (size_t j = 0; j < velSet.size(); j++) {
       sum[i] += velSet[j][i];
@@ -576,7 +593,7 @@ std::vector<float> EnkfAnalyze::pCreateAMean(const std::vector<float*>& velSet, 
 		ret[i] /= nSamples;
 	}
 
-  return std::vector<float>(ret, ret + modelSize);
+	return ret;
 }
 
 void EnkfAnalyze::check(std::vector<float> a, std::vector<float> b)
