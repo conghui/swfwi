@@ -32,4 +32,4 @@ if [[ -z $2 ]]; then  nthread=8; else  nthread=$2; fi
 export OMP_NUM_THREADS=$nthread
 #}}}
 
-scons task=$1 queue=q_sw_cab37
+scons task=$1 queue=q_sw_err_slow

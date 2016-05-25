@@ -55,7 +55,7 @@ def run_enfwi(task, enfwibin):
     vin=${SOURCES[0]} shots=${SOURCES[1]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 seed=10 maxdv=200 nita=5 sigfac=0.2 niterenkf=10 nsample=20
-    perin=/home/rice/data/marm/velpert533x193x100.bin
+    perin=/home/export/online1/systest/swrice/data/marm/velpert533x193x100.bin
     ''' % (enfwibin), stdout=-1, stdin=0)
 
 def run_noise(SWCompiler, normbin):#{{{
