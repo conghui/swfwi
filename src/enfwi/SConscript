@@ -7,6 +7,7 @@ bin_list = [
 lib = 'enfwi'
 
 modules = """
+pMatrix.cpp
 Matrix.cpp
 dgesvd.cpp
 enkfanalyze.cpp
