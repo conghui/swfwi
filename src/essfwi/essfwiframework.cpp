@@ -178,7 +178,9 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
 
 void EssFwiFramework::epoch(int iter) {
   // create random codes
-  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
+	int seed = 1;
+	RandomCodes r(seed);
+  const std::vector<int> encodes = r.genPlus1Minus1(ns);
 
   std::stringstream ss;
   std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));

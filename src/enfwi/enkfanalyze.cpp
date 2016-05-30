@@ -55,7 +55,9 @@ EnkfAnalyze::EnkfAnalyze(const Damp4t10d &fm, const std::vector<float> &wlt,
 }
 
 void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *> &velSet) const {
-  std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+	int seed = 0;
+	RandomCodes r(seed);
+  std::vector<int> code = r.genPlus1Minus1(fm.getns());
   Matrix gainMatrix = calGainMatrix(velSet, code);
 
   int rank;
@@ -113,7 +115,9 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 }
 
 void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
-  std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+	int seed = 0;
+	RandomCodes r(seed);
+  std::vector<int> code = r.genPlus1Minus1(fm.getns());
   Matrix pGainMatrix = pCalGainMatrix(velSet, code);
 
   int rank;
@@ -193,7 +197,11 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 
 	if(code.size() == 0)
-		code = RandomCode::genPlus1Minus1(fm.getns());
+	{
+		int seed = 1;
+		RandomCodes r(seed);
+		code = r.genPlus1Minus1(fm.getns());
+	}
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
 
   Matrix local_HOnA(local_n, numDataSamples);
@@ -358,7 +366,11 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
 	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 	if(code.size() == 0)
-		std::vector<int> code = RandomCode::genPlus1Minus1(fm.getns());
+	{
+		int seed = 1;
+		RandomCodes r(seed);
+		std::vector<int> code = r.genPlus1Minus1(fm.getns());
+	}
   MPI_Bcast(&code[0], code.size(), MPI_INT, 0, MPI_COMM_WORLD);   /// broadcast the code to all other processes
 
   Matrix local_HOnA(local_n, numDataSamples);

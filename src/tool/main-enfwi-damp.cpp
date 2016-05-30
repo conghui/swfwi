@@ -218,7 +218,9 @@ std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
 float calobj(const Damp4t10d &fmMethod, const std::vector<float> wlt,
     std::vector<float> &dobs, int ns, int ng, int nt) {
   // create random codes
-  const std::vector<int> encodes = RandomCode::genPlus1Minus1(ns);
+	int seed = 1;
+	RandomCodes r(seed);
+  const std::vector<int> encodes = r.genPlus1Minus1(ns);
 
   Encoder encoder(encodes);
   std::vector<float> encsrc  = encoder.encodeSource(wlt);
