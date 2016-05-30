@@ -37,7 +37,7 @@ void initAPerturb(Matrix &matAPerturb, const std::vector<float *> &velSet,
   assert((size_t)matAPerturb.getNumCol() == velSet.size()); // the matrix is row-majored
   assert(matAPerturb.getNumRow() == modelSize);
 
-	printf("initAPerturb, col = %d, row = %d\n", matAPerturb.getNumCol(), matAPerturb.getNumRow()); 
+	//printf("initAPerturb, col = %d, row = %d\n", matAPerturb.getNumCol(), matAPerturb.getNumRow()); 
   for (int i = 0; i < matAPerturb.getNumCol(); i++) {
     Matrix::value_type *p = matAPerturb.getData() + (i * matAPerturb.getNumRow());
     std::transform(velSet[i], velSet[i] + modelSize, AMean.begin(), p, std::minus<Matrix::value_type>());
@@ -62,8 +62,6 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-	gainMatrix.print("gainMatrix");
 
 	if(rank == 0)
 	{
@@ -257,8 +255,6 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
     Matrix HA_Perturb(N, numDataSamples);
     initGamma(HOnA, HA_Perturb);
     DEBUG() << "sum of HA_Perturb: " << getSum(HA_Perturb);
-		HOnA.print("HOnA.txt");
-		HA_Perturb.print("HA_Perturb.txt");
 
     TRACE() << "initialize the perturbation";
     Matrix perturbation(N, numDataSamples);
@@ -324,7 +320,6 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
     }
     DEBUG() << "sum of matSSqInv: " << getSum(matSSqInv);
     TRACE() << "matSSQInv: ";
-		matSSqInv.print("matSSqInv");
 
 		Matrix t0(N, numDataSamples); /// D - HA
     A_minus_B(D, HOnA, t0);
@@ -333,7 +328,6 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
 		Matrix t1(N, N); /// U' * (D - HA)
     alpha_ATrans_B_plus_beta_C(1, matU, t0, 0, t1);
     DEBUG() << "sum of t1: " << getSum(t1);
-		t1.print("t1.txt");
 
     Matrix t2(N, N); /// HA' * U
     alpha_ATrans_B_plus_beta_C(1, HA_Perturb, matU, 0, t2);
@@ -346,7 +340,6 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
     alpha_A_B_plus_beta_C(1, t3, t1, 0, t4);
     DEBUG() << "sum of t4: " << getSum(t4);
     DEBUG() << "print HA' * U * SSqInv * U' * (D - HA)";
-		t4.print("t4_new.txt");
     t4.print();
   }
   return t4;
@@ -361,7 +354,6 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
   int N = 0;
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 
-	//added by cbw
 	int nSamples = N;
 	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -653,7 +645,7 @@ void EnkfAnalyze::pInitPerturbation(Matrix& perturbation, const Matrix &HA_Pertu
 		double totalMaxHAP = 0;
 		MPI_Allreduce(&maxHAP, &totalMaxHAP, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 		double sigma = initPerturbSigma(totalMaxHAP, sigmaFactor);
-		DEBUG() << "p sigmaIter0: " << sigma;
+		DEBUG() << "parallel: sigmaIter0: " << sigma;
 		sigmaIter0 = sigma;
 		generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
   }
@@ -670,7 +662,7 @@ void EnkfAnalyze::pInitPerturbation2(Matrix& perturbation, const Matrix &HA_Pert
 		double totalMaxHAP = 0;
 		MPI_Allreduce(&maxHAP, &totalMaxHAP, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 		double sigma = initPerturbSigma(totalMaxHAP, sigmaFactor);
-		DEBUG() << "p sigmaIter0: " << sigma;
+		DEBUG() << "parallel: sigmaIter0: " << sigma;
 		sigmaIter0 = sigma;
 		generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
   }
