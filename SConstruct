@@ -9,7 +9,7 @@
 import os
 
 # compiler options
-compiler_set        = 'sw' # intel, gnu, sw, swintel
+compiler_set        = 'gnu' # intel, gnu, sw, swintel
 debug_mode          = 0
 additional_includes = [os.environ['HOME'] + '/softs/install/boost/include', ]
 additional_includes = []

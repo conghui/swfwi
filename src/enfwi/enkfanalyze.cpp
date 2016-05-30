@@ -147,9 +147,11 @@ void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
   std::vector<float> pAMean = pCreateAMean(local_A, nSamples);
   Matrix local_A_Perturb(local_n, modelSize);
   initAPerturb(local_A_Perturb, local_A, pAMean, modelSize);
+	/*
 	char filename[20];
 	sprintf(filename, "HA_Perturb%d.txt", rank);
 	local_A_Perturb.print(filename);
+	*/
 	Matrix::value_type sum_A_Perturb = pGetSum2(local_A_Perturb, nSamples);
   Matrix local_t5(local_n, modelSize);
 	pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, pGainMatrix, 1, 0.0, local_t5, 1, nSamples);
@@ -461,7 +463,7 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
         p[i * nrow + i] = (1 / s[i]) * (1 / s[i]);
       }
     }
-		local_matSSqInv.print("local_matSSqInv.txt");
+		//local_matSSqInv.print("local_matSSqInv.txt");
 	}
   Matrix local_t0(local_n, numDataSamples); /// D - HA
 	A_minus_B(local_D, local_HOnA, local_t0);
@@ -478,9 +480,11 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
   Matrix local_t4(local_n, nSamples); /// U' * (D - HA)
   pAlpha_A_B_plus_beta_C(1.0, local_t3, 1, local_t1, 1, 0.0, local_t4, 1, nSamples);
 	Matrix::value_type sum_local_t4 = pGetSum2(local_t4, nSamples);
+	/*
 	char filename[20];
 	sprintf(filename, "local_t4%d.txt", rank);
 	local_t4.print(filename);
+	*/
 	if(rank == 0)
 	{
     DEBUG() << "parallel: sum of matSSqInv: " << getSum(local_matSSqInv);
