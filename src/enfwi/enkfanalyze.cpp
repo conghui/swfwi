@@ -620,7 +620,7 @@ void EnkfAnalyze::check(std::vector<float> a, std::vector<float> b)
 
 void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Perturb) const {
   if (!initSigma) {
-    //initSigma = true;
+    initSigma = true;
     int seed = 1;
     double mean = 0;
     double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
@@ -636,7 +636,7 @@ void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Pertur
 
 void EnkfAnalyze::pInitPerturbation(Matrix& perturbation, const Matrix &HA_Perturb, const int rank, const int nSamples) const {
   if (!initSigma) {
-    //initSigma = true;
+    initSigma = true;
 		//how to make time seed in parallel program
     //int seed = 1;
     int seed = rank;
@@ -655,7 +655,7 @@ void EnkfAnalyze::pInitPerturbation(Matrix& perturbation, const Matrix &HA_Pertu
 
 void EnkfAnalyze::pInitPerturbation2(Matrix& perturbation, const Matrix &HA_Perturb, const int rank, const int nSamples) const {
   if (!initSigma) {
-    //initSigma = true;
+    initSigma = true;
     int seed = 1;
     double mean = 0;
     double maxHAP = std::abs(*std::max_element(HA_Perturb.getData(), HA_Perturb.getData() + HA_Perturb.size(), abs_less<float>));
