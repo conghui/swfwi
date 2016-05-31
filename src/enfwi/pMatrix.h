@@ -96,6 +96,7 @@ class pMatrixSVD
 {
 	public:
 		pMatrixSVD(pMatrix *_A, pMatrix *_U, pMatrix *_S, pMatrix *_Vt);
+		~pMatrixSVD();
 		void run();
 		int getInfo();
 	private:

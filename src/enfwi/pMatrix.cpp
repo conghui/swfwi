@@ -174,6 +174,7 @@ int pMatrix::getGCol()
 
 pMatrix::~pMatrix()
 {
+	free(desc);
 }
 
 pMatrixMM::pMatrixMM(char _transa, char _transb, int _M, int _N, int _K, double _alpha, pMatrix *_A, pMatrix *_B, double _beta, pMatrix *_C)
@@ -207,6 +208,11 @@ pMatrixSVD::pMatrixSVD(pMatrix *_A, pMatrix *_U, pMatrix *_S, pMatrix *_Vt)
 	N = A->getGCol();
 	lwork = -1;
 	work = (double *)malloc(sizeof(double));
+}
+
+pMatrixSVD::~pMatrixSVD()
+{
+	free(work);
 }
 
 void pMatrixSVD::run()
