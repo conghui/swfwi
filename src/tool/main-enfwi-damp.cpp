@@ -230,6 +230,8 @@ std::vector<Velocity *> pCreateVelDB(const Velocity &vel, const char *perin, int
 
 	int readSize = modelSize;
 
+	printf("%d %d %d\n", modelSize, readSize, offset);
+
   for (int iv = 0; iv < N; iv++) {
     std::vector<float> ret(modelSize);
 		MPI_File_read_at(fh, offset, &tmp[0], readSize, MPI_FLOAT, &status);
