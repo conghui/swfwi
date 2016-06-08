@@ -216,7 +216,7 @@ std::vector<Velocity *> pCreateVelDB(const Velocity &vel, const char *perin, int
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_File_open(MPI_COMM_WORLD, perin, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh); 
 	MPI_Status status;
-	offset = modelSize * N * rank;
+	offset = modelSize * sizeof(float) * N * rank;
 
   TRACE() << "parallel: add perturbation to initial velocity";
   if (!fh) {
@@ -234,12 +234,13 @@ std::vector<Velocity *> pCreateVelDB(const Velocity &vel, const char *perin, int
 
   for (int iv = 0; iv < N; iv++) {
     std::vector<float> ret(modelSize);
-		MPI_File_read_at(fh, offset, &tmp[0], readSize, MPI_FLOAT, &status);
-		offset += readSize * sizeof(&tmp[0]);
-    //ifs.read(reinterpret_cast<char *>(&tmp[0]), modelSize * sizeof(tmp[0]));
+		MPI_File_seek(fh, offset, MPI_SEEK_SET);
+		offset += readSize * sizeof(float);
+		MPI_File_read(fh, &tmp[0], readSize, MPI_FLOAT, &status);
     std::transform(tmp.begin(), tmp.end(), velOrig.begin(), ret.begin(), std::plus<float>());
     std::transform(ret.begin(), ret.end(), ret.begin(), boost::bind(velTrans<float>, _1, dx, dt));
     veldb[iv] = new Velocity(ret, vel.nx, vel.nz);
+
   }
 
 	MPI_File_close(&fh);
@@ -418,18 +419,18 @@ int main(int argc, char *argv[]) {
 
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
 
-  std::vector<Velocity *> totalveldb;  /// only for rank 0
+  //std::vector<Velocity *> totalveldb;  /// only for rank 0
   std::vector<Velocity *> veldb(ntask); /// each process owns # of velocity
 
 
 	int size;
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	int model_size = veldb[0]->nx * veldb[0]->nz;
-  std::vector<Velocity *> veldb2(ntask); /// each process owns # of velocity
-	veldb2 = pCreateVelDB(exvel, params.perin, veldb.size(), dx, dt, rank, size);
-  EnkfAnalyze enkfAnly2(fmMethod, wlt, dobs, sigfac);
+  //std::vector<Velocity *> veldb2(ntask); /// each process owns # of velocity
+	veldb = pCreateVelDB(exvel, params.perin, veldb.size(), dx, dt, rank, size);
+  //EnkfAnalyze enkfAnly2(fmMethod, wlt, dobs, sigfac);
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	/*
   if (rank == 0) { /// sender
     totalveldb = createVelDB(exvel, params.perin, N, dx, dt);
     for (size_t i = 0; i < totalveldb.size(); i++) {
@@ -440,6 +441,7 @@ int main(int argc, char *argv[]) {
   for (size_t iv = 0; iv < veldb.size(); iv++) {
     veldb[iv] = new Velocity(exvel.nx, exvel.nz);
   }
+	*/
 
   /// it is a bad implementation. one process send each velocity to all other processes
   /// if the number of samples become large, it would be the bottleneck.
@@ -447,14 +449,15 @@ int main(int argc, char *argv[]) {
   /// each Velocity has a pointer that points to the correct location.
 
   //TODO: need modifying, delete scatter and gather, make processes reading files in parallel
-  scatterVelocity(veldb, totalveldb, params);
+  //scatterVelocity(veldb, totalveldb, params);
   DEBUG() << "dispatching velocity finished!";
 //  MPI_Barrier(MPI_COMM_WORLD);
 
+	/*
 	for(int i = 0 ; i < veldb.size() ; i ++)
 		enkfAnly2.check(veldb[i]->dat, veldb2[i]->dat);
-	MPI_Barrier(MPI_COMM_WORLD);
-	exit(1);
+		*/
+//	MPI_Barrier(MPI_COMM_WORLD);
 
 
   std::vector<Damp4t10d *> fms(ntask);
@@ -473,14 +476,16 @@ int main(int argc, char *argv[]) {
 
 
   /// collect all the data from other process to rank 0
-  gatherVelocity(totalveldb, veldb, params);
+  //gatherVelocity(totalveldb, veldb, params);
 
   std::vector<float *> velset = generateVelSet(veldb);
-  std::vector<float *> totalVelSet;
+  //std::vector<float *> totalVelSet;
 
+	/*
   if (rank == 0) {
     totalVelSet = generateVelSet(totalveldb);
   }
+	*/
 
   //enkfAnly.analyze(totalVelSet, velset);
   enkfAnly.pAnalyze(velset);
@@ -553,11 +558,13 @@ int main(int argc, char *argv[]) {
   }
 
   /// release memory
+	/*
   if (rank == 0) {
     for (size_t i = 0; i < totalveldb.size(); i++) {
       delete totalveldb[i];
     }
   }
+	*/
   for (int i = 0; i < ntask; i++) {
     delete veldb[i];
     delete fms[i];
