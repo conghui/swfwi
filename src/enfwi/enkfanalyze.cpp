@@ -598,7 +598,10 @@ std::vector<float> EnkfAnalyze::pCreateAMean(const std::vector<float*>& velSet, 
 
 void EnkfAnalyze::check(std::vector<float> a, std::vector<float> b)
 {
-	printf("Checking...\n");
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	printf("Rank = %d, checking...\n", rank);
+	int counter = 0;
 	for(int i = 0 ; i < a.size() ; i ++)
 	{
 		float abserr = fabs(a[i] - b[i]);
@@ -606,8 +609,13 @@ void EnkfAnalyze::check(std::vector<float> a, std::vector<float> b)
 		if(relerr > 0.000001)
 		{
 			printf("Check index: %d %f %f %f\n", i, a[i], b[i], relerr);
+			counter ++;
 		}
+		if(counter > 10)
+			return;
 	}
+	if(counter == 0)
+		printf("Pass!\n");
 }
 
 void EnkfAnalyze::initPerturbation(Matrix& perturbation, const Matrix &HA_Perturb) const {

@@ -206,6 +206,48 @@ std::vector<Velocity *> createVelDB(const Velocity &vel, const char *perin, int 
   return veldb;
 }
 
+std::vector<Velocity *> pCreateVelDB(const Velocity &vel, const char *perin, int N, float dx, float dt, int rank, int size) {
+  std::vector<Velocity *> veldb(N);   /// here is all the velocity samples resides, others are pointer to this
+
+  int modelSize = vel.nx * vel.nz;
+	MPI_File fh;
+	MPI_Offset file_size, offset;
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_File_open(MPI_COMM_WORLD, perin, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh); 
+	MPI_Status status;
+	offset = modelSize * sizeof(float) * N * rank;
+
+  TRACE() << "parallel: add perturbation to initial velocity";
+  if (!fh) {
+    ERROR() << "cannot open file: " << perin;
+    exit(EXIT_FAILURE);
+  }
+
+  std::vector<float> tmp(modelSize);
+  std::vector<float> velOrig = vel.dat;
+  std::transform(velOrig.begin(), velOrig.end(), velOrig.begin(), boost::bind(velRecover<float>, _1, dx, dt));
+
+	int readSize = modelSize;
+
+	printf("%d %d %d\n", modelSize, readSize, offset);
+
+  for (int iv = 0; iv < N; iv++) {
+    std::vector<float> ret(modelSize);
+		MPI_File_seek(fh, offset, MPI_SEEK_SET);
+		offset += readSize * sizeof(float);
+		MPI_File_read(fh, &tmp[0], readSize, MPI_FLOAT, &status);
+    std::transform(tmp.begin(), tmp.end(), velOrig.begin(), ret.begin(), std::plus<float>());
+    std::transform(ret.begin(), ret.end(), ret.begin(), boost::bind(velTrans<float>, _1, dx, dt));
+    veldb[iv] = new Velocity(ret, vel.nx, vel.nz);
+
+  }
+
+	MPI_File_close(&fh);
+
+  return veldb;
+}
+
 std::vector<float *> generateVelSet(std::vector<Velocity *> &veldb) {
   std::vector<float *> velSet(veldb.size());
   for (size_t iv = 0; iv < veldb.size(); iv++) {
@@ -377,9 +419,18 @@ int main(int argc, char *argv[]) {
 
   UpdateVelOp updatevelop(vmin, vmax, dx, dt);
 
-  std::vector<Velocity *> totalveldb;  /// only for rank 0
+  //std::vector<Velocity *> totalveldb;  /// only for rank 0
   std::vector<Velocity *> veldb(ntask); /// each process owns # of velocity
 
+
+	int size;
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	int model_size = veldb[0]->nx * veldb[0]->nz;
+  //std::vector<Velocity *> veldb2(ntask); /// each process owns # of velocity
+	veldb = pCreateVelDB(exvel, params.perin, veldb.size(), dx, dt, rank, size);
+  //EnkfAnalyze enkfAnly2(fmMethod, wlt, dobs, sigfac);
+
+	/*
   if (rank == 0) { /// sender
     totalveldb = createVelDB(exvel, params.perin, N, dx, dt);
     for (size_t i = 0; i < totalveldb.size(); i++) {
@@ -390,6 +441,7 @@ int main(int argc, char *argv[]) {
   for (size_t iv = 0; iv < veldb.size(); iv++) {
     veldb[iv] = new Velocity(exvel.nx, exvel.nz);
   }
+	*/
 
   /// it is a bad implementation. one process send each velocity to all other processes
   /// if the number of samples become large, it would be the bottleneck.
@@ -397,9 +449,16 @@ int main(int argc, char *argv[]) {
   /// each Velocity has a pointer that points to the correct location.
 
   //TODO: need modifying, delete scatter and gather, make processes reading files in parallel
-  scatterVelocity(veldb, totalveldb, params);
+  //scatterVelocity(veldb, totalveldb, params);
   DEBUG() << "dispatching velocity finished!";
 //  MPI_Barrier(MPI_COMM_WORLD);
+
+	/*
+	for(int i = 0 ; i < veldb.size() ; i ++)
+		enkfAnly2.check(veldb[i]->dat, veldb2[i]->dat);
+		*/
+//	MPI_Barrier(MPI_COMM_WORLD);
+
 
   std::vector<Damp4t10d *> fms(ntask);
   std::vector<UpdateSteplenOp *> usl(ntask);
@@ -417,14 +476,16 @@ int main(int argc, char *argv[]) {
 
 
   /// collect all the data from other process to rank 0
-  gatherVelocity(totalveldb, veldb, params);
+  //gatherVelocity(totalveldb, veldb, params);
 
   std::vector<float *> velset = generateVelSet(veldb);
-  std::vector<float *> totalVelSet;
+  //std::vector<float *> totalVelSet;
 
+	/*
   if (rank == 0) {
     totalVelSet = generateVelSet(totalveldb);
   }
+	*/
 
   //enkfAnly.analyze(totalVelSet, velset);
   enkfAnly.pAnalyze(velset);
@@ -497,11 +558,13 @@ int main(int argc, char *argv[]) {
   }
 
   /// release memory
+	/*
   if (rank == 0) {
     for (size_t i = 0; i < totalveldb.size(); i++) {
       delete totalveldb[i];
     }
   }
+	*/
   for (int i = 0; i < ntask; i++) {
     delete veldb[i];
     delete fms[i];
