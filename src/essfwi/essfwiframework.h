@@ -11,6 +11,7 @@
 #include "damp4t10d.h"
 #include "updatevelop.h"
 #include "updatesteplenop.h"
+#include "random-code.h"
 
 class EssFwiFramework {
 public:
@@ -24,12 +25,15 @@ public:
   float getInitObj() const;
 
 private:
+  static const int ESS_SEED = 1;
+
+private:
   Damp4t10d &fmMethod;
   UpdateSteplenOp updateStenlelOp;
   const UpdateVelOp &updateVelOp;
   const std::vector<float> &wlt;  /// wavelet
   const std::vector<float> &dobs; /// actual observed data (nt*ng*ns)
-
+  RandomCodes essRandomCodes;
 
 private: /// propagate from other construction
   int ns;

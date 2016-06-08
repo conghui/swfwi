@@ -16,7 +16,7 @@
 #include "Matrix.h"
 #include "pMatrix.h"
 #include <iostream>
-#include <vector>
+#include "random-code.h"
 
 class EnkfAnalyze {
 public:
@@ -41,9 +41,13 @@ protected:
   void pInitPerturbation2(Matrix& perturbation, const Matrix &HA_Perturb, const int rank, const int nSamples) const;
 
 protected:
+  static const int ENKF_SEED = 2;
+
+protected:
   const Damp4t10d &fm;
   const std::vector<float> &wlt;
   const std::vector<float> &dobs;
+  mutable RandomCodes enkfRandomCodes;
 
   int modelSize;
   float sigmaFactor;

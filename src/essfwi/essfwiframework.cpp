@@ -168,6 +168,7 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
     const UpdateVelOp &_updateVelOp,
     const std::vector<float> &_wlt, const std::vector<float> &_dobs) :
     fmMethod(method), updateStenlelOp(updateSteplenOp), updateVelOp(_updateVelOp), wlt(_wlt), dobs(_dobs),
+    essRandomCodes(ESS_SEED),
     ns(method.getns()), ng(method.getng()), nt(method.getnt()),
     nx(method.getnx()), nz(method.getnz()), dx(method.getdx()), dt(method.getdt()),
     updateobj(0), initobj(0)
@@ -178,9 +179,7 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
 
 void EssFwiFramework::epoch(int iter) {
   // create random codes
-	int seed = 1;
-	RandomCodes r(seed);
-  const std::vector<int> encodes = r.genPlus1Minus1(ns);
+  const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
 
   std::stringstream ss;
   std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
