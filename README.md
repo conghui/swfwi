@@ -1,11 +1,22 @@
 ## Introduction
 I will write the introduction to this project later when I am free.
 
+## Prerequirement
+- Scons: We use scons to compile the projects.
+- Boost library: We use some functions in boost library.
+- Math Library: Please compile blas, lapack, scalapack library in your own machine and put them into the scalapack directory.
+- Madagascar: We use madagascar to visualize the results.
+
 ## Build
 Change `compiler_set` and `addition_includes` in `SConstruct` according to your
 actual compiler.
 
 run `scons` to build.
+
+```
+	vim Sconstruct	# change the compiler_set and addition_includes
+	scons
+```
 
 ## Run
 The recommended way to run the programs is to create separate folders for each
@@ -20,11 +31,12 @@ cases. The following is a general work flow in normal cases:
   cp ../../model/marm/* .
   vim SConstruct  # update the parameters is necessary
   vim run.sh      # choose the task you want to start
-  ./run.sh
+  ./run.sh				
 ```
 
 If you want to run `enfwi` or `enfwi-sw`, you will need perturbation files as
-input. You can generate this file by compiling and runing the `
+input. You can generate this file by compiling and runing the `./run.sh noise` 
+to produce shotsnoise.rsf, and then modify the relative file name in the job/01/Sconstruct.
 
 ## Show result
 In the same directory where you run the case, you can check the result including
@@ -69,7 +81,9 @@ objective function values, L1 L2 normalized model fit and inverted images.
   samples becomes large (tens of thousands), the communication performance may
   decrease dramatically. One possible solution is to refactor the `Velocity`
   class as a wrapper, making a contains a pointer which points to the actual
-  velocity data.
+  velocity data. (Solved)
 
-- the memory is not enough on SW when the number of samples is 100. 50 is ok.
+- the memory is not enough on SW when the number of samples is 100. 50 is ok. (Solved)
 
+## Contact us
+If you have any questions or any suggestions, you can send email to heconghui@gmail.com or chenbwei2012@gmail.com.
