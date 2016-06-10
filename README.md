@@ -6,6 +6,7 @@ I will write the introduction to this project later when I am free.
 - Boost library: We use some functions in boost library.
 - Math Library: Please compile blas, lapack, scalapack library in your own machine and put them into the scalapack directory.
 - Madagascar: We use madagascar to visualize the results.
+- Mpich:	We use mpich to make enfwi parallel.
 
 ## Build
 Change `compiler_set` and `addition_includes` in `SConstruct` according to your
