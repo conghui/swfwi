@@ -359,8 +359,6 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
 
   Matrix local_HOnA(local_n, numDataSamples);
   Matrix local_D(local_n, numDataSamples);
-  Matrix HOnA(N, numDataSamples);
-  Matrix D(N, numDataSamples);
 
   for (int i = 0; i < local_n; i++) {
     DEBUG() << format("calculate HA on velocity %2d/%d") % (i + 1) % velSet.size();
@@ -398,8 +396,6 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   int count = local_D.getNumCol() * local_D.getNumRow();
-  MPI_Gather(local_D.getData(), count, MPI_DOUBLE, D.getData(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Gather(local_HOnA.getData(), count, MPI_DOUBLE, HOnA.getData(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   Matrix t4(N, N); /// HA' * U * SSqInv * U' * (D - HA)
 
