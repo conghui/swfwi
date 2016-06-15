@@ -49,6 +49,7 @@ private:
   std::vector<float> updateDirection;
   float updateobj;
   float initobj;
+	float obj_val4;
 };
 
 #endif /* SRC_ESS_FWI2D_ESSFWIFRAMEWORK_H_ */
