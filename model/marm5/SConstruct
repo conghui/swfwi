@@ -51,8 +51,8 @@ def run_enfwi(task, enfwibin):
   else:
     submit_cmd = '~/softs/install/mpi/bin/mpirun -np 1 '
 
-  Flow('vsnaps absobjs norobjs', 'smvel shots', submit_cmd + '''%s
-    vin=${SOURCES[0]} shots=${SOURCES[1]}
+  Flow('vsnaps absobjs norobjs', 'smvel shots vel', submit_cmd + '''%s
+    vin=${SOURCES[0]} shots=${SOURCES[1]} vreal=${SOURCES[2]}
     vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
     niter=300 seed=10 maxdv=200 nita=5 sigfac=0.2 niterenkf=10 nsample=20
     perin=/home/export/online1/systest/swrice/data/marm/velpert533x193x100.bin

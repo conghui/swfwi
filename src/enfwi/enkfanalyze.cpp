@@ -164,17 +164,18 @@ void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
 	}
   for (size_t i = 0; i < velSet.size(); i++) {
     float *vel = velSet[i];
-    DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+		int absvel = rank * local_n + i + 1;
+    DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % absvel % nSamples %
         (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
     TRACE() << "transform velocity to original";
     std::transform(vel, vel + modelSize, vel, boost::bind(velRecover<float>, _1, dx, dt));
-    DEBUG() << format("vel recoverty,       velset[%2d/%d], min: %f, max: %f") % i % velSet.size() %
+    DEBUG() << format("vel recoverty,       velset[%2d/%d], min: %f, max: %f") % absvel % nSamples %
         (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
     TRACE() << "add value calculated from ENKF to velocity";
     Matrix::value_type *pu = local_t5.getData() + i * local_t5.getNumRow();
     std::transform(vel, vel + modelSize, pu, vel, std::plus<Matrix::value_type>());
     TRACE() << "sum velset " << i << ": " << std::accumulate(vel, vel + modelSize, 0.0f);
-    DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % i % velSet.size() %
+    DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % absvel % nSamples %
         (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
     std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
   }
@@ -345,6 +346,9 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
   int ng = fm.getng();
   int numDataSamples = nt * ng;
 
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
   int N = 0;
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
 
@@ -361,7 +365,8 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
   Matrix local_D(local_n, numDataSamples);
 
   for (int i = 0; i < local_n; i++) {
-    DEBUG() << format("calculate HA on velocity %2d/%d") % (i + 1) % velSet.size();
+		int absvel = rank * local_n + i + 1;
+    DEBUG() << format("calculate HA on velocity %2d/%d") % absvel % nSamples;
 
     /// "making encoded shot, both sources and receivers";
     Encoder encoder(code);
@@ -374,7 +379,7 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
     const float *pdata = &trans[0];
     std::copy(pdata, pdata + numDataSamples, local_D.getData() + i * numDataSamples);
 
-    DEBUG() << format("sum D %.20f") % getSum(local_D);
+    DEBUG() << format("parallel: sum D %.20f") % getSum(local_D);
 
     /// "H operate on A, and store data in HOnA";
     std::vector<float> dcal(encobs.size(), 0);
@@ -384,16 +389,13 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
     Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
     newfm.bindVelocity(curvel);
 
-    DEBUG() << format("   curvel %.20f") % sum(curvel.dat);
+    DEBUG() << format("parallel: curvel %.20f") % sum(curvel.dat);
     newfm.EssForwardModeling(encsrc, dcal);
     matrix_transpose(&dcal[0], &trans[0], ng, nt);
     std::copy(pdata, pdata + numDataSamples, local_HOnA.getData() + i * numDataSamples);
 
-    DEBUG() << format("   sum HonA %.20f") % getSum(local_HOnA);
+    DEBUG() << format("parallel: sum HonA %.20f") % getSum(local_HOnA);
   }
-
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   int count = local_D.getNumCol() * local_D.getNumRow();
 

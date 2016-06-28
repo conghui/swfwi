@@ -44,6 +44,7 @@ public:
 
 public:
   sf_file vinit;        /* initial velocity model, unit=m/s */
+  sf_file vreal;        /* real velocity model, unit=m/s */
   sf_file shots;        /* recorded shots from exact velocity model */
   sf_file vupdates;     /* updated velocity in iterations */
   sf_file absobjs;         /* absolute values of objective function in iterations */
@@ -89,6 +90,7 @@ public:
 
 Params::Params() {
   vinit = sf_input ("vin");       /* initial velocity model, unit=m/s */
+  vreal	= sf_input ("vreal");       /* real	velocity model, unit=m/s */
   shots = sf_input("shots");      /* recorded shots from exact velocity model */
   vupdates = sf_output("vout");   /* updated velocity in iterations */
   absobjs = sf_output("absobjs"); /* absolute values of objective function in iterations */
@@ -362,7 +364,43 @@ void gatherVelocity(std::vector<Velocity *> &totalveldb, const std::vector<Veloc
 
    }
 }
-} /// end of name space
+
+void slownessL1L2Norm(const float *accurate2, const float *curr, const Params &params, float &l1norm, float &l2norm) {
+	int bz = params.nb;
+	int bx = bz;
+	int nx = params.nx;
+	int nz = params.nz;
+
+	float norm1 = 0;
+	float norm2 = 0;
+	float sumSquare = 0;
+	float sum = 0;
+
+	std::vector<float> accurate(accurate2, accurate2 + nx * nz);
+	std::transform(accurate.begin(), accurate.end(), accurate.begin(), boost::bind(velRecover<float>, _1, params.dx, params.dt));
+	std::vector<float> tmp(curr, curr + nx * nz);
+	std::transform(tmp.begin(), tmp.end(), tmp.begin(), boost::bind(velRecover<float>, _1, params.dx, params.dt));
+
+	for (int ix = bx; ix < nx - bx; ix++) {
+		for (int iz = 0; iz < nz - bz; iz++) {
+			int offset = ix * nz + iz;
+
+			float accvel = 1.0f / accurate[offset]; /// slowness
+			float curvel = 1.0f / tmp[offset];      /// slowness
+			float absdiff = std::abs(accvel - curvel);
+
+			norm2     += absdiff * absdiff;
+			sumSquare += accvel * accvel;
+
+			norm1  += absdiff;
+			sum    += accvel;
+		}
+	}
+
+	l1norm = norm1 / sum;
+	l2norm = norm2 / sumSquare;
+}
+}/// end of name space
 
 
 int main(int argc, char *argv[]) {
@@ -406,6 +444,11 @@ int main(int argc, char *argv[]) {
   velReader.readAndBcast(&v0.dat[0], nx * nz, 0);
   Velocity exvel = fmMethod.expandDomain(v0);
   fmMethod.bindVelocity(exvel);
+
+  SfVelocityReader velReader_real(params.vreal);
+  Velocity v0_real(nx, nz);
+  velReader_real.readAndBcast(&v0_real.dat[0], nx * nz, 0);
+  Velocity exvel_real = fmMethod.expandDomain(v0_real);
 
   std::vector<float> absobj;
   std::vector<float> norobj;
@@ -518,7 +561,7 @@ int main(int argc, char *argv[]) {
     DEBUG() << "\n\n\n\n\n\n\n";
 
     for (size_t ivel = 0; ivel < essfwis.size(); ivel++) {
-      int absvel = rank * k + ivel;
+      int absvel = rank * k + ivel + 1;
       INFO() << format("iter %d, rank %d on %dth velocity, sum %f") % iter % rank % absvel % sum(veldb[ivel]->dat);
       essfwis[ivel]->epoch(iter);
     }
@@ -526,6 +569,16 @@ int main(int argc, char *argv[]) {
     TRACE() << "enkf analyze and update velocity";
     //gatherVelocity(totalveldb, veldb, params);
     if (iter % niterenkf == 0) {
+			for(int ivel = 0 ; ivel < essfwis.size() ; ivel ++)
+			{
+				int absvel = rank * k + ivel + 1;
+				INFO() << format("%4d/%d iter, velset[%d/%d] data rss: %g") % iter % params.niter % absvel % N % essfwis[ivel]->getUpdateObj();
+
+				float l1norm, l2norm;
+				slownessL1L2Norm(&exvel_real.dat[0], &veldb[ivel]->dat[0], params, l1norm, l2norm);
+				INFO() << format("%4d/%d iter, velset[%d/%d] slowness l1norm: %g, slowness l2norm: %g") % iter % params.niter % absvel % N % l1norm % l2norm;
+			}
+
       //enkfAnly.analyze(totalVelSet, velset);
       enkfAnly.pAnalyze(velset);
     }
