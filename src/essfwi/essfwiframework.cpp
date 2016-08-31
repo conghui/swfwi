@@ -133,7 +133,9 @@ void calgradient(const Damp4t10d &fmMethod,
 
   for(int it=0; it<nt; it++) {
     fmMethod.addSource(&sp1[0], &encSrc[it * ns], allSrcPos);
+    //printf("it = %d, forward 1\n", it);
     fmMethod.stepForward(&sp0[0], &sp1[0]);
+    //printf("it = %d, forward 2\n", it);
     std::swap(sp1, sp0);
     fmMethod.writeBndry(&bndr[0], &sp0[0], it);
   }
@@ -141,21 +143,30 @@ void calgradient(const Damp4t10d &fmMethod,
   for(int it = nt - 1; it >= 0 ; it--) {
     fmMethod.readBndry(&bndr[0], &sp0[0], it);
     std::swap(sp0, sp1);
+    //printf("it = %d, back 1\n", it);
     fmMethod.stepBackward(&sp0[0], &sp1[0]);
+    //printf("it = %d, back 2\n", it);
     fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
 
     /**
      * forward propagate receviers
      */
     fmMethod.addSource(&gp1[0], &vsrc[it * ng], allGeoPos);
+    //printf("it = %d, receiver 1\n", it);
     fmMethod.stepForward(&gp0[0], &gp1[0]);
+    //printf("it = %d, receiver 2\n", it);
     std::swap(gp1, gp0);
 
     if (dt * it > 0.4) {
+      //printf("it = %d, cross 1\n", it);
       cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), 1.0);
+      //printf("it = %d, cross 2\n", it);
     } else if (dt * it > 0.3) {
+      //printf("it = %d, cross 3\n", it);
       cross_correlation(&sp0[0], &gp0[0], &g0[0], g0.size(), (dt * it - 0.3) / 0.1);
+      //printf("it = %d, cross 4\n", it);
     } else {
+      //printf("it = %d, cross 5\n");
       break;
     }
  }
@@ -200,12 +211,17 @@ void EssFwiFramework::epoch(int iter) {
   initobj = iter == 0 ? obj1 : initobj;
   DEBUG() << format("obj: %e") % obj1;
 
+  //printf("check a\n");
   transVsrc(vsrc, nt, ng);
+  //printf("check b\n");
 
   std::vector<float> g1(nx * nz, 0);
+  //printf("check c\n");
   calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
+  //printf("check d\n");
 
   DEBUG() << format("grad %.20f") % sum(g1);
+  //printf("check e\n");
 
   fmMethod.scaleGradient(&g1[0]);
   fmMethod.maskGradient(&g1[0]);
