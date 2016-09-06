@@ -24,6 +24,7 @@ depend_libpath = []
 depend_libs = ['modeling', 'common']
 
 # clone the environment from global env and make some modification of it
+
 myenv   = env.Clone(CPPPATH = include_dir)
 myenv.Append(LIBPATH = depend_libpath)
 myenv.Prepend(LIBS = depend_libs)

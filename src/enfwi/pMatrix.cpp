@@ -31,7 +31,7 @@ void pMatrix::init(int proSize)
 {
 	nprow = 1;
 	npcol = proSize;
-	//get content 
+	//get content
 	blacs_get_( &i_negone, &i_zero, &ictxt );
 	//initial grid
 	blacs_gridinit_( &ictxt, "C", &nprow, &npcol );
@@ -222,7 +222,6 @@ void pMatrixSVD::run()
 	free(work);
 	work = (double *)malloc(sizeof(double) * lwork);
 	pdgesvd_(&JOBU, &JOBV, &M, &N, A->getData(), &i_one, &i_one, A->getDesc(), S->getData(), U->getData(), &i_one, &i_one, U->getDesc(), Vt->getData(), &i_one, &i_one, Vt->getDesc(), work, &lwork, &info);
-	//printf("info = %d\n", info);
 }
 
 int pMatrixSVD::getInfo()
@@ -256,7 +255,7 @@ void row_col(int &M, int &N, int &grow, int &gcol, int &lrow, int &lcol, bool &g
 	lrow = M;
 	lcol = N;
 	global = true;
-	
+
 	if(kind / 2 == 1)
 	{
 		lrow /= size;
@@ -282,7 +281,7 @@ void pAlpha_A_B_plus_beta_C(char transa, char transb, double alpha, Matrix &tA, 
 	int M_A = tA.getNumRow();
 	int N_A = tA.getNumCol();
 	row_col(M_A, N_A, grow_A, gcol_A, lrow_A, lcol_A, global_A, size, kindA);
-		
+
 	int grow_B, gcol_B, lrow_B, lcol_B;
 	bool global_B;
 	int M_B = tB.getNumRow();

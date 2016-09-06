@@ -21,9 +21,17 @@ include_dir = [
 depend_libpath = []
 depend_libs = ['modeling', 'common']
 
+cflags = []
+if compiler_set == 'sw':
+  new_c_compiler = ['swacc', '-OPT:IEEE_arith=2']#,'-priv', ]
+  cflags = ['-OPT:IEEE_arith=2']
+else:
+  new_c_compiler = c_compiler
+
 # clone the environment from global env and make some modification of it
 myenv   = env.Clone(CPPPATH = include_dir)
 myenv.Append(LIBPATH = depend_libpath)
+#myenv.Append(CFLAGS = cflags)
 myenv.Prepend(LIBS = depend_libs)
 
 objs      = myenv.StaticObject(modules)

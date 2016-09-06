@@ -28,6 +28,7 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
   a[4] = -0.01626042;
   a[5] = +0.00216736;
 
+  //printf("fm 1\n");
 #ifdef USE_OPENMP
   #pragma omp parallel for default(shared) private(ix, iz)
 #endif
@@ -55,9 +56,11 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
     }
   }
 
+  //printf("fm 2\n");
   #pragma omp parallel for default(shared) private(ix, iz)
   for (ix = d; ix < nx - d; ix++) { /// the range of ix is different from that in previous for loop
     for (iz = d; iz < nz - d; iz++) { /// be careful of the range of iz
+      //printf("check 1\n");
       float delta;
       float dist = 0;
       if (ix >= bx && ix < nx - bx &&
@@ -83,7 +86,30 @@ void fd4t10s_damp_zjh_2d_vtrans(float *prev_wave, const float *curr_wave, const 
                           (1.0f / curvel) * u2[curPos] + /// 2nd order
                           1.0f / 12 * (1.0f / curvel) * (1.0f / curvel) *
                           (u2[curPos - 1] + u2[curPos + 1] + u2[curPos - nz] + u2[curPos + nz] - 4 * u2[curPos]); /// 4th order
+      /*
+      prev_wave[curPos] = (2. - 2 * delta + delta * delta) * curr_wave[curPos] - (1 - 2 * delta) * prev_wave[curPos]  +
+                          (1.0f / curvel) * u2[curPos]; /// 2nd order
+      //printf("check 3, ix = %d, iz = %d\n", ix, iz);
+      float tt = 1.0f / 12 * (1.0f / curvel) * (1.0f / curvel);
+      //printf("check 4\n");
+      float ttt = u2[curPos - 1];
+      //printf("check 5\n");
+      ttt += u2[curPos + 1];
+      //printf("check 6\n");
+      ttt += u2[curPos - nz];
+      //printf("check 7, curPos + nz = %d, nx * nz = %d, u2[curPos + nz] = %f, ttt = %f\n", curPos + nz, nx * nz, u2[curPos + nz], ttt);
+      float a = u2[curPos + nz];
+      //printf("check 8\n");
+      ttt += a;
+      //printf("check 9\n");
+      ttt -= 4 * u2[curPos];
+      //printf("check 9\n");
+      prev_wave[curPos] += tt * ttt;
+      //prev_wave[curPos] += tt * (u2[curPos - 1] + u2[curPos + 1] + u2[curPos - nz] + u2[curPos + nz] - 4 * u2[curPos]); /// 4th order
+      //printf("check 10\n");
+      */
     }
   }
+  //printf("fm 3\n");
 
 }

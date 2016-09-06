@@ -17,8 +17,9 @@ extra_include_dir = [
 
 new_c_compiler = c_compiler
 if compiler_set == 'sw':
-  new_c_compiler = ['swacc', '-priv', ]
-  cflags = ['-DUSE_SWACC']
+  new_c_compiler = ['swacc', '-OPT:IEEE_arith=2']#,'-priv', ]
+  #new_c_compiler = ['swacc']
+  cflags = ['-OPT:IEEE_arith=2','-DUSE_SWACC']
 else:
   new_c_compiler = c_compiler
   cflags = ['-DUSE_OPENMP']
@@ -27,10 +28,10 @@ else:
 #######################################################################
 # clone the environment from global env and make some modification of it
 myenv    = env.Clone(
-    CC= new_c_compiler,
+#    CC= new_c_compiler,
     CPPPATH = extra_include_dir)
 
-myenv.Append(CFLAGS = cflags)
+#myenv.Append(CFLAGS = cflags)
 
 # compile to object files
 lib_objs = myenv.StaticObject(lib_modules)

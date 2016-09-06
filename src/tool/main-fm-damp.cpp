@@ -7,6 +7,7 @@ extern "C" {
 #include <omp.h>
 #endif
 
+#include "mpi.h"
 #include "logger.h"
 #include "sum.h"
 #include "ricker-wavelet.h"
@@ -52,6 +53,12 @@ public:
   int jsz;
   int jgx;
   int jgz;
+
+public:
+  int rank;
+  int k;
+  int np;
+  int ntask; /// exactly the # of task each process owns
 };
 
 
@@ -165,6 +172,11 @@ Params::Params() {
   sf_putfloat(shots, "vmin", vmin);
   sf_putfloat(shots, "vmax", vmax);
 
+  MPI_Comm_size(MPI_COMM_WORLD, &np);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  k = std::ceil(ns * 1.0 / np);
+  ntask = std::min(k, ns - rank*k);
+
   check();
 }
 
@@ -188,6 +200,9 @@ void Params::check() {
 } /// end of name space
 
 int main(int argc, char* argv[]) {
+  MPI_Init(&argc, &argv);
+	MPI_Status status;
+	MPI_Request request;
   /* initialize Madagascar */
   sf_init(argc,argv);
   Environment::setDatapath();
@@ -206,6 +221,9 @@ int main(int argc, char* argv[]) {
   int ns = params.ns;
   float dt = params.dt;
   float fm = params.fm;
+  int rank = params.rank;
+  int k = params.k;
+  int ntask = params.ntask;
 
   ShotPosition allSrcPos(params.szbeg, params.sxbeg, params.jsz, params.jsx, ns, nz);
   ShotPosition allGeoPos(params.gzbeg, params.gxbeg, params.jgz, params.jgx, ng, nz);
@@ -218,12 +236,13 @@ int main(int argc, char* argv[]) {
   std::vector<float> wlt(nt);
   rickerWavelet(&wlt[0], nt, fm, dt, params.amp);
 
-  for(int is=0; is<ns; is++) {
+  std::vector<float> trans(params.ntask * params.nt * params.ng, 0);
+  for(int is=rank*k; is<rank*k+ntask; is++) {
+    int local_is = is - rank * k;
     Timer timer;
     std::vector<float> p0(exvel.nz * exvel.nx, 0);
     std::vector<float> p1(exvel.nz * exvel.nx, 0);
     std::vector<float> dobs(params.nt * params.ng, 0);
-    std::vector<float> trans(params.nt * params.ng, 0);
     ShotPosition curSrcPos = allSrcPos.clipRange(is, is);
 
     for(int it=0; it<nt; it++) {
@@ -233,13 +252,25 @@ int main(int argc, char* argv[]) {
       fmMethod.recordSeis(&dobs[it*ng], &p0[0]);
     }
 
-    matrix_transpose(&dobs[0], &trans[0], ng, nt);
-    sf_floatwrite(&trans[0], ng*nt, params.shots);
-
+    matrix_transpose(&dobs[0], &trans[local_is * ng * nt], ng, nt);
+    if(rank == 0) {
+      sf_floatwrite(&trans[0], ng*nt, params.shots);
+      if(is == rank * k + ntask - 1) {
+        for(int other_is = rank * k + ntask ; other_is < ns ; other_is ++) {
+          MPI_Recv(&trans[0], ng*nt, MPI_FLOAT, other_is / k, other_is, MPI_COMM_WORLD, &status);
+          sf_floatwrite(&trans[0], ng*nt, params.shots);
+        }
+      }
+    }
+    else {
+      MPI_Isend(&trans[local_is * ng * nt], ng*nt, MPI_FLOAT, 0, is, MPI_COMM_WORLD, &request);
+    }
     INFO() << format("shot %d, elapsed time %fs") % is % timer.elapsed();
   }
 
   INFO() << format("total elapsed time %fs") % totalTimer.elapsed();
+
+  MPI_Finalize();
   return 0;
 }
 

@@ -127,8 +127,8 @@ Params::Params() {
   if (!sf_histint(shots,  "nb",&nb))        { sf_error("no nb"); }  /* thickness of sponge ABC  */
   if (!sf_histfloat(shots, "vmin", &vmin)) { sf_error("no vmin"); } /* minimal velocity in real model*/
   if (!sf_histfloat(shots, "vmax", &vmax)) { sf_error("no vmax"); } /* maximal velocity in real model*/
-  vmin -= 50;
-  vmax += 100;
+  //vmin -= 50;
+  //vmax += 100;
 
   /**
    * output parameters
@@ -216,7 +216,7 @@ std::vector<Velocity *> pCreateVelDB(const Velocity &vel, const char *perin, int
 	MPI_Offset file_size, offset;
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_File_open(MPI_COMM_WORLD, perin, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh); 
+	MPI_File_open(MPI_COMM_WORLD, perin, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
 	MPI_Status status;
 	offset = modelSize * sizeof(float) * N * rank;
 

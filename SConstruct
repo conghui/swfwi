@@ -9,18 +9,18 @@
 import os
 
 # compiler options
-compiler_set        = 'gnu' # intel, gnu, sw, swintel
+compiler_set        = 'sw' # intel, gnu, sw, swintel
 debug_mode          = 0
 additional_includes = [os.environ['HOME'] + '/softs/install/boost/include', ]
 additional_libpath  = []
 additional_libs     = []
 
 if compiler_set == 'sw':#{{{
-  c_compiler      = ['mpicc', '-ver', '5.421-sw-437', '-host']
-  cxx_compiler    = ['mpiCC', '-ver', '5.421-sw-437', '-host']
+  c_compiler      = ['mpicc', '-host']
+  cxx_compiler    = ['mpiCC', '-host']
   linker          = ['swaCC']
   warn_flags      = ['-Wno-write-strings']
-  optimize_flags  = ['-O2']
+  optimize_flags  = ['-O2', '-OPT:IEEE_arith=2']
   debug_flags     = ['-O0', '-g']
   other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
   link_flags      = ['-O1']

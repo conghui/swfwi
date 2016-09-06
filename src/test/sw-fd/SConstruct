@@ -1,6 +1,6 @@
 import os
 
-sw_queue = 'q_sw_err_slow'
+sw_queue = 'q_sw_yyz'
 # macro = ['-DNUM_THREADS=64',
 # '-DD=6',
 # '-DNX=533',

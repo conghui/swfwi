@@ -152,6 +152,8 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
   static std::vector<float> u2(vel->nx * vel->nz, 0);
+  //float *u2 = new float[vel-> nx * vel->nz];
+  memset(&u2[0], 0, sizeof(float) * vel->nx * vel->nz);
 
   fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], &u2[0], vel->nx, vel->nz, bx0);
 }
