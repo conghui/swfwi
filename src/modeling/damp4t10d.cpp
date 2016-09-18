@@ -389,6 +389,12 @@ void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
   this->recordSeis(seis_it, p, *this->allGeoPos);
 }
 
+void Damp4t10d::fwiRemoveDirectArrival(float* data, int shot_id) const {
+  float t_width = 1.5 / fm;
+  ShotPosition curSrcPos = allSrcPos->clipRange(shot_id, shot_id);
+  this->removeDirectArrival(curSrcPos, *this->allGeoPos, data, nt, t_width);
+}
+
 void Damp4t10d::removeDirectArrival(float* data) const {
   float t_width = 1.5 / fm;
   this->removeDirectArrival(*this->allSrcPos, *this->allGeoPos, data, nt, t_width);

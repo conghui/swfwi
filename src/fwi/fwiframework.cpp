@@ -198,8 +198,8 @@ void FwiFramework::epoch(int iter) {
 
 		std::vector<float> dcal(nt * ng, 0);
 		fmMethod.FwiForwardModeling(encsrc, dcal, is);
-		fmMethod.removeDirectArrival(&encobs[0]);
-		fmMethod.removeDirectArrival(&dcal[0]);
+		fmMethod.fwiRemoveDirectArrival(&encobs[0], is);
+		fmMethod.fwiRemoveDirectArrival(&dcal[0], is);
 
 		std::vector<float> vsrc(nt * ng, 0);
 		vectorMinus(encobs, dcal, vsrc);
