@@ -9,14 +9,14 @@
 #define SRC_ESS_FWI2D_ESSFWIFRAMEWORK_H_
 
 #include "damp4t10d.h"
-#include "updatevelop.h"
-#include "updatesteplenop.h"
+#include "fwiupdatevelop.h"
+#include "fwiupdatesteplenop.h"
 #include "random-code.h"
 
 class FwiFramework {
 public:
-  FwiFramework(Damp4t10d &fmMethod, const UpdateSteplenOp &updateSteplenOp,
-                  const UpdateVelOp &updateVelOp, const std::vector<float> &wlt,
+  FwiFramework(Damp4t10d &fmMethod, const FwiUpdateSteplenOp &updateSteplenOp,
+                  const FwiUpdateVelOp &updateVelOp, const std::vector<float> &wlt,
                   const std::vector<float> &dobs);
 
   void epoch(int iter);
@@ -29,8 +29,8 @@ private:
 
 private:
   Damp4t10d &fmMethod;
-  UpdateSteplenOp updateStenlelOp;
-  const UpdateVelOp &updateVelOp;
+  FwiUpdateSteplenOp updateStenlelOp;
+  const FwiUpdateVelOp &updateVelOp;
   const std::vector<float> &wlt;  /// wavelet
   const std::vector<float> &dobs; /// actual observed data (nt*ng*ns)
   RandomCodes essRandomCodes;

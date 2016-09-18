@@ -8,8 +8,8 @@ lib = 'fwi'
 
 modules = """
 fwiframework.cpp
-updatevelop.cpp
-updatesteplenop.cpp
+fwiupdatevelop.cpp
+fwiupdatesteplenop.cpp
           """.split()
 
 include_dir = [

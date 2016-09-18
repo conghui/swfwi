@@ -182,17 +182,15 @@ int main(int argc, char *argv[]) {
   std::vector<float> dobs(ns * nt * ng);     /* all observed data */
   ShotDataReader::serialRead(params.shots, &dobs[0], ns, nt, ng);
 
-  UpdateVelOp updatevelop(vmin, vmax, dx, dt);
-  UpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
+  FwiUpdateVelOp updatevelop(vmin, vmax, dx, dt);
+  FwiUpdateSteplenOp updateSteplenOp(fmMethod, updatevelop, nita, maxdv);
 
   FwiFramework fwi(fmMethod, updateSteplenOp, updatevelop, wlt, dobs);
 
   std::vector<float> absobj;
   std::vector<float> norobj;
   for (int iter = 0; iter < params.niter; iter++) {
-		for (int is = 0 ; is < params.ns ; is ++) {
-			fwi.epoch(iter, is);
-		}
+		fwi.epoch(iter);
     fwi.writeVel(params.vupdates);
     float obj = fwi.getUpdateObj();
     if (iter == 0) {

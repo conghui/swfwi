@@ -10,14 +10,19 @@
 
 #include <vector>
 #include "damp4t10d.h"
-#include "updatevelop.h"
+#include "fwiupdatevelop.h"
 
-class UpdateSteplenOp {
+class FwiUpdateSteplenOp {
 public:
-  UpdateSteplenOp(const Damp4t10d &fmMethod, const UpdateVelOp &updateVelOp, int max_iter_select_alpha3, float maxdv);
+  FwiUpdateSteplenOp(const Damp4t10d &fmMethod, const FwiUpdateVelOp &updateVelOp, int max_iter_select_alpha3, float maxdv);
 
   void bindEncSrcObs(const std::vector<float> &encsrc, const std::vector<float> &encobs);
   void calsteplen(const std::vector<float> &grad, float obj_val1, int iter, float &steplen, float &objval);
+	void parabola_fit(float alpha1, float alpha2, float alpha3, float obj_val1, float obj_val2, float obj_val3, float maxAlpha3, bool toParabolic, int iter, float &steplen, float &objval);
+
+public:
+	float alpha1, alpha2, alpha3, obj_val1, obj_val2, obj_val3;
+	float maxAlpha3;
 
 private:
   float calobjval(const std::vector<float> &grad, float steplen) const;
@@ -34,7 +39,7 @@ private:
 
 private:
   const Damp4t10d &fmMethod;
-  const UpdateVelOp &updateVelOp;
+  const FwiUpdateVelOp &updateVelOp;
   const std::vector<float> *encsrc;
   const std::vector<float> *encobs;
 

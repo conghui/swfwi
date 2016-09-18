@@ -5,7 +5,7 @@
  *      Author: rice
  */
 
-#include "updatevelop.h"
+#include "fwiupdatevelop.h"
 #include "logger.h"
 
 static void update_vel(float *new_vel, const float *vel, const float *grad, int size, float steplen, float vmin, float vmax) {
@@ -20,7 +20,7 @@ static void update_vel(float *new_vel, const float *vel, const float *grad, int 
   }
 }
 
-UpdateVelOp::UpdateVelOp(float _vmin, float _vmax, float dx, float dt) {
+FwiUpdateVelOp::FwiUpdateVelOp(float _vmin, float _vmax, float dx, float dt) {
   vmin = (dx / dt / _vmax) * (dx / dt / _vmax);
   vmax = (dx / dt / _vmin) * (dx / dt / _vmin);
 
@@ -30,7 +30,7 @@ UpdateVelOp::UpdateVelOp(float _vmin, float _vmax, float dx, float dt) {
   }
 }
 
-void UpdateVelOp::update(Velocity& newVel,
+void FwiUpdateVelOp::update(Velocity& newVel,
     const Velocity& vel, const std::vector<float>& grad,
     float steplen) const {
   update_vel(&newVel.dat[0], &vel.dat[0], &grad[0], newVel.dat.size(), steplen, vmin, vmax);

@@ -175,8 +175,8 @@ void calgradient(const Damp4t10d &fmMethod,
 } /// end of namespace
 
 
-FwiFramework::FwiFramework(Damp4t10d &method, const UpdateSteplenOp &updateSteplenOp,
-    const UpdateVelOp &_updateVelOp,
+FwiFramework::FwiFramework(Damp4t10d &method, const FwiUpdateSteplenOp &updateSteplenOp,
+    const FwiUpdateVelOp &_updateVelOp,
     const std::vector<float> &_wlt, const std::vector<float> &_dobs) :
     fmMethod(method), updateStenlelOp(updateSteplenOp), updateVelOp(_updateVelOp), wlt(_wlt), dobs(_dobs),
     essRandomCodes(ESS_SEED),
@@ -188,54 +188,67 @@ FwiFramework::FwiFramework(Damp4t10d &method, const UpdateSteplenOp &updateStepl
   updateDirection.resize(nx*nz, 0);
 }
 
-void FwiFramework::epoch(int iter, int shot_id) {
-  // create random codes
-	/*
-  const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
+void FwiFramework::epoch(int iter) {
+	std::vector<float> g2(nx * nz, 0);
+	std::vector<float> encsrc  = wlt;
+	std::vector<float> encobs(ng * nt, 0);
+	float obj1;
+	for(int is = 0 ; is < ns ; is ++) {
+		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
 
-  std::stringstream ss;
-  std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
-  DEBUG() << "code is: " << ss.str();
+		std::vector<float> dcal(nt * ng, 0);
+		fmMethod.FwiForwardModeling(encsrc, dcal, is);
+		fmMethod.removeDirectArrival(&encobs[0]);
+		fmMethod.removeDirectArrival(&dcal[0]);
 
-  Encoder encoder(encodes);
-  std::vector<float> encsrc  = encoder.encodeSource(wlt);
-  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
-	*/
+		std::vector<float> vsrc(nt * ng, 0);
+		vectorMinus(encobs, dcal, vsrc);
+		obj1 = cal_objective(&vsrc[0], vsrc.size());
+		initobj = iter == 0 ? obj1 : initobj;
+		DEBUG() << format("obj: %e") % obj1;
 
-  std::vector<float> encsrc  = wlt;
-  std::vector<float> encobs = dobs;
+		//printf("check a\n");
+		transVsrc(vsrc, nt, ng);
+		//printf("check b\n");
 
-  std::vector<float> dcal(nt * ng, 0);
-  fmMethod.FwiForwardModeling(encsrc, dcal, shot_id);
-  fmMethod.removeDirectArrival(&encobs[0]);
-  fmMethod.removeDirectArrival(&dcal[0]);
+		std::vector<float> g1(nx * nz, 0);
+		//printf("check c\n");
+		calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
+		//printf("check d\n");
 
-  std::vector<float> vsrc(nt * ng, 0);
-  vectorMinus(encobs, dcal, vsrc);
-  float obj1 = cal_objective(&vsrc[0], vsrc.size());
-  initobj = iter == 0 ? obj1 : initobj;
-  DEBUG() << format("obj: %e") % obj1;
+		DEBUG() << format("grad %.20f") % sum(g1);
+		//printf("check e\n");
 
-  //printf("check a\n");
-  transVsrc(vsrc, nt, ng);
-  //printf("check b\n");
+		fmMethod.scaleGradient(&g1[0]);
+		fmMethod.maskGradient(&g1[0]);
 
-  std::vector<float> g1(nx * nz, 0);
-  //printf("check c\n");
-  calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
-  //printf("check d\n");
+		std::transform(g2.begin(), g2.end(), g1.begin(), g2.begin(), std::plus<float>());
+	}
 
-  DEBUG() << format("grad %.20f") % sum(g1);
-  //printf("check e\n");
+  updateGrad(&g0[0], &g2[0], &updateDirection[0], g0.size(), iter);
 
-  fmMethod.scaleGradient(&g1[0]);
-  fmMethod.maskGradient(&g1[0]);
-
-  updateGrad(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
-
-  updateStenlelOp.bindEncSrcObs(encsrc, encobs);
-  float steplen;
-  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
+	float steplen;
+	float alpha1 = 0, alpha2 = 0, alpha3 = 0;
+	float obj_val1 = 0, obj_val2 = 0, obj_val3 = 0;
+	float maxAlpha3 = 0;
+	bool toParabolic = true;
+	for(int is = 0 ; is < ns ; is ++) {
+		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
+		updateStenlelOp.bindEncSrcObs(encsrc, encobs);
+		updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
+		float t_obj_val1, t_obj_val2, t_obj_val3;
+		alpha1 = updateStenlelOp.alpha1;
+		alpha2 = updateStenlelOp.alpha2;
+		alpha3 = updateStenlelOp.alpha3;
+		maxAlpha3 = updateStenlelOp.maxAlpha3;
+		t_obj_val1 = updateStenlelOp.obj_val1;
+		t_obj_val2 = updateStenlelOp.obj_val2;
+		t_obj_val3 = updateStenlelOp.obj_val3;
+		obj_val1 += t_obj_val1;
+		obj_val2 += t_obj_val2;
+		obj_val3 += t_obj_val3;
+	}
+	updateStenlelOp.parabola_fit(alpha1, alpha2, alpha3, obj_val1, obj_val2, obj_val3, maxAlpha3, toParabolic, iter, steplen, updateobj);
 
   Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);

@@ -280,7 +280,7 @@ void Damp4t10d::FwiForwardModeling(const std::vector<float>& encSrc,
 
   std::vector<float> p0(nz * nx, 0);
   std::vector<float> p1(nz * nx, 0);
-  ShotPosition curSrcPos = allSrcPos.clipRange(shot_id, shot_id);
+  ShotPosition curSrcPos = allSrcPos->clipRange(shot_id, shot_id);
 
   for(int it=0; it<nt; it++) {
     addSource(&p1[0], &encSrc[it], curSrcPos);

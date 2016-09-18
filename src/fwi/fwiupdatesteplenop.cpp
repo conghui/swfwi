@@ -7,7 +7,7 @@
 
 #include <set>
 #include <cmath>
-#include "updatesteplenop.h"
+#include "fwiupdatesteplenop.h"
 #include "logger.h"
 #include "common.h"
 #include "parabola-vertex.h"
@@ -48,7 +48,7 @@ void calMaxAlpha2_3(const Velocity &exvel,  const float *grad, float dt, float d
 
 } /// end of name space
 
-UpdateSteplenOp::UpdateSteplenOp(const Damp4t10d &fmMethod, const UpdateVelOp &updateVelOp,
+FwiUpdateSteplenOp::FwiUpdateSteplenOp(const Damp4t10d &fmMethod, const FwiUpdateVelOp &updateVelOp,
     int max_iter_select_alpha3, float maxdv) :
   fmMethod(fmMethod), updateVelOp(updateVelOp), encsrc(NULL), encobs(NULL),
   max_iter_select_alpha3(max_iter_select_alpha3), maxdv(maxdv)
@@ -56,7 +56,7 @@ UpdateSteplenOp::UpdateSteplenOp(const Damp4t10d &fmMethod, const UpdateVelOp &u
 
 }
 
-float UpdateSteplenOp::calobjval(const std::vector<float>& grad,
+float FwiUpdateSteplenOp::calobjval(const std::vector<float>& grad,
     float steplen) const {
   int nx = fmMethod.getnx();
   int nz = fmMethod.getnz();
@@ -85,7 +85,7 @@ float UpdateSteplenOp::calobjval(const std::vector<float>& grad,
   return val;
 }
 
-bool UpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1, float maxAlpha3,
+bool FwiUpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1, float maxAlpha3,
     float& _alpha2, float& _obj_val2, float& _alpha3, float& _obj_val3) const {
 
   TRACE() << "SELECTING THE RIGHT OBJECTIVE VALUE 3";
@@ -97,12 +97,13 @@ bool UpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1
   obj_val2 = calobjval(grad, alpha2);
   obj_val3 = calobjval(grad, alpha3);
 
-  DEBUG() << "BEFORE TUNNING";
+  //DEBUG() << "BEFORE TUNNING";
   DEBUG() << __FUNCTION__ << format(" alpha1 = %e, obj_val1 = %e") % 0. % obj_val1;
   DEBUG() << __FUNCTION__ << format(" alpha2 = %e, obj_val2 = %e") % alpha2 % obj_val2;
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % alpha3 % obj_val3;
 
 
+	/*
   TRACE() << "maintain a set to store alpha2 that we ever tuned";
   std::set<ParaPoint, bool (*)(const ParaPoint &, const ParaPoint &) > tunedAlpha(parabolicLessComp);
   tunedAlpha.insert(std::make_pair(alpha2, obj_val2));
@@ -211,28 +212,11 @@ bool UpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1
   DEBUG() << __FUNCTION__ << format(" alpha3 = %e, obj_val3 = %e") % _alpha3 % _obj_val3;
 
   return toParabolicFit;
+	*/
+	return true;
 }
 
-void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
-    float obj_val1, int iter, float &steplen, float &objval) {
-
-  float dt = fmMethod.getdt();
-  float dx = fmMethod.getdx();
-
-  /// "calculate the initial value of alpha2 and alpha3";
-  float max_alpha2, max_alpha3;
-
-  calMaxAlpha2_3(fmMethod.getVelocity(), &grad[0], dt, dx, maxdv, max_alpha2, max_alpha3);
-  DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
-
-  float alpha1 = 0, alpha2, alpha3;
-  initAlpha23(max_alpha3, alpha2, alpha3);
-  DEBUG() << format("after init alpha,  alpha2 = %e,      alpha3: = %e") % alpha2 % alpha3;
-
-  float obj_val2, obj_val3;
-
-  bool toParabolic = refineAlpha(grad, obj_val1, max_alpha3, alpha2, obj_val2, alpha3, obj_val3);
-
+void FwiUpdateSteplenOp::parabola_fit(float alpha1, float alpha2, float alpha3, float obj_val1, float obj_val2, float obj_val3, float max_alpha3, bool toParabolic, int iter, float &steplen, float &objval) {
   float alpha4, obj_val4;
   if (toParabolic) {
     DEBUG() << "parabolic fit";
@@ -264,13 +248,33 @@ void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
   objval = obj_val4;
 }
 
-void UpdateSteplenOp::bindEncSrcObs(const std::vector<float>& encsrc,
+void FwiUpdateSteplenOp::calsteplen(const std::vector<float>& grad,
+    float obj_val1, int iter, float &steplen, float &objval) {
+
+  float dt = fmMethod.getdt();
+  float dx = fmMethod.getdx();
+
+  /// "calculate the initial value of alpha2 and alpha3";
+  float max_alpha2, max_alpha3;
+
+  calMaxAlpha2_3(fmMethod.getVelocity(), &grad[0], dt, dx, maxdv, max_alpha2, max_alpha3);
+  DEBUG() << format("               max_alpha2 = %e,  max_alpha3: = %e") % max_alpha2 % max_alpha3;
+
+  alpha1 = 0;
+	this->obj_val1 = obj_val1;
+  initAlpha23(max_alpha3, alpha2, alpha3);
+  DEBUG() << format("after init alpha,  alpha2 = %e,      alpha3: = %e") % alpha2 % alpha3;
+
+  bool toParabolic = refineAlpha(grad, obj_val1, max_alpha3, alpha2, obj_val2, alpha3, obj_val3);
+}
+
+void FwiUpdateSteplenOp::bindEncSrcObs(const std::vector<float>& encsrc,
     const std::vector<float>& encobs) {
   this->encsrc = &encsrc;
   this->encobs = &encobs;
 }
 
-void UpdateSteplenOp::initAlpha23(float maxAlpha3, float &initAlpha2, float &initAlpha3) {
+void FwiUpdateSteplenOp::initAlpha23(float maxAlpha3, float &initAlpha2, float &initAlpha3) {
   const float minAlpha   = 1.0E-7;
   const float resetAlpha = 1.0E-4;
 
