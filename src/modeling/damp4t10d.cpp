@@ -271,6 +271,25 @@ void Damp4t10d::refillVelStencilBndry() {
   fillForStencil(exvel, EXFDBNDRYLEN);
 }
 
+void Damp4t10d::FwiForwardModeling(const std::vector<float>& encSrc,
+    std::vector<float>& dcal, int shot_id) const {
+  int nx = getnx();
+  int nz = getnz();
+  int ns = getns();
+  int ng = getng();
+
+  std::vector<float> p0(nz * nx, 0);
+  std::vector<float> p1(nz * nx, 0);
+  ShotPosition curSrcPos = allSrcPos.clipRange(shot_id, shot_id);
+
+  for(int it=0; it<nt; it++) {
+    addSource(&p1[0], &encSrc[it], curSrcPos);
+    stepForward(&p0[0], &p1[0]);
+    std::swap(p1, p0);
+    recordSeis(&dcal[it*ng], &p0[0]);
+  }
+}
+
 void Damp4t10d::EssForwardModeling(const std::vector<float>& encSrc,
     std::vector<float>& dcal) const {
   int nx = getnx();
