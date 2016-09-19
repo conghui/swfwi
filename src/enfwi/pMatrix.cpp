@@ -322,7 +322,6 @@ void pAlpha_A_B_plus_beta_C(char transa, char transb, double alpha, Matrix &tA, 
 
 	pMatrixMM mm(transa, transb, M, N, K, alpha, &A, &B, beta, &C);
 	mm.run();
-	pMatrix::finalize();
 }
 
 int pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
@@ -370,7 +369,6 @@ int pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
 
 	pMatrixSVD svd(&band, &U, &S, &Vt);
 	svd.run();
-	pMatrix::finalize();
 	return svd.getInfo();
 
 	/*

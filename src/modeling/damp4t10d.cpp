@@ -252,7 +252,7 @@ void Damp4t10d::refillBoundary(float* gradient) const {
 }
 
 void Damp4t10d::sfWriteVel(const std::vector<float> &exvel, sf_file file) const {
-  assert(exvel.size() == vel->dat.size());
+  //assert(exvel.size() == vel->dat.size());
   int nzpad = vel->nz;
   int nxpad = vel->nx;
   int nz = nzpad - bz0 - bzn;
