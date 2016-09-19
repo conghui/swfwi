@@ -193,7 +193,7 @@ void FwiFramework::epoch(int iter) {
 	std::vector<float> encsrc  = wlt;
 	std::vector<float> encobs(ng * nt, 0);
 	float obj1;
-	for(int is = 0 ; is < ns ; is ++) {
+	for(int is = 10 ; is < ns ; is ++) {
 		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
 
 		std::vector<float> dcal(nt * ng, 0);
