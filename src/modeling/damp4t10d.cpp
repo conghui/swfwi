@@ -152,8 +152,6 @@ Velocity Damp4t10d::expandDomain(const Velocity& _vel) {
 
 void Damp4t10d::stepForward(float* p0, float* p1) const {
   static std::vector<float> u2(vel->nx * vel->nz, 0);
-  //float *u2 = new float[vel-> nx * vel->nz];
-  memset(&u2[0], 0, sizeof(float) * vel->nx * vel->nz);
 
   fd4t10s_damp_zjh_2d_vtrans(p0, p1, &vel->dat[0], &u2[0], vel->nx, vel->nz, bx0);
 }
@@ -254,7 +252,7 @@ void Damp4t10d::refillBoundary(float* gradient) const {
 }
 
 void Damp4t10d::sfWriteVel(const std::vector<float> &exvel, sf_file file) const {
-  assert(exvel.size() == vel->dat.size());
+  //assert(exvel.size() == vel->dat.size());
   int nzpad = vel->nz;
   int nxpad = vel->nx;
   int nz = nzpad - bz0 - bzn;
@@ -269,6 +267,25 @@ void Damp4t10d::sfWriteVel(const std::vector<float> &exvel, sf_file file) const 
 void Damp4t10d::refillVelStencilBndry() {
   Velocity &exvel = getVelocity();
   fillForStencil(exvel, EXFDBNDRYLEN);
+}
+
+void Damp4t10d::FwiForwardModeling(const std::vector<float>& encSrc,
+    std::vector<float>& dcal, int shot_id) const {
+  int nx = getnx();
+  int nz = getnz();
+  int ns = getns();
+  int ng = getng();
+
+  std::vector<float> p0(nz * nx, 0);
+  std::vector<float> p1(nz * nx, 0);
+  ShotPosition curSrcPos = allSrcPos->clipRange(shot_id, shot_id);
+
+  for(int it=0; it<nt; it++) {
+    addSource(&p1[0], &encSrc[it], curSrcPos);
+    stepForward(&p0[0], &p1[0]);
+    std::swap(p1, p0);
+    recordSeis(&dcal[it*ng], &p0[0]);
+  }
 }
 
 void Damp4t10d::EssForwardModeling(const std::vector<float>& encSrc,
@@ -368,6 +385,12 @@ void Damp4t10d::subEncodedSource(float* p, const float* source) const {
 
 void Damp4t10d::recordSeis(float* seis_it, const float* p) const {
   this->recordSeis(seis_it, p, *this->allGeoPos);
+}
+
+void Damp4t10d::fwiRemoveDirectArrival(float* data, int shot_id) const {
+  float t_width = 1.5 / fm;
+  ShotPosition curSrcPos = allSrcPos->clipRange(shot_id, shot_id);
+  this->removeDirectArrival(curSrcPos, *this->allGeoPos, data, nt, t_width);
 }
 
 void Damp4t10d::removeDirectArrival(float* data) const {

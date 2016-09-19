@@ -524,9 +524,8 @@ void EnkfAnalyze::pInitGamma(const Matrix& perturbation, Matrix& gamma, const in
   assert(perturbation.isCompatible(gamma));
 
   const Matrix::value_type *p = perturbation.getData();
-	Matrix::value_type *sum_t = (Matrix::value_type*)malloc(sizeof(Matrix::value_type) * gamma.getNumRow());
-	memset(sum_t, 0.0, sizeof(Matrix::value_type) * gamma.getNumRow());
-	Matrix::value_type *sum = (Matrix::value_type*)malloc(sizeof(Matrix::value_type) * gamma.getNumRow());
+	std::vector<Matrix::value_type> sum_t(gamma.getNumRow(), 0.0);
+	std::vector<Matrix::value_type> sum(gamma.getNumRow(), 0.0);
 
   for (int irow = 0; irow < gamma.getNumRow(); irow++) {
     for (int icol = 0; icol < gamma.getNumCol(); icol++) {
@@ -534,7 +533,7 @@ void EnkfAnalyze::pInitGamma(const Matrix& perturbation, Matrix& gamma, const in
     }
 	}
 
-	MPI_Allreduce(sum_t, sum, gamma.getNumRow(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(&sum_t[0], &sum[0], gamma.getNumRow(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   for (int irow = 0; irow < gamma.getNumRow(); irow++) {
 		Matrix::value_type avg = sum[irow] / nSamples;
@@ -544,6 +543,7 @@ void EnkfAnalyze::pInitGamma(const Matrix& perturbation, Matrix& gamma, const in
       gamma.getData()[idx] = p[idx] - avg;
     }
   }
+
 }
 
 void EnkfAnalyze::checkMatrix(const Matrix& a, const Matrix& b) const {
@@ -667,10 +667,10 @@ void EnkfAnalyze::pInitPerturbation2(Matrix& perturbation, const Matrix &HA_Pert
 		generator = new boost::variate_generator<boost::mt19937, boost::normal_distribution<> >(boost::mt19937(seed), boost::normal_distribution<>(mean, sigma));
   }
 
-	double *perturbation_t = (double *)malloc(sizeof(double) * nSamples * perturbation.getNumRow());
+	std::vector<double> perturbation_t(nSamples * perturbation.getNumRow(), 0.0);
 	if(rank == 0)
 	{
-		std::generate(perturbation_t, perturbation_t + nSamples * perturbation.getNumRow(), *generator);
+		std::generate(&perturbation_t[0], &perturbation_t[0] + nSamples * perturbation.getNumRow(), *generator);
 	}
-	MPI_Scatter(perturbation_t, perturbation.size(), MPI_DOUBLE, perturbation.getData(), perturbation.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatter(&perturbation_t[0], perturbation.size(), MPI_DOUBLE, perturbation.getData(), perturbation.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }

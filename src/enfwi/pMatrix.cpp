@@ -39,6 +39,11 @@ void pMatrix::init(int proSize)
 	blacs_gridinfo_( &ictxt, &nprow, &npcol, &myrow, &mycol);
 }
 
+void pMatrix::finalize()
+{
+	blacs_exit_(&i_zero);
+}
+
 int pMatrix::getMp()
 {
 	return mp;

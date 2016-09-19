@@ -14,13 +14,31 @@ def run_fm(task, fmbin):
     submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
     -n 1 -p q_x86_bio '''
   else:
-    submit_cmd = ''
+    submit_cmd = '~/soft/mpich-3.1.4/bin/mpirun -np 4 '
 #}}}
   Flow('shots', 'vel', submit_cmd + '''%s
     vinit=${SOURCES[0]} shots=${TARGETS[0]}
     fm=10 amp=1 dt=0.0015 ns=47 ng=461 nt=2000 nb=30
     sxbeg=0 szbeg=6 jsx=10 jsz=0 gxbeg=0 gzbeg=6 jgx=1 jgz=0
     ''' % (fmbin), stdout=-1, stdin=0)
+
+def run_fwi(task, fwibin):
+  # setup submit_cmd#{{{
+  if task == 'fwi-sw':
+    submit_cmd = '''/usr/sw-mpp/bin/bsub -I -b -m 1 -p -q %s
+    -host_stack 1024 -share_size 7000 -n 1 -cgsp 64
+    -o bsub.out -J "fwi" ''' % sw_queue
+  elif task == 'fwi-swintel':
+    submit_cmd = '''/usr/sw-cluster/slurm-14.11.3/bin/srun
+    -n 1 -p q_x86_bio '''
+  else:
+    submit_cmd = ''
+#}}}
+  Flow('vsnaps absobjs norobjs', 'smvel shots', submit_cmd + '''%s
+    vin=${SOURCES[0]} shots=${SOURCES[1]}
+    vout=${TARGETS[0]} absobjs=${TARGETS[1]} norobjs=${TARGETS[2]}
+    niter=300 seed=10 maxdv=200 nita=5
+    ''' % (fwibin), stdout=-1, stdin=0)
 
 def run_essfwi(task, essfwibin):
   # setup submit_cmd#{{{
@@ -129,6 +147,7 @@ Result('marm', 'vel smvel', 'OverUnderAniso')
 # setup binaries#{{{
 bindir    = '../../bin/'
 fmbin     = bindir + 'fm-damp'
+fwibin = bindir + 'fwi-damp'
 essfwibin = bindir + 'essfwi-damp'
 enfwibin  = bindir + 'enfwi-damp'
 normbin   = bindir + 'norm'
@@ -142,6 +161,8 @@ task = str(ARGUMENTS.get('task'))
 if 'fm' in task:
   run_fm(task, fmbin)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
+elif 'fwi' in task:
+  run_fwi(task, fwibin)
 elif 'essfwi' in task:
   run_essfwi(task, essfwibin)
 elif 'enfwi' in task:

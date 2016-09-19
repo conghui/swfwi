@@ -34,6 +34,7 @@ public:
   void refillBoundary(float *vel) const;
   void sfWriteVel(const std::vector<float> &exvel, sf_file file) const;
 
+  void fwiRemoveDirectArrival(float* data, int shot_id) const;
   void removeDirectArrival(float* data) const;
   void subEncodedSource(float *p, const float *source) const;
   void refillVelStencilBndry();
@@ -42,6 +43,7 @@ public:
   void writeBndry(float* _bndr, const float* p, int it) const;
   void readBndry(const float* _bndr, float* p, int it) const;
 
+  void FwiForwardModeling(const std::vector<float> &encsrc, std::vector<float> &dcal, int shot_id) const;
   void EssForwardModeling(const std::vector<float> &encsrc, std::vector<float> &dcal) const;
 
 public:
