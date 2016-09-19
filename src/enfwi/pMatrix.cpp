@@ -39,6 +39,11 @@ void pMatrix::init(int proSize)
 	blacs_gridinfo_( &ictxt, &nprow, &npcol, &myrow, &mycol);
 }
 
+void pMatrix::finalize()
+{
+	blacs_exit_(&i_zero);
+}
+
 int pMatrix::getMp()
 {
 	return mp;
@@ -317,6 +322,7 @@ void pAlpha_A_B_plus_beta_C(char transa, char transb, double alpha, Matrix &tA, 
 
 	pMatrixMM mm(transa, transb, M, N, K, alpha, &A, &B, beta, &C);
 	mm.run();
+	pMatrix::finalize();
 }
 
 int pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
@@ -364,6 +370,7 @@ int pSvd(Matrix &tA, Matrix &tU, Matrix &tS, Matrix &tVt, const int nSamples)
 
 	pMatrixSVD svd(&band, &U, &S, &Vt);
 	svd.run();
+	pMatrix::finalize();
 	return svd.getInfo();
 
 	/*
