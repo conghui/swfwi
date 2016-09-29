@@ -193,7 +193,8 @@ void FwiFramework::epoch(int iter) {
 	std::vector<float> encsrc  = wlt;
 	std::vector<float> encobs(ng * nt, 0);
 	float obj1;
-	for(int is = 10 ; is < ns ; is ++) {
+	for(int is = 0 ; is < ns ; is ++) {
+		INFO() << format("calculate gradient, shot id: %d") % is;
 		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
 
 		std::vector<float> dcal(nt * ng, 0);
@@ -233,6 +234,7 @@ void FwiFramework::epoch(int iter) {
 	float maxAlpha3 = 0;
 	bool toParabolic = true;
 	for(int is = 0 ; is < ns ; is ++) {
+		INFO() << format("calculate steplen, shot id: %d") % is;
 		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
 		updateStenlelOp.bindEncSrcObs(encsrc, encobs);
 		updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
