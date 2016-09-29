@@ -189,6 +189,64 @@ FwiFramework::FwiFramework(Damp4t10d &method, const FwiUpdateSteplenOp &updateSt
 }
 
 void FwiFramework::epoch(int iter) {
+  // create random codes
+  const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
+
+  std::stringstream ss;
+  std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
+  DEBUG() << "code is: " << ss.str();
+
+  Encoder encoder(encodes);
+  std::vector<float> encsrc  = encoder.encodeSource(wlt);
+  std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+
+  std::vector<float> dcal(nt * ng, 0);
+  fmMethod.EssForwardModeling(encsrc, dcal);
+  fmMethod.removeDirectArrival(&encobs[0]);
+  fmMethod.removeDirectArrival(&dcal[0]);
+
+	if(iter == 0)
+	{
+		FILE *f = fopen("shot_merge.bin","wb");
+		fwrite(&dcal[0], sizeof(float), nt * ng, f);
+		fclose(f);
+	}
+
+  std::vector<float> vsrc(nt * ng, 0);
+  vectorMinus(encobs, dcal, vsrc);
+  float obj1 = cal_objective(&vsrc[0], vsrc.size());
+  initobj = iter == 0 ? obj1 : initobj;
+  DEBUG() << format("obj: %e") % obj1;
+
+  //printf("check a\n");
+  transVsrc(vsrc, nt, ng);
+  //printf("check b\n");
+
+  std::vector<float> g1(nx * nz, 0);
+  //printf("check c\n");
+  calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
+  //printf("check d\n");
+
+  DEBUG() << format("grad %.20f") % sum(g1);
+  //printf("check e\n");
+
+  fmMethod.scaleGradient(&g1[0]);
+  fmMethod.maskGradient(&g1[0]);
+
+  updateGrad(&g0[0], &g1[0], &updateDirection[0], g0.size(), iter);
+
+  updateStenlelOp.bindEncSrcObs(encsrc, encobs);
+  float steplen;
+  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
+
+  Velocity &exvel = fmMethod.getVelocity();
+  updateVelOp.update(exvel, exvel, updateDirection, steplen);
+
+  fmMethod.refillBoundary(&exvel.dat[0]);
+}
+
+/*
+void FwiFramework::epoch2(int iter) {
 	std::vector<float> g2(nx * nz, 0);
 	std::vector<float> encsrc  = wlt;
 	std::vector<float> encobs(ng * nt, 0);
@@ -201,6 +259,18 @@ void FwiFramework::epoch(int iter) {
 		fmMethod.FwiForwardModeling(encsrc, dcal, is);
 		fmMethod.fwiRemoveDirectArrival(&encobs[0], is);
 		fmMethod.fwiRemoveDirectArrival(&dcal[0], is);
+		if(is == 0)
+		{
+			FILE *f = fopen("shot0.bin","wb");
+			fwrite(&dcal[0], sizeof(float), nt * ng, f);
+			fclose(f);
+		}
+		if(is == 1)
+		{
+			FILE *f = fopen("shot1.bin","wb");
+			fwrite(&dcal[0], sizeof(float), nt * ng, f);
+			fclose(f);
+		}
 
 		std::vector<float> vsrc(nt * ng, 0);
 		vectorMinus(encobs, dcal, vsrc);
@@ -257,6 +327,7 @@ void FwiFramework::epoch(int iter) {
 
   fmMethod.refillBoundary(&exvel.dat[0]);
 }
+*/
 
 void FwiFramework::writeVel(sf_file file) const {
   fmMethod.sfWriteVel(fmMethod.getVelocity().dat, file);

@@ -11,7 +11,7 @@ import os
 # compiler options
 compiler_set        = 'gnu' # intel, gnu, sw, swintel
 debug_mode          = 0
-additional_includes = [os.environ['HOME'] + '/softs/install/boost/include', ]
+additional_includes = [os.environ['HOME'] + '/tar/boost_1_61_0/',]
 additional_libpath  = []
 additional_libs     = []
 
@@ -43,7 +43,7 @@ elif compiler_set == 'gnu':#{{{
   optimize_flags  = ['-O2']
   debug_flags     = ['-O0', '-g']
   other_flags     = ['-DNO_BLAS', '-DMPICH_IGNORE_CXX_SEEK']
-  link_flags      = ['-O1', '-Wl', '--hash-style=sysv']
+  link_flags      = ['-O1']#, '-Wl', '--hash-style=sysv']
 #}}}
 elif compiler_set == 'intel':#{{{
   c_compiler      = ['mpicc',  '-cc=icc',   '-openmp']
