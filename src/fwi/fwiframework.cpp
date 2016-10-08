@@ -115,7 +115,8 @@ void calgradient(const Damp4t10d &fmMethod,
     const std::vector<float> &encSrc,
     const std::vector<float> &vsrc,
     std::vector<float> &g0,
-    int nt, float dt)
+    int nt, float dt,
+		int shot_id)
 {
   int nx = fmMethod.getnx();
   int nz = fmMethod.getnz();
@@ -131,8 +132,10 @@ void calgradient(const Damp4t10d &fmMethod,
   std::vector<float> gp1(nz * nx, 0);
 
 
+  ShotPosition curSrcPos = allSrcPos.clipRange(shot_id, shot_id);
+
   for(int it=0; it<nt; it++) {
-    fmMethod.addSource(&sp1[0], &encSrc[it * ns], allSrcPos);
+    fmMethod.addSource(&sp1[0], &encSrc[it], curSrcPos);
     //printf("it = %d, forward 1\n", it);
     fmMethod.stepForward(&sp0[0], &sp1[0]);
     //printf("it = %d, forward 2\n", it);
@@ -146,7 +149,8 @@ void calgradient(const Damp4t10d &fmMethod,
     //printf("it = %d, back 1\n", it);
     fmMethod.stepBackward(&sp0[0], &sp1[0]);
     //printf("it = %d, back 2\n", it);
-    fmMethod.subEncodedSource(&sp0[0], &encSrc[it * ns]);
+    //fmMethod.subEncodedSource(&sp0[0], &encSrc[it]);
+    fmMethod.subSource(&sp0[0], &encSrc[it], curSrcPos);
 
     /**
      * forward propagate receviers
@@ -188,9 +192,14 @@ FwiFramework::FwiFramework(Damp4t10d &method, const FwiUpdateSteplenOp &updateSt
   updateDirection.resize(nx*nz, 0);
 }
 
+/*
 void FwiFramework::epoch(int iter) {
   // create random codes
-  const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
+  //const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
+  std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
+	for(int i = 0 ; i < encodes.size() ; i ++)
+		encodes[i] = 0;
+	encodes[1] = 1;
 
   std::stringstream ss;
   std::copy(encodes.begin(), encodes.end(), std::ostream_iterator<int>(ss, " "));
@@ -198,17 +207,28 @@ void FwiFramework::epoch(int iter) {
 
   Encoder encoder(encodes);
   std::vector<float> encsrc  = encoder.encodeSource(wlt);
+	for(int i = 0 ; i < wlt.size() ; i ++)
+		if(encsrc[i*ns + 1] - wlt[i] >= 1e-6 || wlt[i] - encsrc[i*ns + 1] >= 1e-6)
+			printf("src rss %d = %lf\n", i, encsrc[i*ns + 1] - wlt[i]);
   std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+	for(int i = 0 ; i < encobs.size() ; i ++)
+		if(encobs[i] - dobs[encobs.size() * 1 + i] >= 1e-6 || dobs[encobs.size() * 1+ i ] - encobs[i] >= 1e-6)
+		{
+			printf("obj rss %d = %lf\n", i, encobs[i] - dobs[encobs.size() * 1 + i]);
+			exit(1);
+		}
 
   std::vector<float> dcal(nt * ng, 0);
   fmMethod.EssForwardModeling(encsrc, dcal);
-  fmMethod.removeDirectArrival(&encobs[0]);
-  fmMethod.removeDirectArrival(&dcal[0]);
+  fmMethod.fwiRemoveDirectArrival(&encobs[0],1);
+  fmMethod.fwiRemoveDirectArrival(&dcal[0],1);
 
 	if(iter == 0)
 	{
+		std::vector<float> trans(ng * nt, 0);
+    matrix_transpose(&dobs[encobs.size() * 1 + 0], &trans[0], ng, nt);
 		FILE *f = fopen("shot_merge.bin","wb");
-		fwrite(&dcal[0], sizeof(float), nt * ng, f);
+		fwrite(&trans[0], sizeof(float), nt * ng, f);
 		fclose(f);
 	}
 
@@ -244,13 +264,13 @@ void FwiFramework::epoch(int iter) {
 
   fmMethod.refillBoundary(&exvel.dat[0]);
 }
+*/
 
-/*
-void FwiFramework::epoch2(int iter) {
+void FwiFramework::epoch(int iter) {
 	std::vector<float> g2(nx * nz, 0);
-	std::vector<float> encsrc  = wlt;
+	std::vector<float> encsrc = wlt;
 	std::vector<float> encobs(ng * nt, 0);
-	float obj1;
+	float obj1 = 0.0f;
 	for(int is = 0 ; is < ns ; is ++) {
 		INFO() << format("calculate gradient, shot id: %d") % is;
 		memcpy(&encobs[0], &dobs[is * ng * nt], sizeof(float) * ng * nt);
@@ -259,39 +279,46 @@ void FwiFramework::epoch2(int iter) {
 		fmMethod.FwiForwardModeling(encsrc, dcal, is);
 		fmMethod.fwiRemoveDirectArrival(&encobs[0], is);
 		fmMethod.fwiRemoveDirectArrival(&dcal[0], is);
+		/*
 		if(is == 0)
 		{
+			std::vector<float> trans(nt * ng, 0);
+			matrix_transpose(&dcal[0], &trans[0], ng, nt);
 			FILE *f = fopen("shot0.bin","wb");
-			fwrite(&dcal[0], sizeof(float), nt * ng, f);
+			fwrite(&trans[0], sizeof(float), nt * ng, f);
 			fclose(f);
 		}
 		if(is == 1)
 		{
+			std::vector<float> trans(nt * ng, 0);
+			matrix_transpose(&dcal[0], &trans[0], ng, nt);
 			FILE *f = fopen("shot1.bin","wb");
-			fwrite(&dcal[0], sizeof(float), nt * ng, f);
+			fwrite(&trans[0], sizeof(float), nt * ng, f);
 			fclose(f);
 		}
+		*/
 
 		std::vector<float> vsrc(nt * ng, 0);
 		vectorMinus(encobs, dcal, vsrc);
-		obj1 = cal_objective(&vsrc[0], vsrc.size());
+		obj1 += cal_objective(&vsrc[0], vsrc.size());
 		initobj = iter == 0 ? obj1 : initobj;
 		DEBUG() << format("obj: %e") % obj1;
 
-		//printf("check a\n");
 		transVsrc(vsrc, nt, ng);
-		//printf("check b\n");
 
 		std::vector<float> g1(nx * nz, 0);
-		//printf("check c\n");
-		calgradient(fmMethod, encsrc, vsrc, g1, nt, dt);
-		//printf("check d\n");
+		calgradient(fmMethod, encsrc, vsrc, g1, nt, dt, is);
 
 		DEBUG() << format("grad %.20f") % sum(g1);
-		//printf("check e\n");
 
 		fmMethod.scaleGradient(&g1[0]);
 		fmMethod.maskGradient(&g1[0]);
+
+		char filename[20];
+		sprintf(filename, "gradient%02d.bin", is);
+		FILE *f = fopen(filename,"wb");
+		fwrite(&g1[0], sizeof(float), nx * nz, f);
+		fclose(f);
 
 		std::transform(g2.begin(), g2.end(), g1.begin(), g2.begin(), std::plus<float>());
 	}
@@ -327,7 +354,7 @@ void FwiFramework::epoch2(int iter) {
 
   fmMethod.refillBoundary(&exvel.dat[0]);
 }
-*/
+
 
 void FwiFramework::writeVel(sf_file file) const {
   fmMethod.sfWriteVel(fmMethod.getVelocity().dat, file);

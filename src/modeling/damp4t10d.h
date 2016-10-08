@@ -27,6 +27,7 @@ public:
   void bindVelocity(const Velocity &_vel);
   void addSource(float *p, const float *source, const ShotPosition &pos) const;
   void addSource(float *p, const float *source, int is) const;
+  void subSource(float *p, const float *source, const ShotPosition &pos) const;
   void addEncodedSource(float *p, const float *encsrc) const;
   void recordSeis(float *seis_it, const float *p) const;
   void maskGradient(float *grad) const;
@@ -62,7 +63,6 @@ public:
 private:
   void manipSource(float *p, const float *source, const ShotPosition &pos, boost::function2<float, float, float> op) const;
   void recordSeis(float *seis_it, const float *p, const ShotPosition &geoPos) const;
-  void subSource(float *p, const float *source, const ShotPosition &pos) const;
   void removeDirectArrival(const ShotPosition &allSrcPos, const ShotPosition &allGeoPos, float* data, int nt, float t_width) const;
 
 private:
