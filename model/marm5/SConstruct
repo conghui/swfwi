@@ -161,7 +161,7 @@ task = str(ARGUMENTS.get('task'))
 if 'fm' in task:
   run_fm(task, fmbin)
   Plot('shots','grey color=g title=shot label2= unit2=', view=0)
-elif 'fwi' in task:
+elif 'cfwi' in task:
   run_fwi(task, fwibin)
 elif 'essfwi' in task:
   run_essfwi(task, essfwibin)
