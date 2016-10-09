@@ -190,6 +190,7 @@ int main(int argc, char *argv[]) {
   std::vector<float> absobj;
   std::vector<float> norobj;
   for (int iter = 0; iter < params.niter; iter++) {
+		INFO() << format("Conventional FWI, iter %d") % iter;
 		fwi.epoch(iter);
     fwi.writeVel(params.vupdates);
     float obj = fwi.getUpdateObj();
