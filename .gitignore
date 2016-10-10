@@ -10,3 +10,4 @@ job/
 .project
 .tune_err
 .privateAnalyse.dat
+.envrc

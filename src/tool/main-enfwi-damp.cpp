@@ -531,7 +531,18 @@ int main(int argc, char *argv[]) {
 	*/
 
   //enkfAnly.analyze(totalVelSet, velset);
-  enkfAnly.pAnalyze(velset);
+
+  /// for regulalization
+  float initLambdaRatio = 0.5;
+  float local_n = velset.size();
+  Matrix ratioSet(local_n, 2);  /// 0 for muX, 1 for muZ
+  Matrix lambdaSet(local_n, 2); /// 0 for lambdaX, 1 for lambdaZ
+  std::fill(ratioSet.getData(), ratioSet.getData() + ratioSet.size(), initLambdaRatio);
+  enkfAnly.initLambdaSet(velset, lambdaSet, ratioSet);
+  enkfAnly.pAnalyze(velset, lambdaSet, ratioSet);
+
+
+//  enkfAnly.pAnalyze(velset);
 
 
   //TODO: need modifying, createAMean
@@ -554,6 +565,9 @@ int main(int argc, char *argv[]) {
   /// after enkf, we should scatter velocities
   //scatterVelocity(veldb, totalveldb, params);
 
+
+
+
   srand(params.seed + params.rank);
   TRACE() << "iterate the remaining iteration";
   for (int iter = 0; iter < params.niter; iter++) {
@@ -563,7 +577,9 @@ int main(int argc, char *argv[]) {
     for (size_t ivel = 0; ivel < essfwis.size(); ivel++) {
       int absvel = rank * k + ivel + 1;
       INFO() << format("iter %d, rank %d on %dth velocity, sum %f") % iter % rank % absvel % sum(veldb[ivel]->dat);
-      essfwis[ivel]->epoch(iter);
+      double lambdaX = lambdaSet.getData()[ivel * lambdaSet.getNumRow()];
+      double lambdaZ = lambdaSet.getData()[ivel * lambdaSet.getNumRow() + 1];
+      essfwis[ivel]->epoch(iter, lambdaX, lambdaZ);
     }
 
     TRACE() << "enkf analyze and update velocity";
@@ -580,7 +596,8 @@ int main(int argc, char *argv[]) {
 			}
 
       //enkfAnly.analyze(totalVelSet, velset);
-      enkfAnly.pAnalyze(velset);
+			enkfAnly.pAnalyze(velset, lambdaSet, ratioSet);
+
     }
 
 		std::vector<float> vvt = enkfAnly.pCreateAMean(velset, N);

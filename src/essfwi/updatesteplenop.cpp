@@ -12,6 +12,7 @@
 #include "common.h"
 #include "parabola-vertex.h"
 #include "sum.h"
+#include "ReguFactor.h"
 
 namespace {
 typedef std::pair<float, float> ParaPoint;
@@ -79,6 +80,11 @@ float UpdateSteplenOp::calobjval(const std::vector<float>& grad,
   std::vector<float> vdiff(nt * ng, 0);
   vectorMinus(*encobs, dcal, vdiff);
   float val = cal_objective(&vdiff[0], vdiff.size());
+
+    if (!(lambdaX == 0 && lambdaZ == 0)) {
+      ReguFactor fac(&newVel.dat[0], nx, nz, lambdaX, lambdaZ);
+      val += fac.getReguTerm();
+    }
 
   DEBUG() << format("curr_alpha = %e, pure object value = %e") % steplen % val;
 
@@ -214,7 +220,10 @@ bool UpdateSteplenOp::refineAlpha(const std::vector<float> &grad, float obj_val1
 }
 
 void UpdateSteplenOp::calsteplen(const std::vector<float>& grad,
-    float obj_val1, int iter, float &steplen, float &objval) {
+    float obj_val1, int iter, float lambdaX, float lambdaZ, float &steplen, float &objval) {
+
+    this->lambdaX = lambdaX;
+    this->lambdaZ = lambdaZ;
 
   float dt = fmMethod.getdt();
   float dx = fmMethod.getdx();

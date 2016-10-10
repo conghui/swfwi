@@ -17,6 +17,7 @@ lib_modules = """
 			  sfutil.cpp
 			  environment.cpp
 			  logger.cpp
+			  ReguFactor.cpp
               """.split()
 
 extra_include_dir = [

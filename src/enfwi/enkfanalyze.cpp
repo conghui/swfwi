@@ -15,6 +15,8 @@
 #include "random-code.h"
 #include "encoder.h"
 #include "dgesvd.h"
+#include "aux.h"
+#include "ReguFactor.h"
 
 namespace {
 //std::vector<float> createAMean(const std::vector<float *> &velSet, int modelSize) {
@@ -110,33 +112,36 @@ void EnkfAnalyze::analyze(std::vector<float*>& totalVelSet, std::vector<float *>
   }
 }
 
-void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
+void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet, Matrix &lambdaSet, Matrix &ratioSet) const {
   std::vector<int> code = enkfRandomCodes.genPlus1Minus1(fm.getns());
-  Matrix pGainMatrix = pCalGainMatrix(velSet, code);
+
+  int local_n = velSet.size();
+  std::vector<float> resdSet(local_n);
+  Matrix pGainMatrix = pCalGainMatrix(velSet, code, resdSet);
+
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	/*
+  /*
 	gainMatrix.print("gainMatrix");
 	char fname[20];
 	sprintf(fname, "pGainMatrix%d", rank);
 	pGainMatrix.print(fname);
-	*/
+   */
 
 
-  int local_n = velSet.size();
   int N = 0;
   MPI_Reduce(&local_n, &N, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); /// reduce # of total samples to rank 0
-	int nSamples = N;
-	MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  int nSamples = N;
+  MPI_Bcast(&nSamples, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-	Matrix::value_type sum_pGainMatrix = pGetSum(pGainMatrix, nSamples);
-	if(rank == 0)
-	{
-		//DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
-		DEBUG() << "sum of pGainMatrix: " << sum_pGainMatrix;
-	}
+  Matrix::value_type sum_pGainMatrix = pGetSum(pGainMatrix, nSamples);
+  if(rank == 0)
+  {
+    //DEBUG() << "sum of gainMatrix: " << getSum(gainMatrix);
+    DEBUG() << "sum of pGainMatrix: " << sum_pGainMatrix;
+  }
 
 
   float dt = fm.getdt();
@@ -145,26 +150,26 @@ void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
   std::vector<float> pAMean = pCreateAMean(local_A, nSamples);
   Matrix local_A_Perturb(local_n, modelSize);
   initAPerturb(local_A_Perturb, local_A, pAMean, modelSize);
-	/*
+  /*
 	char filename[20];
 	sprintf(filename, "HA_Perturb%d.txt", rank);
 	local_A_Perturb.print(filename);
-	*/
-	Matrix::value_type sum_A_Perturb = pGetSum(local_A_Perturb, nSamples);
+   */
+  Matrix::value_type sum_A_Perturb = pGetSum(local_A_Perturb, nSamples);
   Matrix local_t5(local_n, modelSize);
-	pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, pGainMatrix, 1, 0.0, local_t5, 1, nSamples);
-	Matrix::value_type sum_local_t5 = pGetSum(local_t5, nSamples);
+  pAlpha_A_B_plus_beta_C(1.0, local_A_Perturb, 1, pGainMatrix, 1, 0.0, local_t5, 1, nSamples);
+  Matrix::value_type sum_local_t5 = pGetSum(local_t5, nSamples);
 
-	if(rank == 0)
-	{
+  if(rank == 0)
+  {
     DEBUG() << "sum of pAMean: " << sum(pAMean);
     DEBUG() << "sum of local_A_Perturb: " << sum_A_Perturb;
     DEBUG() << "sum of pt5: " << sum_local_t5;
     TRACE() << "add the update back to velocity model";
-	}
+  }
   for (size_t i = 0; i < velSet.size(); i++) {
     float *vel = velSet[i];
-		int absvel = rank * local_n + i + 1;
+    int absvel = rank * local_n + i + 1;
     DEBUG() << format("before vel recovery, velset[%2d/%d], min: %f, max: %f") % absvel % nSamples %
         (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
     TRACE() << "transform velocity to original";
@@ -178,6 +183,32 @@ void EnkfAnalyze::pAnalyze(std::vector<float *> &velSet) const {
     DEBUG() << format("after plus ENKF,     velset[%2d/%d], min: %f, max: %f\n") % absvel % nSamples %
         (*std::min_element(vel, vel + modelSize)) % (*std::max_element(vel, vel + modelSize));
     std::transform(vel, vel + modelSize, vel, boost::bind(velTrans<float>, _1, dx, dt));
+  }
+
+  TRACE() << "updating ratioset";
+  Matrix ratio_Perturb(local_n, 2);
+  pInitRatioPerturb(ratioSet, ratio_Perturb, nSamples);
+
+  Matrix local_t6(local_n, 2);
+  pAlpha_A_B_plus_beta_C(1, ratio_Perturb, 1, pGainMatrix, 1, 0, local_t6, 1, nSamples);
+
+  A_plus_B(ratioSet, local_t6, ratioSet);
+
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  float lambdaX = 0;
+  float lambdaZ = 0;
+  TRACE() << "updating lamdaset";
+  for (int i = 0; i < N; i++) {
+    ReguFactor fac(velSet[i], nx, nz, lambdaX, lambdaZ);
+    Matrix::value_type *pLambda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    Matrix::value_type *pRatio  = ratioSet.getData()  + i * ratioSet.getNumRow();
+    pLambda[0] = pRatio[0] * resdSet[i] / fac.getWx2();
+    pLambda[1] = pRatio[1] * resdSet[i] / fac.getWz2();
+    DEBUG() << "PRATIO[0] " << pRatio[0];
+    DEBUG() << "PRESD[i] " << resdSet[i];
+    DEBUG() << "PLAMBDA[0] " << pLambda[0];
+    DEBUG() << "";
   }
 
 }
@@ -340,7 +371,7 @@ Matrix EnkfAnalyze::calGainMatrix(const std::vector<float*>& velSet, std::vector
   return t4;
 }
 
-Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vector<int> code) const {
+Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vector<int> code, std::vector<float> &resdSet) const {
   int local_n = velSet.size();
   int nt = fm.getnt();
   int ng = fm.getng();
@@ -395,6 +426,13 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
     std::copy(pdata, pdata + numDataSamples, local_HOnA.getData() + i * numDataSamples);
 
     DEBUG() << format("parallel: sum HonA %.20f") % getSum(local_HOnA);
+
+    TRACE() << "save the resd";
+    const Matrix::value_type *obsDataBegin = local_D.getData() + i * numDataSamples;
+    const Matrix::value_type *obsDataEnd   = obsDataBegin + numDataSamples;
+    const Matrix::value_type *synDataBegin = local_HOnA.getData() + i * numDataSamples;
+    resdSet[i] = variance(obsDataBegin, obsDataEnd, synDataBegin);
+
   }
 
   int count = local_D.getNumCol() * local_D.getNumRow();
@@ -493,6 +531,75 @@ Matrix EnkfAnalyze::pCalGainMatrix(const std::vector<float*>& velSet, std::vecto
 	local_t4.print();
 	return local_t4;
 }
+void EnkfAnalyze::initLambdaSet(const std::vector<float*>& velSet, Matrix& lambdaSet, const Matrix& ratioSet) const {
+  DEBUG() << "initial lambda ratio is: " << ratioSet.getData()[0];
+
+  int ng = fm.getng();
+  int nt = fm.getnt();
+  int ns = fm.getns();
+  int nx = fm.getnx();
+  int nz = fm.getnz();
+  int modelSize = nx * nz;
+  int diffColDiffCodes = 0;
+
+  int local_n = velSet.size();
+  std::vector<std::vector<int> > codes(local_n);
+
+  int numDataSamples = ng * nt;
+  std::vector<float> obsData(numDataSamples);
+  std::vector<float> synData(numDataSamples);
+
+  for (int i = 0; i < local_n; i++) {
+    DEBUG() << format("init Lambda on velocity %2d/%d") % (i + 1) % velSet.size();
+
+    ///  "making encoded shot, both sources and receivers";
+    codes[i] = enkfRandomCodes.genPlus1Minus1(ns);
+
+    Encoder encoder(codes[0]);
+    std::vector<float> encobs = encoder.encodeObsData(dobs, nt, ng);
+    std::vector<float> encsrc  = encoder.encodeSource(wlt);
+
+    TRACE() << "save encoded data";
+    std::vector<float> trans(encobs.size());
+    matrix_transpose(&encobs[0], &trans[0], ng, nt);
+    const float *p= &trans[0];
+    std::copy(p, p + numDataSamples, obsData.begin());
+
+    std::vector<float> dcal(encobs.size(), 0);
+
+    ///// this decrease the performance ///
+    Damp4t10d newfm = fm;
+    Velocity curvel(std::vector<float>(velSet[i], velSet[i] + modelSize), fm.getnx(), fm.getnz());
+    newfm.bindVelocity(curvel);
+    newfm.EssForwardModeling(encsrc, dcal);
+    matrix_transpose(&dcal[0], &trans[0], ng, nt);
+    std::copy(p, p + numDataSamples, synData.begin());
+
+    TRACE() << "calculate the data residule";
+    float resd = variance(obsData, synData);
+
+    TRACE() << "create regularization factor";
+    ReguFactor reguFac(velSet[i], nx, nz);
+    float Wx2 = reguFac.getWx2();
+    float Wz2 = reguFac.getWz2();
+
+    TRACE() << "update LambdaSet";
+    assert(lambdaSet.getNumCol() == local_n);
+    Matrix::value_type *plamda = lambdaSet.getData() + i * lambdaSet.getNumRow();
+    const Matrix::value_type *pratio = ratioSet.getData() + i * ratioSet.getNumRow();
+    plamda[0] = pratio[0] * resd / Wx2; /// lambdaX
+    plamda[1] = pratio[1] * resd / Wz2; /// lamdaZ
+    DEBUG() << "pratio[0] " << pratio[0];
+    DEBUG() << "plambda[0] " << plamda[0];
+
+  }
+
+}
+
+void EnkfAnalyze::pInitRatioPerturb(const Matrix& ratioSet, Matrix& ratioPerturb, int nsamples) const {
+  pInitGamma(ratioSet, ratioPerturb, nsamples);
+}
+
 
 double EnkfAnalyze::initPerturbSigma(double maxHAP, float factor) const {
   return maxHAP * factor;

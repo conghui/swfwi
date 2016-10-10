@@ -34,6 +34,18 @@ bool abs_less(T a, T b) {
   return std::abs(a) < std::abs(b);
 }
 
+template <typename T>
+float variance(const T *A_Begin, const T *A_End, const T *B_Begin) {
+  float v = 0;
+
+  for (; A_Begin != A_End; ++A_Begin, ++B_Begin) {
+    v += (*A_Begin - *B_Begin) * (*A_Begin - *B_Begin);
+  }
+
+  return v;
+}
+
+
 void matrix_transpose(float *matrix, float *trans, int n1, int n2);
 void step_forward(const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);
 void step_backward(float *illum, float *lap, const float *p0, const float *p1, float *p2, const float *vv, float dtz, float dtx, int nz, int nx);

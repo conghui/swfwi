@@ -19,7 +19,7 @@ public:
                   const UpdateVelOp &updateVelOp, const std::vector<float> &wlt,
                   const std::vector<float> &dobs);
 
-  void epoch(int iter);
+  void epoch(int iter, float lambdaX = 0, float lambdaZ = 0);
   void writeVel(sf_file file) const;
   float getUpdateObj() const;
   float getInitObj() const;

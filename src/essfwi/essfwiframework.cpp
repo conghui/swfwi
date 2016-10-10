@@ -36,6 +36,8 @@ extern "C"
 #include "essfwiframework.h"
 
 #include "aux.h"
+#include "ReguFactor.h"
+
 
 namespace {
 
@@ -188,7 +190,7 @@ EssFwiFramework::EssFwiFramework(Damp4t10d &method, const UpdateSteplenOp &updat
   updateDirection.resize(nx*nz, 0);
 }
 
-void EssFwiFramework::epoch(int iter) {
+void EssFwiFramework::epoch(int iter, float lambdaX, float lambdaZ) {
   // create random codes
   const std::vector<int> encodes = essRandomCodes.genPlus1Minus1(ns);
 
@@ -211,6 +213,13 @@ void EssFwiFramework::epoch(int iter) {
   initobj = iter == 0 ? obj1 : initobj;
   DEBUG() << format("obj: %e") % obj1;
 
+    Velocity &exvel = fmMethod.getVelocity();
+    if (!(lambdaX == 0 && lambdaZ == 0)) {
+      ReguFactor fac(&exvel.dat[0], nx, nz, lambdaX, lambdaZ);
+      obj1 += fac.getReguTerm();
+    }
+
+
   //printf("check a\n");
   transVsrc(vsrc, nt, ng);
   //printf("check b\n");
@@ -230,9 +239,9 @@ void EssFwiFramework::epoch(int iter) {
 
   updateStenlelOp.bindEncSrcObs(encsrc, encobs);
   float steplen;
-  updateStenlelOp.calsteplen(updateDirection, obj1, iter, steplen, updateobj);
+  updateStenlelOp.calsteplen(updateDirection, obj1, iter, lambdaX, lambdaZ, steplen, updateobj);
 
-  Velocity &exvel = fmMethod.getVelocity();
+//  Velocity &exvel = fmMethod.getVelocity();
   updateVelOp.update(exvel, exvel, updateDirection, steplen);
 
   fmMethod.refillBoundary(&exvel.dat[0]);
